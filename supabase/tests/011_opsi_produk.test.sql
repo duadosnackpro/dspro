@@ -7,8 +7,13 @@ do $$
 declare pr2 uuid; v3 uuid; g_lv uuid; g_cm uuid; g_x uuid; i_l3 uuid; i_l1 uuid; i_gr uuid; i_rb uuid; i_x uuid;
 begin
   perform t.ok((select count(*) from public.option_groups where lower(name) in ('level', 'cara masak') and active) = 2, 'seed: grup Level dan Cara masak ada');
-  perform t.ok((select count(*) from public.option_items i join public.option_groups g on g.id = i.group_id where lower(g.name) = 'level') = 3, 'seed: Level 1-3');
+  perform t.ok((select count(*) from public.option_items i join public.option_groups g on g.id = i.group_id where lower(g.name) = 'level') = 5, 'seed: Level 1-5');
   perform t.ok((select count(*) from public.option_items i join public.option_groups g on g.id = i.group_id where lower(g.name) = 'cara masak') = 3, 'seed: Rebus, Goreng, Mix');
+  perform t.ok((select price_delta from public.option_items i join public.option_groups g on g.id = i.group_id where lower(g.name) = 'level' and i.name = 'Level 1') = 0
+           and (select price_delta from public.option_items i join public.option_groups g on g.id = i.group_id where lower(g.name) = 'level' and i.name = 'Level 2') = 0, 'seed: Level 1 dan 2 tanpa tambahan harga');
+  perform t.ok((select price_delta from public.option_items i join public.option_groups g on g.id = i.group_id where lower(g.name) = 'level' and i.name = 'Level 3') = 1000, 'seed 0034: Level 3 = +1000');
+  perform t.ok((select price_delta from public.option_items i join public.option_groups g on g.id = i.group_id where lower(g.name) = 'level' and i.name = 'Level 4') = 2000
+           and (select price_delta from public.option_items i join public.option_groups g on g.id = i.group_id where lower(g.name) = 'level' and i.name = 'Level 5') = 2000, 'seed 0034: Level 4 dan 5 = +2000');
   insert into public.products (name, category) values ('Keripik Tanpa Opsi', 'Snack') returning id into pr2;
   insert into public.product_variants (product_id, sku, size) values (pr2, 'KRP-100', '100g') returning id into v3;
   insert into public.channel_prices (variant_id, channel_id, price) values (v3, t.id('ch'), 7000);

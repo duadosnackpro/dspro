@@ -199,7 +199,7 @@ do $$ declare r1 jsonb; r2 jsonb; p jsonb; n0 bigint; n1 bigint; begin
   r2 := public.rpc_sale_create(p);
   perform t.logout();
   select count(*) into n1 from public.sale_item_options;
-  perform t.ok(r1 = r2 and n0 = n1, 'percobaan ulang tidak menggandakan baris opsi');
+  perform t.ok((r2 ->> 'duplicate')::boolean and (r1 -> 'sale' ->> 'id') = (r2 -> 'sale' ->> 'id') and n0 = n1, 'percobaan ulang tidak menggandakan baris opsi');
 end $$;
 
 -- ===== O8 retur menyalin opsi; kunci retur per baris (varian + opsi) =====

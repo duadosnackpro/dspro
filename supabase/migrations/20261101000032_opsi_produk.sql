@@ -500,7 +500,7 @@ begin
   -- 3) Nomor struk: kode outlet + tanggal lokal outlet + urutan.
   v_local := v_sold at time zone v_outlet.timezone;
   v_seq := app.next_seq(v_outlet.id, 'sale', v_local::date);
-  v_no := v_outlet.code || '-' || to_char(v_local, 'YYMMDD') || '-' || lpad(v_seq::text, 3, '0');
+  v_no := v_outlet.code || '-' || to_char(v_local, 'YYMMDD') || '-' || app.seq_text(v_seq);
 
   insert into public.sales (id, outlet_id, receipt_no, request_id, kind, channel_id, cashier_id, cash_session_id, status,
                             subtotal, discount, fee_channel, tax_rate, tax_amount, total, payment_method,
@@ -635,7 +635,7 @@ begin
   select cs.cashier_id into v_scash from public.cash_sessions cs where cs.id = v_session;
   v_local := now() at time zone v_outlet.timezone;
   v_seq := app.next_seq(v_o.outlet_id, 'return', v_local::date);
-  v_no := 'RT-' || v_outlet.code || '-' || to_char(v_local, 'YYMMDD') || '-' || lpad(v_seq::text, 3, '0');
+  v_no := 'RT-' || v_outlet.code || '-' || to_char(v_local, 'YYMMDD') || '-' || app.seq_text(v_seq);
 
   insert into public.sales (id, outlet_id, receipt_no, request_id, kind, ref_sale_id, channel_id, cashier_id, cash_session_id,
                             status, subtotal, discount, fee_channel, tax_rate, tax_amount, total, payment_method, note, reason, approved_by)

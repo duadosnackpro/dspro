@@ -70,7 +70,7 @@ do $$ declare e text; r jsonb; begin
   perform t.login(t.id('ka'));
   r := public.rpc_bootstrap(jsonb_build_object('outlet_id', t.id('o1')));
   perform t.ok(jsonb_array_length(r -> 'option_groups') >= 2 and jsonb_array_length(r -> 'product_options') = 2, 'bootstrap: grup dan tautan aktif');
-  perform t.ok((select (e ->> 'pakai_opsi')::boolean from jsonb_array_elements(r -> 'products') e where e ->> 'id' = t.id('pr1')::text), 'bootstrap: pakai_opsi produk');
+  perform t.ok((select (pe ->> 'pakai_opsi')::boolean from jsonb_array_elements(r -> 'products') pe where pe ->> 'id' = t.id('pr1')::text), 'bootstrap: pakai_opsi produk');
   perform t.logout();
 
   -- stok awal untuk uji penjualan
@@ -212,7 +212,7 @@ do $$ declare r jsonb; rs jsonb; e text; sid uuid; rid uuid; begin
   rs := public.rpc_sale_detail(jsonb_build_object('id', sid));
   perform t.logout();
   perform t.ok(jsonb_array_length(rs -> 'items') = 2, 'detail memisahkan baris per opsi');
-  perform t.ok(exists (select 1 from jsonb_array_elements(rs -> 'items') e where e ->> 'label' = 'Level 3 · Goreng' and jsonb_array_length(e -> 'opsi') = 2 and (e ->> 'harga')::numeric = 10500), 'detail membawa label, id opsi, dan harga per baris');
+  perform t.ok(exists (select 1 from jsonb_array_elements(rs -> 'items') pe where pe ->> 'label' = 'Level 3 · Goreng' and jsonb_array_length(pe -> 'opsi') = 2 and (pe ->> 'harga')::numeric = 10500), 'detail membawa label, id opsi, dan harga per baris');
 
   perform t.login(t.id('owner'));
   e := t.err('rpc_sale_return', jsonb_build_object('id', sid, 'request_id', 'req-opsi-0041', 'alasan', 'uji retur', 'restock', true,

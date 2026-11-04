@@ -166,7 +166,7 @@ do $$ declare r jsonb; sid uuid; m0 bigint; s0 numeric; begin
   perform t.ok((r -> 'sale' ->> 'total')::numeric = 3 * 10500 + 10000, 'harga per baris opsi: ' || (r -> 'sale' ->> 'total'));
   perform t.ok((select count(*) from public.sale_items where sale_id = (r -> 'sale' ->> 'id')::uuid) = 2, 'opsi sama digabung; opsi berbeda terpisah');
   perform t.ok((select quantity from public.inventory_balances where outlet_id = t.id('o1') and variant_id = t.id('v1')) = s0 - 4, 'stok varian berkurang 4');
-  perform t.ok((select count(*) from public.stock_movements where movement_type = 'sale') = m0 + 2, 'mutasi stok: satu untuk v1 (gabungan) dan tidak per opsi');
+  perform t.ok((select count(*) from public.stock_movements where movement_type = 'sale') = m0 + 1, 'mutasi stok: satu untuk v1 (gabungan) dan tidak per opsi');
 end $$;
 
 -- ===== O6 transaksi tertunda (offline): item nonaktif diterima dan ditandai; online ditolak =====

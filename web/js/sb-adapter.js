@@ -57,7 +57,7 @@ const MANAGE_ROLES = ['owner', 'admin'];
    MIN_SCHEMA = migrasi terakhir yang dibutuhkan klien ini (harus ada di supabase/migrations; dijaga tests/release_check.js).
    Database lebih lama => berhenti dengan pesan jelas (bukan galat 404 acak di tengah transaksi).
    Database mensyaratkan klien lebih baru (min_client) => minta perangkat memperbarui aplikasi. */
-const MIN_SCHEMA = '20261101000032';
+const MIN_SCHEMA = '20261101000035';
 const semverLt = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 let schemaOkAt = 0;
 async function checkSchema(token) {
@@ -286,6 +286,7 @@ async function call(action, p, token, tokCb) {
     case 'stock.adjust': return rpc('stock_adjust', withOutlet(p), token);
     case 'purchase.create': return rpc('purchase_create', withOutlet(Object.assign({request_id: uuid()}, p)), token);
     case 'production.create': return rpc('production_create', Object.assign({kitchen_outlet_id: outletId, output_outlet_id: outletId}, p), token);
+    case 'production.record': return rpc('production_record', Object.assign({request_id: uuid(), kitchen_outlet_id: outletId, output_outlet_id: outletId}, p), token);   // 0035: rencana + selesai sekali jalan
     case 'production.complete': return rpc('production_complete', p, token);
     case 'production.cancel': return rpc('production_cancel', p, token);
     case 'production.list': return rpc('production_list', withOutlet(p), token);

@@ -3,6 +3,7 @@
 'use strict';
 const A = window.APP, S = A.S, $ = A.$, api = A.api, rp = A.rp, num = A.num, esc = A.esc, LS = A.LS, T = A.T, sheet = A.sheet, closeSheet = A.closeSheet, toast = A.toast, busy = A.busy, skel = A.skel, ACT = A.ACT;
 const set = k => S.data.settings[k];
+const newRid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2);   // request_id produksi: sama selama isian tidak berubah (kirim ulang aman), baru bila isian berubah
 const mById = id => S.data.materials.find(m => m.id === id);
 const pct = n => (Math.round(Number(n) * 10) / 10).toLocaleString('id-ID') + '%';
 const dec = n => (Math.round(Number(n) * 1000) / 1000).toLocaleString('id-ID', {maximumFractionDigits: 3});
@@ -11,7 +12,7 @@ const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDa
 const p2 = n => ('0' + n).slice(-2);
 const kv = (a, b, cl) => '<div class="kv ' + (cl || '') + '"><span>' + a + '</span><span>' + b + '</span></div>';
 const vLabel = id => { const v = A.vById(id); return v ? A.vName(v) + ' ' + A.vSub(v) : '(produk dihapus)'; };
-S.dp = 'hari'; S.pform = {jenis: 'batch', recipe: '', batch: '1', catatan: ''}; S.rt = 'labarugi'; S.rto = A.today(); S.rfrom = S.rto.slice(0, 8) + '01';
+S.dp = 'hari'; S.pform = {jenis: 'batch', recipe: '', batch: '1', catatan: '', rid: ''}; S.prec = null; S.rt = 'labarugi'; S.rto = A.today(); S.rfrom = S.rto.slice(0, 8) + '01';
 
 /* ---------- Akurasi laba: produk terjual yang HPP-nya masih 0 ---------- */
 const hc = {};
@@ -114,7 +115,7 @@ function costHtml(c) {
 /* ---------- Produksi ---------- */
 const JN = {batch: 'Batch', pesanan: 'Per pesanan', repack: 'Repack'};
 function vProduksi() {
-  $('#main').innerHTML = '<div class="row2"><button class="btn pri" data-act="pnew">+ Produksi baru</button>' + (A.own() ? '<button class="btn sec" data-act="go_resep">Resep</button>' : '') + '</div><div id="plist" style="margin-top:10px">' + skel(3) + '</div>';
+  $('#main').innerHTML = '<div class="row2"><button class="btn pri" data-act="prec">+ Catat produksi selesai</button><button class="btn sec" data-act="pnew">Buat rencana</button></div>' + (A.own() ? '<button class="chip" style="margin-top:8px" data-act="go_resep">Resep →</button>' : '') + '<div id="plist" style="margin-top:10px">' + skel(3) + '</div>';
   A.vload('production.list', {}, r => { S.prod = r; drawProd(); }, {fail: e => { if ($('#plist')) $('#plist').innerHTML = '<p class="muted">' + esc(e.message) + '</p>'; }});
 }
 function drawProd() {
@@ -123,10 +124,11 @@ function drawProd() {
     const st = o.status, tag = st === 'selesai' ? '<span class="tag grn">Selesai</span>' : st === 'rencana' ? '<span class="tag">Rencana</span>' : '<span class="tag red">Batal</span>';
     return '<button class="li" style="width:100%;border:0;font:inherit;text-align:left" data-act="pdetail" data-id="' + esc(o.id) + '"><div><b>' + esc(vLabel(o.variant_id)) + '</b><div class="muted">' + esc(JN[o.jenis] || o.jenis) + ' · ' + num(o.jumlah_batch) + ' batch · ' + esc(String(o.tanggal).slice(0, 10)) + '</div></div><div class="r">' + tag +
       (st === 'selesai' ? '<div class="muted">' + num(o.qty_hasil) + ' pcs · HPP ' + rp(o.hpp_per_unit) + '</div>' : '') + '</div></button>';
-  }).join('') || (S.data.recipes.length ? emptyState('produksi', 'Belum ada produksi', 'Catat produksi pertama untuk menambah stok produk jadi dan menghitung HPP otomatis.', '<button class="btn pri" data-act="pnew">+ Produksi baru</button>') : emptyState('produksi', 'Belum ada produksi', 'Buat resep dulu agar kebutuhan bahan dan HPP bisa dihitung otomatis.', '<button class="btn pri" data-act="redit" data-id="">Buat resep pertama</button>'));
+  }).join('') || (S.data.recipes.length ? emptyState('produksi', 'Belum ada produksi', 'Catat produksi pertama untuk menambah stok produk jadi dan menghitung HPP otomatis.', '<button class="btn pri" data-act="prec">+ Catat produksi selesai</button>') : emptyState('produksi', 'Belum ada produksi', 'Buat resep dulu agar kebutuhan bahan dan HPP bisa dihitung otomatis.', '<button class="btn pri" data-act="redit" data-id="">Buat resep pertama</button>'));
 }
 function prodNew() {
-  const f = S.pform, recs = S.data.recipes.filter(r => (f.jenis === 'repack') === (r.jenis === 'repack'));
+  const f = S.pform; if (!f.rid) f.rid = newRid();
+  const recs = S.data.recipes.filter(r => (f.jenis === 'repack') === (r.jenis === 'repack'));
   if (!recs.some(r => r.id === f.recipe)) f.recipe = recs[0] ? recs[0].id : '';
   sheet('<h2>Produksi baru</h2><div class="chips">' + Object.keys(JN).map(k => '<button class="chip ' + (f.jenis === k ? 'on' : '') + '" data-act="pjenis" data-j="' + k + '">' + JN[k] + '</button>').join('') + '</div>' +
     (recs.length ? '<label>Resep<select class="inp" data-pf="recipe">' + recs.map(r => '<option value="' + esc(r.id) + '"' + (r.id === f.recipe ? ' selected' : '') + '>' + esc(r.nama) + ' → ' + esc(vLabel(r.variant_id)) + '</option>').join('') + '</select></label>' +
@@ -151,7 +153,7 @@ function prodDetail(id) {
 function prodDone(id) {
   const o = S.prod.find(x => x.id === id), rec = S.data.recipes.find(r => r.id === o.recipe_id);
   if (!rec) return toast('Resep produksi ini sudah dihapus');
-  S.pd = {id: id, qty: String(o.qty_standar), tk: '', oh: ''};
+  S.pd = {id: id, qty: String(o.qty_standar), tk: '', oh: '', rid: newRid()};
   sheet('<h2>Selesaikan produksi</h2><p class="muted">' + esc(vLabel(o.variant_id)) + ' · ' + num(o.jumlah_batch) + ' batch · standar ' + num(o.qty_standar) + ' unit</p><label>Hasil aktual (unit jadi)<input class="inp" data-pd="qty" inputmode="decimal" value="' + esc(S.pd.qty) + '"></label>' +
     '<div class="row2"><div style="flex:1"><label>Tenaga kerja (Rp)<input class="inp" data-pd="tk" inputmode="numeric" placeholder="otomatis"></label></div><div style="flex:1"><label>Overhead (Rp)<input class="inp" data-pd="oh" inputmode="numeric" placeholder="otomatis"></label></div></div><div id="pdv"></div><button class="btn pri" id="pdbtn" data-act="pdosave">Selesaikan dan masukkan ke stok</button>');
   pdv();
@@ -162,6 +164,54 @@ function pdv() {
   const c = costOf(recItems(rec.id), rec, Number(o.jumlah_batch), q, S.pd.tk, S.pd.oh), v = A.vById(o.variant_id), pos = Math.max(Number(v && v.stok) || 0, 0), lama = Number(v && v.hpp_rata2) || 0, baru = (pos * lama + q * c.hpp) / (pos + q);
   el.innerHTML = costHtml(c) + '<div class="li" style="display:block">' + kv('Susut vs standar', dec(o.qty_standar - q) + ' unit') + kv('HPP produk (rata-rata)', rp(lama) + ' → ' + rp(baru)) + '</div>' + (c.short.length ? '<p class="err">Stok bahan kurang, tidak bisa diselesaikan.</p>' : '');
   const b = $('#pdbtn'); if (b) b.disabled = c.short.length > 0;
+}
+
+/* ---------- Catat produksi selesai: satu lembar, satu transaksi (production.record, migrasi 0035) ---------- */
+const precState = () => S.prec || (S.prec = {jenis: 'batch', recipe: '', batch: '1', qty: '', tk: '', oh: '', catatan: '', rid: newRid()});
+function recCalc() {
+  const f = precState(), rec = S.data.recipes.find(r => r.id === f.recipe), b = N(f.batch), std = rec && b > 0 ? Number(rec.hasil_standar) * b : 0;
+  return {f: f, rec: rec, b: b, std: std, q: f.qty === '' ? std : N(f.qty)};   // hasil aktual kosong = sesuai standar
+}
+function recNew() {
+  const f = precState(), recs = S.data.recipes.filter(r => (f.jenis === 'repack') === (r.jenis === 'repack'));
+  if (!recs.some(r => r.id === f.recipe)) f.recipe = recs[0] ? recs[0].id : '';
+  sheet('<h2>Catat produksi selesai</h2><p class="muted">Bahan terpotong dan stok produk jadi bertambah sekaligus. Hasil aktual dikosongkan = sesuai standar.</p><div class="chips">' +
+    Object.keys(JN).map(k => '<button class="chip ' + (f.jenis === k ? 'on' : '') + '" data-act="prjenis" data-j="' + k + '">' + JN[k] + '</button>').join('') + '</div>' +
+    (recs.length ? '<label>Resep<select class="inp" data-pq="recipe">' + recs.map(r => '<option value="' + esc(r.id) + '"' + (r.id === f.recipe ? ' selected' : '') + '>' + esc(r.nama) + ' → ' + esc(vLabel(r.variant_id)) + '</option>').join('') + '</select></label>' +
+      '<div class="row2"><div style="flex:1"><label>Jumlah batch<input class="inp" data-pq="batch" inputmode="decimal" value="' + esc(f.batch) + '"></label></div><div style="flex:1"><label>Hasil aktual (unit)<input class="inp" data-pq="qty" inputmode="decimal" placeholder="sesuai standar" value="' + esc(f.qty) + '"></label></div></div>' +
+      '<div class="row2"><div style="flex:1"><label>Tenaga kerja (Rp)<input class="inp" data-pq="tk" inputmode="numeric" placeholder="otomatis" value="' + esc(f.tk) + '"></label></div><div style="flex:1"><label>Overhead (Rp)<input class="inp" data-pq="oh" inputmode="numeric" placeholder="otomatis" value="' + esc(f.oh) + '"></label></div></div>' +
+      '<label>' + (f.jenis === 'pesanan' ? 'Referensi pesanan (nama/nomor)' : 'Catatan') + '<input class="inp" data-pq="catatan" value="' + esc(f.catatan) + '"></label><div id="prv"></div>' +
+      '<button class="btn pri" id="prbtn" data-act="prsave">Simpan produksi selesai</button>'
+      : '<p class="muted">Belum ada resep untuk jenis ini. Buat di Produksi, Resep.</p>') + '<button class="btn sec" data-act="close">Batal</button>');
+  rpv();
+}
+function rpv() {
+  const el = $('#prv'); if (!el) return; const c = recCalc(), btn = /** @type {any} */ ($('#prbtn'));
+  if (!c.rec || !(c.b > 0)) { el.innerHTML = ''; if (btn) btn.disabled = true; return; }
+  if (!(c.q > 0)) { el.innerHTML = '<p class="err">Hasil aktual harus lebih dari 0</p>'; if (btn) btn.disabled = true; return; }
+  const k = costOf(recItems(c.rec.id), c.rec, c.b, c.q, c.f.tk, c.f.oh), v = A.vById(c.rec.variant_id), pos = Math.max(Number(v && v.stok) || 0, 0), lama = Number(v && v.hpp_rata2) || 0, baru = (pos * lama + c.q * k.hpp) / (pos + c.q);
+  el.innerHTML = '<p class="muted">Hasil standar ' + num(c.std) + ' unit</p>' + costHtml(k) + '<div class="li" style="display:block">' + kv('Susut vs standar', dec(c.std - c.q) + ' unit') + kv('HPP produk (rata-rata)', rp(lama) + ' → ' + rp(baru)) + '</div>' +
+    (k.short.length ? '<p class="err">Stok bahan kurang: ' + esc(k.short.map(x => x.nama).join(', ')) + '. Catat pembelian dulu atau kurangi jumlah batch.</p>' : '');
+  if (btn) btn.disabled = k.short.length > 0;
+}
+/* Perbarui stok lokal dari hasil server. Hasil kirim-ulang (duplicate) berisi angka saat transaksi pertama dan bisa basi, jadi data dimuat ulang. */
+async function prodApply(r) {
+  if (r.duplicate) return A.loadData();
+  r.materials.forEach(u => { const m = mById(u.id); if (m) m.stok = u.stok; });
+  const v = A.vById(r.variant.id); if (v) { v.stok = r.variant.stok; v.hpp_rata2 = r.variant.hpp_rata2; }
+  LS.set('data', S.data);
+}
+/* Menjalankan production.record / production.complete. F-08: server menolak bahan tanpa harga; supervisor/owner boleh melanjutkan dengan sengaja (mis. bahan memang gratis). */
+async function prodRun(op, body, after) {
+  const fin = async r => { await prodApply(r); after(); toast(r.duplicate ? 'Produksi ini sudah tercatat sebelumnya' : 'Produksi selesai. HPP per unit ' + rp(r.costs.hpp_per_unit)); vProduksi(); };
+  try { await fin(await api(op, body)); }
+  catch (e) {
+    if (/belum punya harga/.test(e.message || '') && A.can('approve') && confirm(e.message + '\n\nLanjutkan tanpa harga bahan itu? HPP produk akan lebih rendah dari sebenarnya.')) {
+      try { await fin(await api(op, Object.assign({}, body, {izinkan_bahan_tanpa_harga: true}))); } catch (e2) { toast(e2.message); }
+      return;
+    }
+    toast(e.message);
+  }
 }
 
 /* ---------- Resep ---------- */
@@ -414,25 +464,17 @@ Object.assign(ACT, {
   bar: el => { const s = (S.dser || [])[Number(el.dataset.i)], bt = $('#bt'); if (!s || !bt) return; bt.innerHTML = '<b>' + esc(idDate(s.d)) + '</b> · Omzet <b>' + rp(s.omzet) + '</b> · Laba kotor <b>' + rp(s.laba) + '</b>'; document.querySelectorAll('.bchart [data-b]').forEach(r => { r.style.opacity = r.dataset.b === el.dataset.i ? 1 : .35; }); },
   rpre: el => { S.rpre = el.dataset.p; if (S.rpre !== 'custom') setPreset(); vLaporan(S.rpre === 'custom'); },
   pnew: prodNew, pjenis: el => { S.pform.jenis = el.dataset.j; prodNew(); },
-  psave: () => busy('Menyimpan rencana…', async () => { try { await api('production.create', {recipe_id: S.pform.recipe, jumlah_batch: N(S.pform.batch), jenis: S.pform.jenis, catatan: S.pform.catatan}); closeSheet(); toast('Rencana produksi tersimpan'); vProduksi(); } catch (e) { toast(e.message); } }),
+  psave: () => busy('Menyimpan rencana…', async () => { try { await api('production.create', {request_id: S.pform.rid || (S.pform.rid = newRid()), recipe_id: S.pform.recipe, jumlah_batch: N(S.pform.batch), jenis: S.pform.jenis, catatan: S.pform.catatan}); S.pform.rid = ''; closeSheet(); toast('Rencana produksi tersimpan'); vProduksi(); } catch (e) { toast(e.message); } }),
   pdetail: el => prodDetail(el.dataset.id), pdone: el => prodDone(el.dataset.id),
   pcancel: el => { if (!confirm('Batalkan rencana produksi ini?')) return; return busy('Membatalkan…', async () => { try { await api('production.cancel', {id: el.dataset.id}); closeSheet(); vProduksi(); } catch (e) { toast(e.message); } }); },
-  pdosave: () => busy('Menyelesaikan produksi…', async () => {
-    try {
-      const r = await api('production.complete', {id: S.pd.id, qty_hasil: N(S.pd.qty), tenaga_kerja: S.pd.tk === '' ? '' : N(S.pd.tk), overhead: S.pd.oh === '' ? '' : N(S.pd.oh)});
-      r.materials.forEach(u => { const m = mById(u.id); if (m) m.stok = u.stok; }); const v = A.vById(r.variant.id); if (v) { v.stok = r.variant.stok; v.hpp_rata2 = r.variant.hpp_rata2; }
-      LS.set('data', S.data); closeSheet(); toast('Produksi selesai. HPP per unit ' + rp(r.costs.hpp_per_unit)); vProduksi();
-    } catch (e) {
-      /* F-08: server menolak bahan tanpa harga. Supervisor/owner boleh melanjutkan dengan sengaja (mis. bahan memang gratis). */
-      if (/belum punya harga/.test(e.message || '') && A.can('approve') && confirm(e.message + '\n\nLanjutkan tanpa harga bahan itu? HPP produk akan lebih rendah dari sebenarnya.')) {
-        try { const r2 = await api('production.complete', {id: S.pd.id, qty_hasil: N(S.pd.qty), tenaga_kerja: S.pd.tk === '' ? '' : N(S.pd.tk), overhead: S.pd.oh === '' ? '' : N(S.pd.oh), izinkan_bahan_tanpa_harga: true});
-          r2.materials.forEach(u => { const m = mById(u.id); if (m) m.stok = u.stok; }); const v2 = A.vById(r2.variant.id); if (v2) { v2.stok = r2.variant.stok; v2.hpp_rata2 = r2.variant.hpp_rata2; }
-          LS.set('data', S.data); closeSheet(); toast('Produksi selesai. HPP per unit ' + rp(r2.costs.hpp_per_unit)); vProduksi(); } catch (e2) { toast(e2.message); }
-        return;
-      }
-      toast(e.message);
-    }
-  }),
+  pdosave: () => busy('Menyelesaikan produksi…', () => prodRun('production.complete', {request_id: S.pd.rid, id: S.pd.id, qty_hasil: N(S.pd.qty), tenaga_kerja: S.pd.tk === '' ? '' : N(S.pd.tk), overhead: S.pd.oh === '' ? '' : N(S.pd.oh)}, closeSheet)),
+  prec: () => { precState(); recNew(); },
+  prjenis: el => { precState().jenis = el.dataset.j; recNew(); },
+  prsave: () => {
+    const c = recCalc(), f = c.f; if (!c.rec || !(c.b > 0) || !(c.q > 0)) return toast('Lengkapi resep, jumlah batch, dan hasil aktual');
+    return busy('Menyimpan produksi…', () => prodRun('production.record', {request_id: f.rid, recipe_id: f.recipe, jumlah_batch: c.b, jenis: f.jenis, catatan: f.catatan, qty_hasil: c.q,
+      tenaga_kerja: f.tk === '' ? '' : N(f.tk), overhead: f.oh === '' ? '' : N(f.oh)}, () => { S.prec = null; closeSheet(); }));
+  },
   /* F-08: perbaiki HPP kosong pada penjualan periode Beranda: pratinjau dampak dulu, baru terapkan (hanya Owner/Admin; tercatat di audit). */
   dwarn: () => { const w = S.dwarn || []; sheet('<div class="sh-h"><h2>Peringatan (' + w.length + ')</h2></div>' + (w.map((x, i) => '<div class="warn-b" role="note"><div><b>' + esc(x.judul) + '</b><div class="muted">' + esc(x.teks) + '</div></div>' + (x.tombol ? '<button class="btn pri sm" data-act="dwgo" data-i="' + i + '" data-t="' + esc(x.t || '') + '">' + esc(x.tombol) + '</button>' : '') + '</div>').join('') || '<p class="muted">Tidak ada peringatan.</p>') + '<button class="btn sec" data-act="close">Tutup</button>'); },
   dwgo: el => { const x = (S.dwarn || [])[Number(el.dataset.i)]; closeSheet(); if (x && ACT[x.act]) ACT[x.act](el); },
@@ -469,8 +511,9 @@ Object.assign(ACT, {
 });
 document.addEventListener('input', e => {
   const t = e.target, d = t.dataset || {};
-  if (d.pf) { S.pform[d.pf] = t.value; if (d.pf === 'recipe' || d.pf === 'batch') pv(); }
-  else if (d.pd) { S.pd[d.pd] = t.value; pdv(); }
+  if (d.pf) { S.pform[d.pf] = t.value; S.pform.rid = newRid(); if (d.pf === 'recipe' || d.pf === 'batch') pv(); }
+  else if (d.pd) { S.pd[d.pd] = t.value; S.pd.rid = newRid(); pdv(); }
+  else if (d.pq && S.prec) { S.prec[d.pq] = /** @type {any} */ (t).value; S.prec.rid = newRid(); if (d.pq !== 'catatan') rpv(); }
   else if (d.rf) { S.rf[d.rf] = t.value; if (d.rf === 'hasil_standar' || d.rf === 'tenaga_kerja' || d.rf === 'variant_id') rfv(); }
   else if (d.dp) { S.dp2[d.dp] = t.value; dupUpd(); }
   else if (d.dv) { S.dp2.sel[d.dv] = t.checked; dupUpd(); }

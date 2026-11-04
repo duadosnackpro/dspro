@@ -20,3 +20,4 @@ psql -f tests/008_sync_signal_index.test.sql
 psql -f tests/009_recipe_delete.test.sql
 psql -f tests/010_cash_reopen.test.sql
 psql -f tests/011_opsi_produk.test.sql
+psql -f tests/012_production_record.test.sql

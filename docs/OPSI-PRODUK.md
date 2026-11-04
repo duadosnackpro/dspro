@@ -13,3 +13,6 @@ Mengikuti `Framework-Opsi-Produk-Supabase.md`. Migrasi `20261101000032_opsi_prod
 
 ## Rollback
 Matikan saklar per produk (opsi tetap tersimpan). Migrasi forward-only; klien lama tetap bisa menjual produk tanpa opsi.
+
+## Harga tambahan Level (migrasi 0034)
+Level 1 = +0, Level 2 = +0, Level 3 = +1.000, Level 4 = +2.000, Level 5 = +2.000. Level 4 dan 5 dibuat oleh migrasi bila belum ada. Pilihan yang selisihnya sudah diubah owner tidak tertimpa, dan pilihan yang pernah dinonaktifkan tidak dihidupkan lagi. Level di atas 5 diisi manual lewat Pustaka opsi.

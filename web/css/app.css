@@ -33,7 +33,7 @@
 
 /* ---------- 2. Dasar ---------- */
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font:16px/1.45 var(--body);-webkit-tap-highlight-color:transparent;overscroll-behavior:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{margin:0;height:100%;width:100%;max-width:100%;overflow-x:hidden;touch-action:pan-y;background:var(--paper);color:var(--ink);font:16px/1.45 var(--body);-webkit-tap-highlight-color:transparent;overscroll-behavior:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 button{font:inherit;color:inherit}
 h1,h2,h3{margin:0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -48,7 +48,7 @@ h1,h2,h3{margin:0}
 .pr,.kv,.kpi b,.hero .big,.cb-t b,.rc-sum b,.cl-t,.qty span,.step b,table,.stk,.li .r,.q-m,#tot,.cp-h{font-variant-numeric:tabular-nums}
 
 /* ---------- 3. Kerangka: kepala, isi, navigasi bawah ---------- */
-#app{display:flex;flex-direction:column;height:100%;max-width:640px;margin:auto;position:relative;background:var(--paper)}
+#app{display:flex;flex-direction:column;height:100%;width:100%;overflow-x:hidden;max-width:640px;margin:auto;position:relative;background:var(--paper)}
 .splash{margin:auto;font:800 28px var(--head);color:var(--brand)}
 .top{display:flex;align-items:center;gap:var(--s3);padding:calc(var(--s2) + env(safe-area-inset-top)) var(--px) var(--s2);background:var(--brand);color:#fff}
 .accent{display:none}
@@ -56,7 +56,7 @@ h1,h2,h3{margin:0}
 .brand{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.1}
 .wordmark{font:800 17px/1.1 var(--head);letter-spacing:.4px;color:var(--yel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand small{margin-top:2px;font-size:12px;color:#EBD6C5}
-main{flex:1;overflow:auto;padding:var(--s3) var(--px) 120px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+main{flex:1;min-width:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior-x:none;touch-action:pan-y;padding:var(--s3) var(--px) 120px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 main.col{display:flex;flex-direction:column;padding-bottom:0}main.col #sf{flex:1 0 auto}
 .nav{display:flex;gap:2px;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
 .nav button{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:none;min-height:56px;padding:2px 0;font-size:12px;font-weight:600;color:var(--mut);border-radius:var(--r-md)}
@@ -361,3 +361,9 @@ pre.rc{background:#fff;border-radius:12px;padding:12px;font:12px/1.35 ui-monospa
 .opt-sub{display:block;font-size:.85rem;color:var(--brand);font-weight:600}.opt-sub.warn{color:var(--err)}
 .opt-form{margin:var(--s3) 0}.opt-row{border:1px solid var(--line);border-radius:var(--r-md);padding:var(--s3);margin:var(--s2) 0}
 .li-btn{width:100%;border:0;font:inherit;text-align:left;margin-top:8px}
+
+/* ---------- Kunci arah geser: hanya vertikal, tanpa zoom ---------- */
+/* Halaman tidak boleh melebar atau bergeser ke samping. Daftar yang memang perlu geser samping (chip, tab, tabel, struk) tetap bisa digeser di dalam wadahnya sendiri. */
+.sheet,.login{overflow-x:hidden;touch-action:pan-y}
+.chips,.seg-wrap .seg,.tw,pre.rc{touch-action:pan-x pan-y;overscroll-behavior-x:contain}
+img,svg,canvas,video{max-width:100%}

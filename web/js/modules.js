@@ -329,18 +329,44 @@ function redit(id) {
     : {id: '', nama: '', variant_id: (S.data.variants[0] || {}).id || '', jenis: 'batch', hasil_standar: '', tenaga_kerja: '0', items: []};
   S.ri = {m: (S.data.materials[0] || {}).id || '', q: '', u: 'main'}; rfSheet();
 }
+/* Baris bahan di resep: jumlah bisa diubah langsung (kolom isian + pilihan satuan kecil bila ada), tanpa harus hapus lalu tambah lagi. */
+function riRow(i, n) {
+  const mm = mById(i.material_id), a = unitAlt(mm), sub = i._u === 'sub' && a, nm = mm ? mm.nama : '(bahan dihapus)', shown = sub ? r6(i.qty * a.f) : r6(i.qty);
+  return '<div class="li ri-row"><div class="ri-top"><b>' + esc(nm) + '</b><button class="chip" data-act="ridel" data-i="' + n + '" aria-label="Hapus ' + esc(nm) + ' dari resep">Hapus</button></div>' +
+    '<div class="ri-edit"><input class="inp" data-rq="' + n + '" inputmode="decimal" autocomplete="off" aria-label="Jumlah ' + esc(nm) + ' per batch" value="' + esc(String(shown).replace('.', ',')) + '">' +
+    (a ? '<select class="inp" data-ru="' + n + '" aria-label="Satuan ' + esc(nm) + '"><option value="main"' + (sub ? '' : ' selected') + '>' + esc(mm.satuan) + '</option><option value="sub"' + (sub ? ' selected' : '') + '>' + esc(a.n) + '</option></select>' : '<span class="ri-unit">' + esc(mm ? mm.satuan : '') + '</span>') +
+    '</div><div class="muted ri-cost" id="rc_' + n + '"></div></div>';
+}
+function riCost(n) {
+  const i = S.rf.items[n], el = $('#rc_' + n); if (!i || !el) return; const mm = mById(i.material_id), q = Number(i.qty);
+  if (!(q > 0)) { el.textContent = 'Isi jumlah lebih dari 0'; return; }
+  el.textContent = '= ' + fmtQ(q, mm) + (mm && Number(mm.hpp_rata2) > 0 ? ' · ' + rp(q * Number(mm.hpp_rata2)) : '');
+}
+function riQty(n, v) {
+  const i = S.rf.items[n]; if (!i) return; const a = unitAlt(mById(i.material_id)); let q = N(v); q = isFinite(q) && q > 0 ? q : 0;
+  if (i._u === 'sub' && a) q = q / a.f; i.qty = r6(q); riCost(n); rfv();
+}
+function riUnit(n, u) {
+  const i = S.rf.items[n]; if (!i) return; const a = unitAlt(mById(i.material_id)); i._u = u === 'sub' && a ? 'sub' : 'main';
+  const inp = /** @type {any} */ (document.querySelector('[data-rq="' + n + '"]')); if (inp) inp.value = String(r6(i._u === 'sub' ? i.qty * a.f : i.qty)).replace('.', ','); riCost(n);
+}
 function rfSheet() {
   const f = S.rf, mats = S.data.materials, ri = S.ri; if (!mats.some(x => x.id === ri.m)) ri.m = mats[0] ? mats[0].id : '';
-  const adder = mats.length ? '<div class="card-s" style="padding:12px"><b>Tambah bahan</b><label>Bahan<select class="inp" id="ri_m" data-ri="m">' + mats.map(x => '<option value="' + esc(x.id) + '"' + (x.id === ri.m ? ' selected' : '') + '>' + esc(x.nama) + ' (' + esc(x.satuan) + ')</option>').join('') + '</select></label>' +
-    '<div class="row2"><div style="flex:2"><label id="ri_l">Jumlah per batch</label><input class="inp" id="ri_q" data-ri="q" inputmode="decimal" placeholder="mis. 0,5" value="' + esc(ri.q) + '"></div><div style="flex:1" id="ri_uw"><label>Satuan</label><select class="inp" id="ri_u" data-ri="u"></select></div></div>' +
-    '<div class="chips" id="ri_ch"></div><div class="muted" id="ri_h" style="min-height:18px"></div><button class="btn sec" data-act="riadd">Tambah ke resep</button></div>'
+  const old = /** @type {any} */ (document.querySelector('#sheet .sheet')), keep = old && !$('#sheet').hidden ? old.scrollTop : 0; // tetap di posisi gulir yang sama setelah tambah/hapus bahan
+  const adder = mats.length ? '<div class="card-s ri-add"><label>Bahan<select class="inp" id="ri_m" data-ri="m">' + mats.map(x => '<option value="' + esc(x.id) + '"' + (x.id === ri.m ? ' selected' : '') + '>' + esc(x.nama) + ' (' + esc(x.satuan) + ')</option>').join('') + '</select></label>' +
+    '<div class="row2 ri-add-r"><div style="flex:2"><label id="ri_l">Jumlah per batch</label><input class="inp" id="ri_q" data-ri="q" inputmode="decimal" placeholder="mis. 0,5" value="' + esc(ri.q) + '"></div><div style="flex:1.2" id="ri_uw"><label>Satuan</label><select class="inp" id="ri_u" data-ri="u"></select></div></div>' +
+    '<div class="chips" id="ri_ch"></div><div class="muted" id="ri_h" style="min-height:18px"></div><button class="btn pri" data-act="riadd">+ Tambah ke resep</button></div>'
     : '<div class="card-s"><p class="muted">Belum ada bahan di Data Master. Tambahkan dulu bahan dan kemasan yang dipakai resep.</p><button class="btn pri" data-act="rimat">Buka Data Master, Bahan</button></div>';
   sheet('<div class="grab"></div><h2>' + (f.id ? 'Ubah resep' : 'Resep baru') + '</h2><label>Nama resep<input class="inp" data-rf="nama" value="' + esc(f.nama) + '"></label><label>Produk hasil (varian)<select class="inp" data-rf="variant_id">' + S.data.variants.map(v => '<option value="' + esc(v.id) + '"' + (v.id === f.variant_id ? ' selected' : '') + '>' + esc(A.vName(v) + ' ' + A.vSub(v)) + '</option>').join('') + '</select></label>' +
     '<label>Jenis<select class="inp" data-rf="jenis"><option value="batch"' + (f.jenis === 'batch' ? ' selected' : '') + '>Batch (produksi sendiri)</option><option value="repack"' + (f.jenis === 'repack' ? ' selected' : '') + '>Repack (kemas ulang)</option></select></label>' +
     '<div class="row2"><div style="flex:1"><label>Hasil standar per batch (unit)<input class="inp" data-rf="hasil_standar" inputmode="decimal" value="' + esc(f.hasil_standar) + '"></label></div><div style="flex:1"><label>Tenaga kerja per batch (Rp)<input class="inp" data-rf="tenaga_kerja" inputmode="decimal" value="' + esc(f.tenaga_kerja) + '"></label></div></div>' +
-    '<b>Bahan per batch</b>' + (f.items.map((i, n) => { const mm = mById(i.material_id); return '<div class="li"><div><b>' + esc(mm ? mm.nama : '(bahan dihapus)') + '</b><div class="muted">' + esc(mm ? fmtQ(i.qty, mm) : dec(i.qty)) + (mm && Number(mm.hpp_rata2) > 0 ? ' · ' + rp(i.qty * Number(mm.hpp_rata2)) : '') + '</div></div><button class="chip" data-act="ridel" data-i="' + n + '">Hapus</button></div>'; }).join('') || '<p class="muted">Belum ada bahan.</p>') +
-    adder + '<div id="rfv"></div><button class="btn pri" data-act="rsave">Simpan resep</button>' + (f.id ? '<button class="btn sec" data-act="rdup" data-id="' + esc(f.id) + '">Duplikat resep ini</button><button class="btn dan" data-act="rdel">Hapus resep</button>' : '') + '<button class="btn sec" data-act="close">Batal</button>');
-  riRefresh(true); rfv();
+    '<div class="sh-h ri-h"><b>Bahan per batch</b><span class="muted">' + f.items.length + ' bahan</span></div>' +
+    adder + /* tombol tambah di ATAS daftar: tidak perlu gulir ke bawah walau bahannya banyak */
+    (f.items.length ? '<div class="sh-h ri-h"><b>Sudah ditambahkan</b><span class="muted">ubah jumlah langsung di kolomnya</span></div>' + f.items.map(riRow).join('') : '<p class="muted">Belum ada bahan.</p>') +
+    '<div id="rfv"></div>' + (f.id ? '<button class="btn sec" data-act="rdup" data-id="' + esc(f.id) + '">Duplikat resep ini</button><button class="btn dan" data-act="rdel">Hapus resep</button>' : '') +
+    '<div class="savebar"><div class="row2"><button class="btn sec" data-act="close">Batal</button><button class="btn pri" data-act="rsave">Simpan resep</button></div></div>');
+  riRefresh(true); rfv(); f.items.forEach((_, n) => riCost(n));
+  const nw = /** @type {any} */ (document.querySelector('#sheet .sheet')); if (nw && keep) nw.scrollTop = keep; // dipulihkan SETELAH isi dilengkapi, supaya perubahan tinggi di atas tidak menggeser posisi
 }
 function riRefresh(full) {
   const mm = mById(S.ri.m), a = unitAlt(mm); if (!$('#ri_m')) return;
@@ -584,7 +610,8 @@ Object.assign(ACT, {
   rhpp: () => { const f = S.rf, v = A.vById(f.variant_id), c = costOf(f.items, {tenaga_kerja: f.tenaga_kerja}, 1, N(f.hasil_standar), '', ''); if (!v || !confirm('Set HPP produk menjadi ' + rp(c.hpp) + ' (stok tidak berubah)?')) return;
     return busy('Menyimpan HPP…', async () => { try { const r = await api('stock.adjust', {tipe: 'varian', id: v.id, stok_baru: Number(v.stok) || 0, hpp: Math.round(c.hpp * 100) / 100, alasan: 'HPP awal dari estimasi resep'}); v.hpp_rata2 = r.hpp_rata2; LS.set('data', S.data); rfv(); toast('HPP produk diperbarui'); } catch (e) { toast(e.message); } }); },
   ridel: el => { S.rf.items.splice(el.dataset.i, 1); rfSheet(); },
-  rsave: () => busy('Menyimpan resep…', async () => { try { const f = S.rf; const rr = await api('recipe.save', {id: f.id || undefined, variant_id: f.variant_id, nama: f.nama, hasil_standar: N(f.hasil_standar), jenis: f.jenis, tenaga_kerja: N(f.tenaga_kerja) || 0, items: f.items}); if (!A.patchRecipe(rr)) await A.loadData(); closeSheet(); A.render(); toast('Resep tersimpan'); } catch (e) { toast(e.message); } }),
+  rsave: () => { const bad = S.rf.items.find(i => !(Number(i.qty) > 0)); if (bad) { const m = mById(bad.material_id); return toast('Jumlah ' + (m ? m.nama : 'bahan') + ' harus lebih dari 0'); }
+    return busy('Menyimpan resep…', async () => { try { const f = S.rf; const rr = await api('recipe.save', {id: f.id || undefined, variant_id: f.variant_id, nama: f.nama, hasil_standar: N(f.hasil_standar), jenis: f.jenis, tenaga_kerja: N(f.tenaga_kerja) || 0, items: f.items.map(i => ({material_id: i.material_id, qty: i.qty}))}); if (!A.patchRecipe(rr)) await A.loadData(); closeSheet(); A.render(); toast('Resep tersimpan'); } catch (e) { toast(e.message); } }); },
   rdel: () => { if (!confirm('Hapus resep ini?')) return; return busy('Menghapus…', async () => { try { await api('master.remove', {table: 'recipes', id: S.rf.id}); await A.loadData(); closeSheet(); A.render(); } catch (e) { toast(e.message); } }); },
   rt: el => { S.rt = el.dataset.t; vLaporan(); }, rrun: runReport,
   rcsv: () => S.rres && download('laporan-' + S.rres.type + '-' + S.rres.to + '.csv', csvText(S.rres)),
@@ -598,6 +625,8 @@ document.addEventListener('input', e => {
   else if (d.pe && S.pe) { S.pe[d.pe] = /** @type {any} */ (t).value; S.pe.rid = newRid(); if (d.pe === 'batch') pev(); }
   else if (d.rs) { S.rsq = /** @type {any} */ (t).value; recFilter(d.rs); }
   else if (d.pq && S.prec) { S.prec[d.pq] = /** @type {any} */ (t).value; S.prec.rid = newRid(); if (d.pq !== 'catatan') rpv(); }
+  else if (d.rq != null) riQty(Number(d.rq), /** @type {any} */ (t).value);
+  else if (d.ru != null) riUnit(Number(d.ru), /** @type {any} */ (t).value);
   else if (d.rf) { S.rf[d.rf] = t.value; if (d.rf === 'hasil_standar' || d.rf === 'tenaga_kerja' || d.rf === 'variant_id') rfv(); }
   else if (d.dp) { S.dp2[d.dp] = t.value; dupUpd(); }
   else if (d.dv) { S.dp2.sel[d.dv] = t.checked; dupUpd(); }

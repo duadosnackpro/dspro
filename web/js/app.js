@@ -55,7 +55,7 @@ const T = v => String(v).toUpperCase() === 'TRUE';
 const APP = window.APP = {views: {}};
 const S = {token: null, data: null, queue: [], tab: 'kasir', ch: null, cat: 'Semua', q: '',
   cart: [], diskon: '', metode: 'tunai', terima: '', catatan: '', nomor: {}, mt: 'products', stab: 'varian', day: null, pb: {items: [], ongkir: '', sup: ''}, rc: null,
-  sq: '', scat: 'Semua', hideOut: false, dirty: false, sheetDirty: false, sheetTtl: '', rcustom: false, installEv: null, opt: null, pus: null, pgid: ''};
+  sq: '', scat: 'Semua', hideOut: false, dirty: false, sheetDirty: false, sheetTtl: '', cfmOpen: false, rcustom: false, installEv: null, opt: null, pus: null, pgid: ''};
 /* P0-1: peran asli dari server dipakai apa adanya. Tampilan ditentukan oleh kemampuan (can), bukan oleh pemetaan peran ke 'owner'/'kasir'.
    Penegakan hak tetap di server (RLS/RPC); daftar ini hanya memilih layar. */
 const ROLES = [['owner', 'Owner'], ['admin', 'Admin'], ['supervisor', 'Supervisor'], ['kasir', 'Kasir'], ['stok', 'Stok'], ['produksi', 'Produksi'], ['auditor', 'Auditor']];
@@ -127,6 +127,7 @@ function sheet(html) {
   if (!d) return;
   { const ttl = h ? h.textContent || '' : ''; if (opening || ttl !== S.sheetTtl) S.sheetDirty = false; S.sheetTtl = ttl; } // re-render dialog yang sama (mis. tambah bahan di resep) tidak menghapus tanda "belum disimpan"
   if (h) { h.id = 'sheet-h'; d.setAttribute('aria-labelledby', 'sheet-h'); } else d.setAttribute('aria-label', 'Dialog'); // nama dialog = judulnya, bukan kata generik
+  if (!opening) { d.style.animation = 'none'; const bg = /** @type {HTMLElement|null} */ (b.querySelector('.sheet-bg')); if (bg) bg.style.animation = 'none'; } // isi diperbarui (tambah/hapus bahan): jangan putar ulang animasi naik dari bawah
   if (opening) d.focus({preventScroll: true}); // fokus masuk ke dialog (wadah, bukan kolom isian: keyboard layar tidak muncul sendiri)
 }
 /* Tab tetap berputar di dalam dialog yang terbuka (aria-modal): tanpa ini Tab keluar ke halaman di belakang sheet. */
@@ -155,10 +156,37 @@ function markSheetDirty(/** @type {Event} */ e) {
   S.sheetDirty = true;
 }
 ['input', 'change', 'click'].forEach(ev => document.addEventListener(ev, markSheetDirty, true)); // fase tangkap: tertandai sebelum aksi tombol (mis. simpan) berjalan
-/* Tutup atas permintaan pengguna (ketuk latar, Esc, Batal/Tutup). Bila ada isian belum tersimpan: tanya dulu. OK = buang dan keluar, Batal = tetap di form. */
-function requestCloseSheet() {
-  if (S.busyOn) return;
-  if (sheetDirtyNow() && !confirm('Data yang Anda isi belum disimpan.\n\nKeluar dan buang perubahan?\n\nOK = keluar tanpa menyimpan\nBatal = kembali ke form')) return;
+/* Dialog konfirmasi di dalam aplikasi (pengganti confirm() bawaan browser, yang di PWA/ponsel sering tidak tampil atau tampak seperti galat).
+   Resolve true = pilih "leave" (tindakan yang membuang), false = tetap. Ketuk latar atau Esc = false, jadi tidak pernah membuang data tanpa disengaja. */
+function confirmBox(/** @type {{title:string,msg:string,stay:string,leave:string}} */ o) {
+  return new Promise(res => {
+    if (S.cfmOpen) return res(false);
+    S.cfmOpen = true; const prev = document.activeElement, sh = $('#sheet'), box = document.createElement('div');
+    box.id = 'cfm'; box.className = 'cfm';
+    box.innerHTML = '<div class="cfm-bg"></div><div class="cfm-box" role="alertdialog" aria-modal="true" aria-labelledby="cfm-h" aria-describedby="cfm-p"><div class="cfm-ic" aria-hidden="true">!</div><h3 id="cfm-h">' + esc(o.title) + '</h3><p id="cfm-p">' + esc(o.msg) + '</p>' +
+      '<button class="btn pri" data-cf="stay">' + esc(o.stay) + '</button><button class="btn dan" data-cf="leave">' + esc(o.leave) + '</button></div>';
+    document.body.appendChild(box); if (sh) sh.setAttribute('inert', '');
+    const btns = /** @type {HTMLElement[]} */ (Array.from(box.querySelectorAll('button')));
+    const done = (/** @type {boolean} */ v) => {
+      document.removeEventListener('keydown', onKey, true); box.remove(); S.cfmOpen = false; if (sh) sh.removeAttribute('inert');
+      try { if (prev && /** @type {any} */ (prev).isConnected && /** @type {any} */ (prev).focus) /** @type {any} */ (prev).focus({preventScroll: true}); } catch (e) {} res(v);
+    };
+    const onKey = (/** @type {KeyboardEvent} */ e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); return; }
+      if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); const i = btns.indexOf(/** @type {HTMLElement} */ (document.activeElement)); btns[(i + (e.shiftKey ? btns.length - 1 : 1)) % btns.length].focus(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    box.addEventListener('click', e => { const t = /** @type {HTMLElement} */ (e.target), b = t.closest && /** @type {HTMLElement|null} */ (t.closest('[data-cf]')); e.stopPropagation(); if (b) done(b.dataset.cf === 'leave'); else if (t.classList.contains('cfm-bg')) done(false); });
+    btns[0].focus();
+  });
+}
+/* Tutup atas permintaan pengguna (ketuk latar, Esc, Batal/Tutup). Bila ada isian belum tersimpan: tampilkan peringatan dulu. */
+async function requestCloseSheet() {
+  if (S.busyOn || S.cfmOpen) return;
+  if (sheetDirtyNow()) {
+    const leave = await confirmBox({title: 'Data belum disimpan', msg: 'Isian yang sudah Anda masukkan akan hilang kalau Anda keluar sekarang.', stay: 'Lanjut mengisi', leave: 'Buang dan keluar'});
+    if (!leave || S.busyOn || $('#sheet').hidden) return;
+  }
   closeSheet();
 }
 
@@ -1858,7 +1886,7 @@ const ACT = {
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'), a = el && el.dataset.act; if (!el || !ACT[a]) return;
-  if (S.dirty && S.tab === 'settings' && (a === 'tab' || a === 'logout' || a === 'sync' || /^go_/.test(a))) { if (!confirm('Perubahan pengaturan belum disimpan. Keluar tanpa menyimpan?')) return; S.dirty = false; }
+  if (S.dirty && S.tab === 'settings' && (a === 'tab' || a === 'logout' || a === 'sync' || /^go_/.test(a))) { confirmBox({title: 'Perubahan belum disimpan', msg: 'Perubahan pengaturan akan hilang kalau Anda keluar sekarang.', stay: 'Lanjut mengisi', leave: 'Buang dan keluar'}).then(ok => { if (ok) { S.dirty = false; ACT[a](el); } }); return; }
   ACT[a](el);
 });
 document.addEventListener('input', e => { if (S.tab === 'settings' && e.target.closest && e.target.closest('#sf')) sDirty(); });

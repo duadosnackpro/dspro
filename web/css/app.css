@@ -367,3 +367,23 @@ pre.rc{background:#fff;border-radius:12px;padding:12px;font:12px/1.35 ui-monospa
 .sheet,.login{overflow-x:hidden;touch-action:pan-y}
 .chips,.seg-wrap .seg,.tw,pre.rc{touch-action:pan-x pan-y;overscroll-behavior-x:contain}
 img,svg,canvas,video{max-width:100%}
+
+/* Form resep: tambah bahan di atas, jumlah tiap bahan bisa diubah langsung, tombol Simpan/Batal selalu terlihat */
+.ri-h{margin:var(--s4) 0 var(--s2)}
+.li.ri-row{display:block;padding:var(--s3);margin-bottom:var(--s2)}
+.ri-top{display:flex;align-items:center;justify-content:space-between;gap:var(--s2)}
+.ri-top .chip{min-height:36px;padding:0 var(--s3)}
+.ri-edit{display:flex;align-items:center;gap:var(--s2)}
+.ri-edit .inp{margin:var(--s2) 0 var(--s1);flex:1;min-width:0}
+.ri-edit select.inp{flex:0 0 40%}
+.ri-unit{flex:0 0 auto;font-weight:600;color:var(--mut);padding:0 var(--s2)}
+.ri-cost{min-height:18px}
+.sheet .savebar{bottom:0;margin-bottom:calc(-1 * (var(--s4) + env(safe-area-inset-bottom)));padding-bottom:calc(var(--s3) + env(safe-area-inset-bottom));background:linear-gradient(rgba(251,247,240,0),var(--paper) 22%)}
+/* Dialog konfirmasi dalam aplikasi */
+.cfm{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:var(--s4)}
+.cfm-bg{position:absolute;inset:0;background:rgba(36,23,20,.6);animation:fade var(--t-med)}
+.cfm-box{position:relative;width:100%;max-width:380px;background:var(--paper);border-radius:var(--r-lg);padding:var(--s5) var(--s4) var(--s4);box-shadow:0 12px 48px rgba(0,0,0,.35);text-align:center}
+.cfm-ic{width:48px;height:48px;border-radius:50%;margin:0 auto var(--s3);display:flex;align-items:center;justify-content:center;background:var(--err-bg);color:var(--err);font:800 26px var(--head)}
+.cfm-box h3{margin:0 0 var(--s2);font:800 20px var(--head);color:var(--brand)}
+.cfm-box p{margin:0 0 var(--s3);color:var(--mut);font-size:15px}
+.ri-add{padding:var(--s3)}.ri-add .inp{min-height:46px;margin-bottom:var(--s2)}.ri-add .chips{margin:0 0 var(--s1)}.ri-add .btn{min-height:48px;margin-top:var(--s1)}

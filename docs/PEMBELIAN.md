@@ -24,5 +24,5 @@ Dua kolom opsional pada `materials`: `pack_unit` (nama kemasan, mis. `pack`) dan
 - **Stok, opname, HPP, laporan tidak berubah.** Tetap satuan utama. Kolom ini hanya tampilan dan kemudahan input; tidak ada RPC stok yang disentuh. Satu-satunya fungsi yang berubah adalah `app.bootstrap`, yang kini ikut mengirim `pack_nama` dan `pack_isi` pada daftar bahan (hanya untuk peran backoffice, seperti sebelumnya).
 - **Pembelian > Per kemasan**: nama dan isi terisi otomatis dari Data Master di semua perangkat. Pengguna masih bisa mengubah isi untuk satu pembelian. Ingatan per perangkat (`pbpack`) hanya dipakai bila Data Master belum punya kemasan bahan itu, dan tidak lagi menimpa apa pun bila sudah ada.
 - **Daftar stok (Bahan dan kemasan)**: baris bahan yang punya kemasan menampilkan "≈ N pack" (stok ÷ isi, 1 desimal; tidak tampil bila stok 0). Hanya tampilan; angka utama tetap dalam satuan bahan.
-- Klien 2.6.6 tetap berjalan di atas skema 0037 (kunci tambahan diabaikan). Klien 2.6.7 butuh skema 0037 (`MIN_SCHEMA`).
+- Klien 2.6.6 tetap berjalan di atas skema 0037 (kunci tambahan diabaikan). Klien 2.6.7 butuh skema 0037 atau lebih baru (`MIN_SCHEMA`, kini 0038).
 - Tes: `npm run test:beli` (klien) dan `supabase/tests/014_material_pack.test.sql` (database; dijalankan lewat `supabase/tests/run.sh`).

@@ -57,7 +57,7 @@ const MANAGE_ROLES = ['owner', 'admin'];
    MIN_SCHEMA = migrasi terakhir yang dibutuhkan klien ini (harus ada di supabase/migrations; dijaga tests/release_check.js).
    Database lebih lama => berhenti dengan pesan jelas (bukan galat 404 acak di tengah transaksi).
    Database mensyaratkan klien lebih baru (min_client) => minta perangkat memperbarui aplikasi. */
-const MIN_SCHEMA = '20261103000037';
+const MIN_SCHEMA = '20261105000038';
 const semverLt = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 let schemaOkAt = 0;
 async function checkSchema(token) {
@@ -347,6 +347,7 @@ async function call(action, p, token, tokCb) {
     case 'produk.foto': return productPhoto(p, token);
     case 'addon.create': return rpc('addon_create', withOutlet(p), token);
     case 'overhead.saran': return rpc('overhead_saran', withOutlet(), token);
+    case 'sale.backdate': return rpc('sale_backdate', withOutlet(p), token);   // 0038: penjualan bertanggal lampau (Owner/Admin); request_id dari klien (anti-ganda)
     case 'shopee.import': return rpc('shopee_import', withOutlet({orders: p.orders, abaikan_stok: p.abaikan_stok !== false}), token);
     case 'transfer.create': return rpc('transfer_create', Object.assign({request_id: uuid()}, p), token);
     case 'transfer.action': return rpc('transfer_action', Object.assign({request_id: uuid()}, p), token);

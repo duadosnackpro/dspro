@@ -55,7 +55,7 @@ const T = v => String(v).toUpperCase() === 'TRUE';
 const APP = window.APP = {views: {}};
 const S = {token: null, data: null, queue: [], tab: 'kasir', ch: null, cat: 'Semua', q: '',
   cart: [], diskon: '', metode: 'tunai', terima: '', catatan: '', nomor: {}, mt: 'products', stab: 'varian', day: null, pb: {items: [], ongkir: '', sup: ''}, rc: null,
-  sq: '', scat: 'Semua', hideOut: false, dirty: false, rcustom: false, installEv: null, opt: null, pus: null, pgid: ''};
+  sq: '', scat: 'Semua', hideOut: false, dirty: false, sheetDirty: false, sheetTtl: '', rcustom: false, installEv: null, opt: null, pus: null, pgid: ''};
 /* P0-1: peran asli dari server dipakai apa adanya. Tampilan ditentukan oleh kemampuan (can), bukan oleh pemetaan peran ke 'owner'/'kasir'.
    Penegakan hak tetap di server (RLS/RPC); daftar ini hanya memilih layar. */
 const ROLES = [['owner', 'Owner'], ['admin', 'Admin'], ['supervisor', 'Supervisor'], ['kasir', 'Kasir'], ['stok', 'Stok'], ['produksi', 'Produksi'], ['auditor', 'Auditor']];
@@ -125,6 +125,7 @@ function sheet(html) {
   b.innerHTML = '<div class="sheet-bg" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" tabindex="-1">' + html + '</div>'; b.hidden = false;
   const d = /** @type {HTMLElement|null} */ (b.querySelector('.sheet')), h = d && d.querySelector('h2');
   if (!d) return;
+  { const ttl = h ? h.textContent || '' : ''; if (opening || ttl !== S.sheetTtl) S.sheetDirty = false; S.sheetTtl = ttl; } // re-render dialog yang sama (mis. tambah bahan di resep) tidak menghapus tanda "belum disimpan"
   if (h) { h.id = 'sheet-h'; d.setAttribute('aria-labelledby', 'sheet-h'); } else d.setAttribute('aria-label', 'Dialog'); // nama dialog = judulnya, bukan kata generik
   if (opening) d.focus({preventScroll: true}); // fokus masuk ke dialog (wadah, bukan kolom isian: keyboard layar tidak muncul sendiri)
 }
@@ -139,5 +140,25 @@ function trapTab(/** @type {KeyboardEvent} */ e) {
   else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
   else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
 }
-function closeSheet() { if (S.opin) { const r = S.opin.res; S.opin = null; r(null); } const b = $('#sheet'); S.qopen = false; b.hidden = true; b.innerHTML = ''; bgInert(false); try { const f = S.sheetFrom; S.sheetFrom = null; if (f && f.isConnected && f.focus) f.focus({preventScroll: true}); } catch (e) {} if (S.deferRender) { S.deferRender = false; render(); } if (S.conflictPending) setTimeout(notifyConflicts, 250); }
+function closeSheet() { S.sheetDirty = false; S.sheetTtl = ''; if (S.opin) { const r = S.opin.res; S.opin = null; r(null); } const b = $('#sheet'); S.qopen = false; b.hidden = true; b.innerHTML = ''; bgInert(false); try { const f = S.sheetFrom; S.sheetFrom = null; if (f && f.isConnected && f.focus) f.focus({preventScroll: true}); } catch (e) {} if (S.deferRender) { S.deferRender = false; render(); } if (S.conflictPending) setTimeout(notifyConflicts, 250); }
+
+/* Pengaman form di dalam sheet: ketukan di luar kotak, tombol Esc, dan tombol Batal/Tutup tidak boleh membuang isian yang belum disimpan tanpa konfirmasi.
+   Sheet dianggap "berisi isian" bila punya kolom input/select/textarea (kecuali kolom cari) dan sudah disentuh (diketik, diganti, atau ada tombol aksi diketuk di dalamnya).
+   Keranjang kasir (#cl) dikecualikan: isinya tersimpan di perangkat dan tidak hilang saat ditutup. closeSheet() langsung tetap dipakai setelah simpan/berhasil. */
+const SHEET_FIELD = 'input:not([type=hidden]):not([type=search]):not([data-rs]):not([data-in]),select,textarea';
+function sheetHasForm() { const b = $('#sheet'), d = b && !b.hidden && !b.querySelector('#cl') ? b.querySelector('.sheet') : null; return !!(d && d.querySelector(SHEET_FIELD)); }
+const sheetDirtyNow = () => !!S.sheetDirty && sheetHasForm();
+function markSheetDirty(/** @type {Event} */ e) {
+  const t = /** @type {HTMLElement|null} */ (e.target), b = $('#sheet'); if (!t || !t.closest || !b || b.hidden || !b.contains(t)) return;
+  if (e.type === 'click') { const x = /** @type {HTMLElement|null} */ (t.closest('[data-act]')); if (!x || x.dataset.act === 'close' || !sheetHasForm()) return; S.sheetDirty = true; return; }
+  if (t.matches('[data-rs],[data-in],[type=search]')) return; // kolom cari/filter bukan isian data
+  S.sheetDirty = true;
+}
+['input', 'change', 'click'].forEach(ev => document.addEventListener(ev, markSheetDirty, true)); // fase tangkap: tertandai sebelum aksi tombol (mis. simpan) berjalan
+/* Tutup atas permintaan pengguna (ketuk latar, Esc, Batal/Tutup). Bila ada isian belum tersimpan: tanya dulu. OK = buang dan keluar, Batal = tetap di form. */
+function requestCloseSheet() {
+  if (S.busyOn) return;
+  if (sheetDirtyNow() && !confirm('Data yang Anda isi belum disimpan.\n\nKeluar dan buang perubahan?\n\nOK = keluar tanpa menyimpan\nBatal = kembali ke form')) return;
+  closeSheet();
+}
 

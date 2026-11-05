@@ -55,7 +55,7 @@ const T = v => String(v).toUpperCase() === 'TRUE';
 const APP = window.APP = {views: {}};
 const S = {token: null, data: null, queue: [], tab: 'kasir', ch: null, cat: 'Semua', q: '',
   cart: [], diskon: '', metode: 'tunai', terima: '', catatan: '', nomor: {}, mt: 'products', stab: 'varian', day: null, pb: {items: [], ongkir: '', sup: ''}, rc: null,
-  sq: '', scat: 'Semua', hideOut: false, dirty: false, rcustom: false, installEv: null, opt: null, pus: null, pgid: ''};
+  sq: '', scat: 'Semua', hideOut: false, dirty: false, sheetDirty: false, sheetTtl: '', rcustom: false, installEv: null, opt: null, pus: null, pgid: ''};
 /* P0-1: peran asli dari server dipakai apa adanya. Tampilan ditentukan oleh kemampuan (can), bukan oleh pemetaan peran ke 'owner'/'kasir'.
    Penegakan hak tetap di server (RLS/RPC); daftar ini hanya memilih layar. */
 const ROLES = [['owner', 'Owner'], ['admin', 'Admin'], ['supervisor', 'Supervisor'], ['kasir', 'Kasir'], ['stok', 'Stok'], ['produksi', 'Produksi'], ['auditor', 'Auditor']];
@@ -125,6 +125,7 @@ function sheet(html) {
   b.innerHTML = '<div class="sheet-bg" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" tabindex="-1">' + html + '</div>'; b.hidden = false;
   const d = /** @type {HTMLElement|null} */ (b.querySelector('.sheet')), h = d && d.querySelector('h2');
   if (!d) return;
+  { const ttl = h ? h.textContent || '' : ''; if (opening || ttl !== S.sheetTtl) S.sheetDirty = false; S.sheetTtl = ttl; } // re-render dialog yang sama (mis. tambah bahan di resep) tidak menghapus tanda "belum disimpan"
   if (h) { h.id = 'sheet-h'; d.setAttribute('aria-labelledby', 'sheet-h'); } else d.setAttribute('aria-label', 'Dialog'); // nama dialog = judulnya, bukan kata generik
   if (opening) d.focus({preventScroll: true}); // fokus masuk ke dialog (wadah, bukan kolom isian: keyboard layar tidak muncul sendiri)
 }
@@ -139,7 +140,27 @@ function trapTab(/** @type {KeyboardEvent} */ e) {
   else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
   else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
 }
-function closeSheet() { if (S.opin) { const r = S.opin.res; S.opin = null; r(null); } const b = $('#sheet'); S.qopen = false; b.hidden = true; b.innerHTML = ''; bgInert(false); try { const f = S.sheetFrom; S.sheetFrom = null; if (f && f.isConnected && f.focus) f.focus({preventScroll: true}); } catch (e) {} if (S.deferRender) { S.deferRender = false; render(); } if (S.conflictPending) setTimeout(notifyConflicts, 250); }
+function closeSheet() { S.sheetDirty = false; S.sheetTtl = ''; if (S.opin) { const r = S.opin.res; S.opin = null; r(null); } const b = $('#sheet'); S.qopen = false; b.hidden = true; b.innerHTML = ''; bgInert(false); try { const f = S.sheetFrom; S.sheetFrom = null; if (f && f.isConnected && f.focus) f.focus({preventScroll: true}); } catch (e) {} if (S.deferRender) { S.deferRender = false; render(); } if (S.conflictPending) setTimeout(notifyConflicts, 250); }
+
+/* Pengaman form di dalam sheet: ketukan di luar kotak, tombol Esc, dan tombol Batal/Tutup tidak boleh membuang isian yang belum disimpan tanpa konfirmasi.
+   Sheet dianggap "berisi isian" bila punya kolom input/select/textarea (kecuali kolom cari) dan sudah disentuh (diketik, diganti, atau ada tombol aksi diketuk di dalamnya).
+   Keranjang kasir (#cl) dikecualikan: isinya tersimpan di perangkat dan tidak hilang saat ditutup. closeSheet() langsung tetap dipakai setelah simpan/berhasil. */
+const SHEET_FIELD = 'input:not([type=hidden]):not([type=search]):not([data-rs]):not([data-in]),select,textarea';
+function sheetHasForm() { const b = $('#sheet'), d = b && !b.hidden && !b.querySelector('#cl') ? b.querySelector('.sheet') : null; return !!(d && d.querySelector(SHEET_FIELD)); }
+const sheetDirtyNow = () => !!S.sheetDirty && sheetHasForm();
+function markSheetDirty(/** @type {Event} */ e) {
+  const t = /** @type {HTMLElement|null} */ (e.target), b = $('#sheet'); if (!t || !t.closest || !b || b.hidden || !b.contains(t)) return;
+  if (e.type === 'click') { const x = /** @type {HTMLElement|null} */ (t.closest('[data-act]')); if (!x || x.dataset.act === 'close' || !sheetHasForm()) return; S.sheetDirty = true; return; }
+  if (t.matches('[data-rs],[data-in],[type=search]')) return; // kolom cari/filter bukan isian data
+  S.sheetDirty = true;
+}
+['input', 'change', 'click'].forEach(ev => document.addEventListener(ev, markSheetDirty, true)); // fase tangkap: tertandai sebelum aksi tombol (mis. simpan) berjalan
+/* Tutup atas permintaan pengguna (ketuk latar, Esc, Batal/Tutup). Bila ada isian belum tersimpan: tanya dulu. OK = buang dan keluar, Batal = tetap di form. */
+function requestCloseSheet() {
+  if (S.busyOn) return;
+  if (sheetDirtyNow() && !confirm('Data yang Anda isi belum disimpan.\n\nKeluar dan buang perubahan?\n\nOK = keluar tanpa menyimpan\nBatal = kembali ke form')) return;
+  closeSheet();
+}
 
 /* ---------- API dan sinkronisasi ---------- */
 let pending = 0;
@@ -1409,11 +1430,21 @@ async function adjSave(t, id) {
   } catch (e) { toast(e.message); }
   });
 }
+/* Pintasan dari layar Produksi (bahan kurang): daftar bahan + jumlah kekurangan diisikan sebagai pilihan cepat, harga TETAP diisi pengguna (tidak ditebak).
+   back = fungsi untuk kembali ke lembar produksi yang tadi dibuka; dipanggil setelah pembelian tersimpan (stok bahan sudah diperbarui). */
+function pbPrefill(need, back) {
+  const o = /** @type {any} */ (S.pb || {}), n = (need || []).filter(x => x && x.id && x.qty > 0);
+  S.pb = {items: o.items || [], ongkir: o.ongkir || '', sup: o.sup || '', need: n, back: back || null, sel: n[0] ? n[0].id : '', selq: n[0] ? n[0].qty : ''};
+  pbSheet();
+}
+const pbQ = q => String(q).replace('.', ',');
 function pbSheet() {
-  const m = S.data.materials, pb = S.pb, tot = pb.items.reduce((a, i) => a + i.qty * i.harga, 0);
-  sheet('<h2>Pembelian bahan</h2><label>Supplier<select class="inp" data-in="pbsup"><option value="">- tanpa supplier -</option>' + S.data.suppliers.map(s => '<option value="' + esc(s.id) + '"' + (s.id === pb.sup ? ' selected' : '') + '>' + esc(s.nama) + '</option>').join('') + '</select></label>' +
+  const m = S.data.materials, pb = S.pb, tot = pb.items.reduce((a, i) => a + i.qty * i.harga, 0), need = (pb.need || []).filter(n => m.some(x => x.id === n.id));
+  sheet((pb.back ? '<button class="chip" data-act="pbback">← Kembali ke produksi</button>' : '') + '<h2>Pembelian bahan</h2>' +
+    (need.length ? '<div class="li" style="display:block"><b>Bahan kurang untuk produksi</b><div class="muted">Ketuk bahan, isi harga beli, lalu Tambah ke daftar.</div><div class="chips">' + need.map(n => { const x = m.find(y => y.id === n.id); return '<button class="chip" data-act="pbfill" data-id="' + esc(n.id) + '" data-q="' + esc(n.qty) + '">' + esc(x.nama) + ' · kurang ' + qf(n.qty) + ' ' + esc(x.satuan) + '</button>'; }).join('') + '</div></div>' : '') +
+    '<label>Supplier<select class="inp" data-in="pbsup"><option value="">- tanpa supplier -</option>' + S.data.suppliers.map(s => '<option value="' + esc(s.id) + '"' + (s.id === pb.sup ? ' selected' : '') + '>' + esc(s.nama) + '</option>').join('') + '</select></label>' +
     pb.items.map((i, n) => { const x = m.find(y => y.id === i.id); return '<div class="li"><div><b>' + esc(x ? x.nama : '?') + '</b><div class="muted">' + qf(i.qty) + ' ' + esc(x ? x.satuan : '') + ' @ ' + rp(i.harga) + '</div></div><button class="chip" data-act="pbdel" data-i="' + n + '">Hapus</button></div>'; }).join('') +
-    '<label>Bahan<select class="inp" id="pb_m">' + m.map(x => '<option value="' + esc(x.id) + '">' + esc(x.nama) + ' (' + esc(x.satuan) + ')</option>').join('') + '</select></label><div class="row2"><div style="flex:1"><label>Jumlah<input class="inp" id="pb_q" inputmode="decimal"></label></div><div style="flex:1"><label>Harga satuan (Rp)<input class="inp" id="pb_h" inputmode="decimal"></label></div></div>' +
+    '<label>Bahan<select class="inp" id="pb_m">' + m.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pb.sel ? ' selected' : '') + '>' + esc(x.nama) + ' (' + esc(x.satuan) + ')</option>').join('') + '</select></label><div class="row2"><div style="flex:1"><label>Jumlah<input class="inp" id="pb_q" inputmode="decimal" value="' + esc(pb.selq === '' || pb.selq == null ? '' : pbQ(pb.selq)) + '"></label></div><div style="flex:1"><label>Harga satuan (Rp)<input class="inp" id="pb_h" inputmode="decimal"></label></div></div>' +
     '<button class="btn sec" data-act="pbadd">Tambah ke daftar</button><label>Ongkir (Rp, dialokasikan ke HPP)<input class="inp" data-in="pbongkir" inputmode="numeric" value="' + esc(pb.ongkir) + '"></label>' +
     '<div class="kv big"><span>Total</span><span>' + rp(tot + (Number(pb.ongkir) || 0)) + '</span></div><button class="btn pri" data-act="pbsave">Simpan pembelian</button><button class="btn sec sm" data-act="pbhist">Riwayat pembelian / batalkan</button>');
 }
@@ -1432,11 +1463,11 @@ async function pbCancel(id) {
 }
 async function pbSave() {
   return busy('Menyimpan pembelian…', async () => {
-  const pb = S.pb; if (!pb.items.length) return toast('Daftar masih kosong');
+  const pb = S.pb, back = pb.back; if (!pb.items.length) return toast('Daftar masih kosong');
   try {
     const r = await api('purchase.create', {supplier_id: pb.sup, ongkir: Number(pb.ongkir) || 0, items: pb.items.map(i => ({material_id: i.id, qty: i.qty, harga_satuan: i.harga}))});
     r.materials.forEach(u => { const m = S.data.materials.find(x => x.id === u.id); if (m) { m.stok = u.stok; if (u.hpp_rata2 !== undefined) m.hpp_rata2 = u.hpp_rata2; } });   // server hanya mengirim stok; jangan menghapus HPP yang ada
-    LS.set('data', S.data); S.pb = {items: [], ongkir: '', sup: ''}; closeSheet(); render(); toast('Pembelian tersimpan, HPP diperbarui');
+    LS.set('data', S.data); S.pb = {items: [], ongkir: '', sup: ''}; closeSheet(); render(); toast('Pembelian tersimpan, HPP diperbarui'); if (back) back();
   } catch (e) { toast(e.message); }
   });
 }
@@ -1745,7 +1776,7 @@ function askReason(title, msg, okLabel) { // v1.9.9: pengganti prompt() bawaan b
   });
 }
 const ACT = {
-  login: doLogin, logout: confirmLogout, close: closeSheet, cart: cartSheet, pay: pay,
+  login: doLogin, logout: confirmLogout, close: requestCloseSheet, cart: cartSheet, pay: pay,
   hideout: el => { S.hideOut = !!el.checked; LS.set('hideOut', S.hideOut); grid(); }, showout: () => { S.hideOut = false; LS.set('hideOut', false); vKasir(); },
   rday: el => { const p = el.dataset.p; if (p === 'today') { S.day = today(); S.rcustom = false; } else if (p === 'yday') { S.day = addDays(today(), -1); S.rcustom = false; } else S.rcustom = true; vRiwayat(); },
   scat: el => { S.scat = el.dataset.c; vStok(); },
@@ -1806,8 +1837,11 @@ const ACT = {
   ohsaran: async () => { const el = $('#oh-saran'); try { const r = await api('overhead.saran', {}); if (r.saran_per_unit == null) { if (el) el.textContent = r.pesan || 'Belum bisa dihitung.'; return; } if (el) el.textContent = 'Bulan ' + r.bulan + ': biaya ' + rp(r.biaya) + ' dibagi ' + num(r.unit) + ' unit = ' + rp(r.saran_per_unit) + ' per bungkus. Diisikan ke kolom di atas; tekan Simpan pengaturan.'; const f = document.querySelector('#sf [data-f="overhead_per_unit"]'), m = document.querySelector('#sf [data-f="metode_overhead"]'); if (m && m.value !== 'per_unit') { m.value = 'per_unit'; m.dispatchEvent(new Event('change', {bubbles: true})); } if (f) { f.value = r.saran_per_unit; f.dispatchEvent(new Event('input', {bubbles: true})); } } catch (e) { toast(e.message); } },
   stab: el => { S.stab = el.dataset.s; S.scat = 'Semua'; S.sq = ''; vStok(); },
   adj: el => adjSheet(el.dataset.t, el.dataset.id), adjsave: el => adjSave(el.dataset.t, el.dataset.id),
-  pbopen: pbSheet, pbdel: el => { S.pb.items.splice(el.dataset.i, 1); pbSheet(); }, pbsave: pbSave,
-  pbadd: () => { const q = dnum($('#pb_q').value), h = dnum($('#pb_h').value), id = $('#pb_m').value; if (!id || !(q > 0) || !(h >= 0) || $('#pb_h').value === '') return toast('Isi jumlah dan harga'); S.pb.items.push({id: id, qty: q, harga: h}); pbSheet(); },
+  pbopen: () => { Object.assign(S.pb, {need: [], back: null, sel: '', selq: ''}); pbSheet(); }, pbdel: el => { S.pb.items.splice(el.dataset.i, 1); pbSheet(); }, pbsave: pbSave,
+  pbadd: () => { const q = dnum($('#pb_q').value), h = dnum($('#pb_h').value), id = $('#pb_m').value; if (!id || !(q > 0) || !(h >= 0) || $('#pb_h').value === '') return toast('Isi jumlah dan harga');
+    S.pb.items.push({id: id, qty: q, harga: h}); S.pb.need = (S.pb.need || []).filter(n => n.id !== id); const nx = S.pb.need[0]; S.pb.sel = nx ? nx.id : ''; S.pb.selq = nx ? nx.qty : ''; pbSheet(); },
+  pbfill: el => { const d = dsOf(el); S.pb.sel = d.id; S.pb.selq = Number(d.q); const m = /** @type {any} */ ($('#pb_m')), q = /** @type {any} */ ($('#pb_q')), h = /** @type {any} */ ($('#pb_h')); if (m) m.value = d.id; if (q) q.value = pbQ(d.q); if (h) h.focus(); },
+  pbback: () => { const b = S.pb.back; S.pb.back = null; if (b) b(); else closeSheet(); },
   go_master: () => { S.tab = 'master'; render(); }, go_riwayat: () => { S.tab = 'riwayat'; render(); }, go_laporan: () => { S.tab = 'laporan'; render(); }, go_shopee: () => { S.tab = 'shopee'; render(); }, go_resep: () => { S.tab = 'resep'; render(); }, go_cek: () => { S.tab = 'cek'; render(); }, go_users: () => { S.tab = 'users'; render(); }, go_settings: () => { S.tab = 'settings'; render(); },
   expvoid: el => { const why = vOf('xv_r').trim(); if (why.length < 3) return toast('Alasan pembatalan wajib diisi');
     return busy('Membatalkan…', async () => { try { await api('expense.void', {id: dsOf(el).id, alasan: why}); S.expLoaded = false; closeSheet(); loadExp(); toast('Biaya dibatalkan'); } catch (e) { toast(e.message); } }); },
@@ -1830,7 +1864,7 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => { if (S.tab === 'settings' && e.target.closest && e.target.closest('#sf')) sDirty(); });
 document.addEventListener('change', e => { const t0 = /** @type {HTMLSelectElement} */ (e.target); if (t0 && t0.dataset && t0.dataset.f === 'role' && t0.closest && t0.closest('#sheet')) { const ri = $('#role-info'); if (ri) ri.textContent = ROLE_INFO[t0.value] || 'Pilih peran untuk melihat hak aksesnya.'; const pl = $('#pin-lbl'); if (pl && pl.firstChild) pl.firstChild.textContent = credLabel(t0.value, (($('[data-act="usave"]') || {dataset: {}}).dataset || {}).id); return; } if (e.target.id === 'foto_file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; fotoLoad(f); return; } if (e.target.id === 'logo_file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; logoLoad(f); return; } if (S.tab === 'settings' && e.target.closest && e.target.closest('#sf')) sDirty(); });
 document.addEventListener('input', e => { if (e.target.dataset && e.target.dataset.lg) logoEdit(e.target); });
-window.addEventListener('beforeunload', e => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (S.dirty || sheetDirtyNow()) { e.preventDefault(); e.returnValue = ''; } });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEv = e; if (S.tab === 'menu' && S.data) vMenu(); });
 window.addEventListener('appinstalled', () => { S.installEv = null; if (S.tab === 'menu' && S.data) vMenu(); });
 { let rzT = 0; window.addEventListener('resize', () => { cancelAnimationFrame(rzT); rzT = requestAnimationFrame(initFades); }); }
@@ -1845,7 +1879,7 @@ document.addEventListener('input', e => {
   if (k === 'diskon' || k === 'terima') { v = v.replace(/\D/g, ''); S[k] = v; return upd(); }
 });
 document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.chg === 'day') { S.day = e.target.value; vRiwayat(); } });
-document.addEventListener('keydown', e => { const t = /** @type {HTMLElement} */ (e.target); if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('[role="button"][data-act]:not(button)')) { e.preventDefault(); t.click(); return; } /* kartu produk berperan tombol: sebelumnya hanya bisa diketuk/diklik, tidak bisa lewat keyboard */ if (e.key === 'Tab') trapTab(e); if (e.key === 'Escape' && $('#sheet') && !$('#sheet').hidden && (!S.opin || S.opin.kind === 'alasan') && !S.busyOn) { closeSheet(); return; } if (e.key === 'Enter' && $('#lp') && document.activeElement === $('#lp')) doLogin(); });
+document.addEventListener('keydown', e => { const t = /** @type {HTMLElement} */ (e.target); if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('[role="button"][data-act]:not(button)')) { e.preventDefault(); t.click(); return; } /* kartu produk berperan tombol: sebelumnya hanya bisa diketuk/diklik, tidak bisa lewat keyboard */ if (e.key === 'Tab') trapTab(e); if (e.key === 'Escape' && $('#sheet') && !$('#sheet').hidden && (!S.opin || S.opin.kind === 'alasan') && !S.busyOn) { requestCloseSheet(); return; } if (e.key === 'Enter' && $('#lp') && document.activeElement === $('#lp')) doLogin(); });
 
 /* ---------- Multi-outlet (v2.1.0): pilih outlet aktif dan administrasi outlet. Aktif hanya pada backend Supabase (S.data.outlets ada). ---------- */
 const multiOutlet = () => !!(S.data && S.data.outlets);
@@ -2211,7 +2245,7 @@ if ('serviceWorker' in navigator) {
 }
 /* v1.9.8: pembaruan tidak boleh memutus sesi kasir. Pemuatan ulang (mis. akibat tab lain menekan "Muat ulang") menunggu sampai tidak ada layar terbuka, permintaan berjalan,
    atau pengiriman antrean; keranjang dan antrean sudah tersimpan di perangkat sehingga tetap utuh setelah dimuat ulang. */
-const idleNow = () => $('#sheet').hidden && !S.busyOn && !flushing && !S.dirty && pending === 0;
+const idleNow = () => $('#sheet').hidden && !S.busyOn && !flushing && !S.dirty && !sheetDirtyNow() && pending === 0;
 let rlT = null;
 function reloadWhenIdle() {
   clearTimeout(rlT);
@@ -2234,5 +2268,5 @@ if (window.MutationObserver) new MutationObserver(ms => { if (ms.every(m => { co
 if (window.matchMedia) { const mq = matchMedia('(min-width: 768px)'); (mq.addEventListener ? mq.addEventListener.bind(mq, 'change') : mq.addListener.bind(mq))(() => { if (S.token && S.data && $('#sheet').hidden && !S.dirty) render(); }); }
 Object.assign(APP.views, {tutup: vTutup, kasir: vKasir, riwayat: vRiwayat, stok: vStok, menu: vMenu, master: vMaster, users: vUsers, settings: vSettings, diag: vDiag});
 Object.assign(APP, {can: can, own: own, S: S, api: api, $: $, rp: rp, num: num, esc: esc, LS: LS, T: T, sheet: sheet, closeSheet: closeSheet, toast: toast, busy: busy, busyLabel: busyLabel, skel: skel, ACT: ACT,
-  render: render, loadData: loadData, patchRecipe: patchRecipe, patchMaster: patchMaster, checkUpdates: checkUpdates, verSync: verSync, dverKey: dverKey, vload: vload, dnum: dnum, qf: qf, r6: r6, flush: flush, Store: Store, isWide: isWide, skuLevel: skuLevel, wrapChips: wrapChips, isAddon: isAddon, emptyState: emptyState, idDate: idDate, idRange: idRange, addDays: addDays, lvText: lvText, vById: vById, pById: pById, vName: vName, vSub: vSub, chName: chName, fmtDT: fmtDT, today: today, start: start});
+  pbPrefill: pbPrefill, render: render, loadData: loadData, patchRecipe: patchRecipe, patchMaster: patchMaster, checkUpdates: checkUpdates, verSync: verSync, dverKey: dverKey, vload: vload, dnum: dnum, qf: qf, r6: r6, flush: flush, Store: Store, isWide: isWide, skuLevel: skuLevel, wrapChips: wrapChips, isAddon: isAddon, emptyState: emptyState, idDate: idDate, idRange: idRange, addDays: addDays, lvText: lvText, vById: vById, pById: pById, vName: vName, vSub: vSub, chName: chName, fmtDT: fmtDT, today: today, start: start});
 })();

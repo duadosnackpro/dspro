@@ -38,11 +38,21 @@ async function adjSave(t, id) {
   } catch (e) { toast(e.message); }
   });
 }
+/* Pintasan dari layar Produksi (bahan kurang): daftar bahan + jumlah kekurangan diisikan sebagai pilihan cepat, harga TETAP diisi pengguna (tidak ditebak).
+   back = fungsi untuk kembali ke lembar produksi yang tadi dibuka; dipanggil setelah pembelian tersimpan (stok bahan sudah diperbarui). */
+function pbPrefill(need, back) {
+  const o = /** @type {any} */ (S.pb || {}), n = (need || []).filter(x => x && x.id && x.qty > 0);
+  S.pb = {items: o.items || [], ongkir: o.ongkir || '', sup: o.sup || '', need: n, back: back || null, sel: n[0] ? n[0].id : '', selq: n[0] ? n[0].qty : ''};
+  pbSheet();
+}
+const pbQ = q => String(q).replace('.', ',');
 function pbSheet() {
-  const m = S.data.materials, pb = S.pb, tot = pb.items.reduce((a, i) => a + i.qty * i.harga, 0);
-  sheet('<h2>Pembelian bahan</h2><label>Supplier<select class="inp" data-in="pbsup"><option value="">- tanpa supplier -</option>' + S.data.suppliers.map(s => '<option value="' + esc(s.id) + '"' + (s.id === pb.sup ? ' selected' : '') + '>' + esc(s.nama) + '</option>').join('') + '</select></label>' +
+  const m = S.data.materials, pb = S.pb, tot = pb.items.reduce((a, i) => a + i.qty * i.harga, 0), need = (pb.need || []).filter(n => m.some(x => x.id === n.id));
+  sheet((pb.back ? '<button class="chip" data-act="pbback">← Kembali ke produksi</button>' : '') + '<h2>Pembelian bahan</h2>' +
+    (need.length ? '<div class="li" style="display:block"><b>Bahan kurang untuk produksi</b><div class="muted">Ketuk bahan, isi harga beli, lalu Tambah ke daftar.</div><div class="chips">' + need.map(n => { const x = m.find(y => y.id === n.id); return '<button class="chip" data-act="pbfill" data-id="' + esc(n.id) + '" data-q="' + esc(n.qty) + '">' + esc(x.nama) + ' · kurang ' + qf(n.qty) + ' ' + esc(x.satuan) + '</button>'; }).join('') + '</div></div>' : '') +
+    '<label>Supplier<select class="inp" data-in="pbsup"><option value="">- tanpa supplier -</option>' + S.data.suppliers.map(s => '<option value="' + esc(s.id) + '"' + (s.id === pb.sup ? ' selected' : '') + '>' + esc(s.nama) + '</option>').join('') + '</select></label>' +
     pb.items.map((i, n) => { const x = m.find(y => y.id === i.id); return '<div class="li"><div><b>' + esc(x ? x.nama : '?') + '</b><div class="muted">' + qf(i.qty) + ' ' + esc(x ? x.satuan : '') + ' @ ' + rp(i.harga) + '</div></div><button class="chip" data-act="pbdel" data-i="' + n + '">Hapus</button></div>'; }).join('') +
-    '<label>Bahan<select class="inp" id="pb_m">' + m.map(x => '<option value="' + esc(x.id) + '">' + esc(x.nama) + ' (' + esc(x.satuan) + ')</option>').join('') + '</select></label><div class="row2"><div style="flex:1"><label>Jumlah<input class="inp" id="pb_q" inputmode="decimal"></label></div><div style="flex:1"><label>Harga satuan (Rp)<input class="inp" id="pb_h" inputmode="decimal"></label></div></div>' +
+    '<label>Bahan<select class="inp" id="pb_m">' + m.map(x => '<option value="' + esc(x.id) + '"' + (x.id === pb.sel ? ' selected' : '') + '>' + esc(x.nama) + ' (' + esc(x.satuan) + ')</option>').join('') + '</select></label><div class="row2"><div style="flex:1"><label>Jumlah<input class="inp" id="pb_q" inputmode="decimal" value="' + esc(pb.selq === '' || pb.selq == null ? '' : pbQ(pb.selq)) + '"></label></div><div style="flex:1"><label>Harga satuan (Rp)<input class="inp" id="pb_h" inputmode="decimal"></label></div></div>' +
     '<button class="btn sec" data-act="pbadd">Tambah ke daftar</button><label>Ongkir (Rp, dialokasikan ke HPP)<input class="inp" data-in="pbongkir" inputmode="numeric" value="' + esc(pb.ongkir) + '"></label>' +
     '<div class="kv big"><span>Total</span><span>' + rp(tot + (Number(pb.ongkir) || 0)) + '</span></div><button class="btn pri" data-act="pbsave">Simpan pembelian</button><button class="btn sec sm" data-act="pbhist">Riwayat pembelian / batalkan</button>');
 }
@@ -61,11 +71,11 @@ async function pbCancel(id) {
 }
 async function pbSave() {
   return busy('Menyimpan pembelian…', async () => {
-  const pb = S.pb; if (!pb.items.length) return toast('Daftar masih kosong');
+  const pb = S.pb, back = pb.back; if (!pb.items.length) return toast('Daftar masih kosong');
   try {
     const r = await api('purchase.create', {supplier_id: pb.sup, ongkir: Number(pb.ongkir) || 0, items: pb.items.map(i => ({material_id: i.id, qty: i.qty, harga_satuan: i.harga}))});
     r.materials.forEach(u => { const m = S.data.materials.find(x => x.id === u.id); if (m) { m.stok = u.stok; if (u.hpp_rata2 !== undefined) m.hpp_rata2 = u.hpp_rata2; } });   // server hanya mengirim stok; jangan menghapus HPP yang ada
-    LS.set('data', S.data); S.pb = {items: [], ongkir: '', sup: ''}; closeSheet(); render(); toast('Pembelian tersimpan, HPP diperbarui');
+    LS.set('data', S.data); S.pb = {items: [], ongkir: '', sup: ''}; closeSheet(); render(); toast('Pembelian tersimpan, HPP diperbarui'); if (back) back();
   } catch (e) { toast(e.message); }
   });
 }

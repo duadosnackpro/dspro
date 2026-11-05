@@ -1,6 +1,6 @@
 // Tes logika klien Opsi Produk (src/app/138-opsi.js) di sandbox vm tanpa DOM: label, harga, kunci baris, grup wajib, migrasi keranjang.
-const fs=require('fs'),vm=require('vm');
-let src=fs.readFileSync('/home/claude/DS-PRO-main/src/app/138-opsi.js','utf8');
+const fs=require('fs'),vm=require('vm'),path=require('path');
+let src=fs.readFileSync(path.join(__dirname,'../src/app/138-opsi.js'),'utf8');
 const ls={}; const log=[];
 const ctx={S:{cart:[],ch:'c1',data:{products:[{id:'p1',nama:'Basreng',pakai_opsi:true}],variants:[{id:'v1',product_id:'p1',stok:50}],
  option_groups:[{id:'g1',nama:'Level',urutan:1},{id:'g2',nama:'Cara masak',urutan:2}],

@@ -1,4 +1,4 @@
-# DUADO POS — backend Supabase (v2.6.10, multi-outlet)
+# DUADO POS — backend Supabase (v2.6.11, multi-outlet)
 
 Implementasi PRD "v2.0.0 → Multi-Outlet Ready", Fase 1–2 (+ pondasi Fase 4–5). Satu database melayani semua outlet; isolasi ditegakkan di database.
 
@@ -25,6 +25,7 @@ Implementasi PRD "v2.0.0 → Multi-Outlet Ready", Fase 1–2 (+ pondasi Fase 4�
 | `0018` | pembatasan laju Edge Function (`rpc_admin_rate_hit`, hanya `service_role`) |
 | `0026` | galat klien (`rpc_client_error_log`, `rpc_client_error_report`), tabel sinyal `sync_events` + trigger + publikasi Realtime (v2.5.2) |
 | `0040` | sinkronisasi data operasional: `ops_ver` pada `app.ping`, sinyal `ops` di `sync_events`, trigger pada resep, bahan, pembelian, produksi, retur, biaya, transfer, sesi kas (v2.6.9, lihat `docs/SINKRONISASI.md`) |
+| `0041` | Beranda tahap 2: `app.dashboard` menambah pcs terjual, diskon, retur, penjualan per metode bayar, jam ramai, terlaris menurut omzet/laba, total bahan habis/menipis (hanya menambah kunci; v2.6.11, lihat `docs/BERANDA.md`) |
 | `functions/admin-users` | Edge Function pembuat akun PIN (satu-satunya pemakai `service_role`) |
 | `tests/` | tes SQL (PRD §14.2) + `run.sh` |
 

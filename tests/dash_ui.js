@@ -4,11 +4,11 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'web/js/modules.js'), 'ut
 const a = src.indexOf('function delta('), b = src.indexOf('/* ---------- Biaya produksi');
 const code = src.slice(a, b);
 let pass = 0; const ok = (c, m) => { assert(c, m); pass++; };
-const dom = {dbody: {innerHTML: ''}, wbell: {innerHTML: ''}};
+const dom = {dbody: {innerHTML: ''}, wbell: {innerHTML: ''}, chcard: {innerHTML: ''}, topcard: {innerHTML: ''}};
 const rp = n => 'Rp' + Math.round(Number(n) || 0).toLocaleString('id-ID'), num = n => String(n), dec = n => String(n);
 const f = new Function('S', 'A', '$', 'esc', 'rp', 'num', 'dec', 'pct', 'kv', 'idRange', 'hppCheck', 'qMark', 'ACT',
-  code + '\nreturn {drawDash, heroHtml, dowOf, cleanNm, chg};');
-const S = {};
+  code + '\nreturn {drawDash, heroHtml, dowOf, cleanNm, chg, dashTab, dashTop, jamHtml, chInner, topInner, jamRange};');
+const S = {};   // dibagi pakai fungsi uji
 const m = f(S, {can: () => true, addDays: (d, n) => d}, sel => dom[sel.slice(1)] || null, s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
   rp, num, dec, x => (Math.round(x * 10) / 10).toString().replace('.', ',') + '%', (x, y, c) => '<div class="kv ' + (c || '') + '"><span>' + x + '</span><span>' + y + '</span></div>',
   (a, b) => a + ' – ' + b, () => Promise.resolve({n: 0, names: []}), '<q/>', {});
@@ -21,6 +21,7 @@ const base = () => ({period: 'minggu', from: '2026-10-30', to: '2026-11-05', pfr
   low: ['Pilus', 'Bumbu Asin', 'Cabe Kering Aida', 'Chili Oil', 'Daun Jeruk', 'Usus Krispy', 'Siomay Kering', 'Makaroni', 'Minyak Bawang', 'Minyak Goreng'].map(n => ({nama: n, stok: 0, satuan: 'gram'})),
   stok_minus: [], peringatan: [], biaya: 0, fee_channel: 0, kerugian: 0, laba_bersih: 178000});
 const draw = d => { dom.dbody.innerHTML = ''; m.drawDash(d); return dom.dbody.innerHTML; };
+ok(!/Produk terjual|dtab|dtop|Jam ramai/.test(draw(base())), 'data tanpa kunci tahap 2 (server/cache lama): tampilan tahap 1 tetap utuh, tanpa tab/kartu baru');
 
 // ---- data seperti tangkapan layar pengguna ----
 let h = draw(base());
@@ -41,7 +42,7 @@ ok(/Lihat 7 lainnya/.test(stokPart) && stokPart.indexOf('Lihat 7 lainnya') > sto
 ok(/Daftar dibatasi 10 bahan teratas/.test(h), 'catatan batas 10 muncul saat daftar penuh');
 ok(/data-act="tab" data-t="stok"/.test(h), 'tombol Buka Stok');
 ok(!/Biaya operasional/.test(h), 'biaya operasional tidak lagi di kartu perhatian');
-ok(/Transaksi/.test(h) && /Rata-rata per transaksi/.test(h) && /Rp22\.425/.test(h), 'Transaksi dan rata-rata per transaksi tetap ada');
+ok(/Transaksi/.test(h) && /Rata-rata \/ transaksi/.test(h) && /Rp22\.425/.test(h), 'Transaksi dan rata-rata per transaksi tetap ada');
 ok(!/ vs 7 hari sebelumnya/.test(h), 'tanpa data pembanding tidak ada teks pembanding');
 
 // ---- ada pembanding ----
@@ -78,4 +79,71 @@ ok(!/Buka Stok/.test(h), 'tidak ada tombol Buka Stok bila stok aman');
 d = base(); d.top[0].nama = '<img src=x onerror=alert(1)>'; d.low[0].nama = '<b>x</b>'; d.channels[0].nama = '<i>y</i>'; h = draw(d);
 ok(!/<img src=x/.test(h) && !/<b>x<\/b>/.test(h) && !/<i>y<\/i>/.test(h), 'nama produk/bahan/channel di-escape');
 
+// ================= Tahap 2 (v2.6.11): pcs, diskon/retur, per pembayaran, jam ramai, urutan terlaris, total bahan =================
+const t2 = () => { const d = base();
+  d.cur = {omzet: 897000, trx: 40, laba: 178000, pcs: 92, diskon: 12000, retur_n: 2, retur_rp: 30000}; d.prev = {omzet: 600000, trx: 30, laba: 100000, pcs: 70};
+  d.metode = [{metode: 'tunai', trx: 25, rp: 600000}, {metode: 'qris', trx: 12, rp: 250000}, {metode: 'transfer', trx: 3, rp: 47000}];
+  d.jam = [{jam: 9, trx: 2, omzet: 40000}, {jam: 12, trx: 11, omzet: 260000}, {jam: 13, trx: 9, omzet: 210000}, {jam: 18, trx: 9, omzet: 230000}, {jam: 23, trx: 1, omzet: 9000}];
+  d.top_om = [{nama: 'Bareng Chili Oil 500 g ~', qty: 13, om: 520000, laba: 150000}, {nama: 'Pangsit Kuah Pedas 650 ml ~', qty: 45, om: 450000, laba: 20000}];
+  d.top_laba = [{nama: 'Makaroni 100 g Level 1', qty: 6, om: 90000, laba: 70000}, {nama: 'Pilus 80 g Level 1', qty: 5, om: 60000, laba: 40000}];
+  d.low_habis = 14; d.low_tipis = 1; return d; };
+h = draw(t2());
+ok(/class="kgrid k3"/.test(h) && /Produk terjual/.test(h) && />92 pcs</.test(h), 'KPI Produk terjual (pcs) tampil dalam 3 kolom');
+ok(/▲/.test(h.slice(h.indexOf('Produk terjual'), h.indexOf('Rata-rata'))) , 'pcs punya panah perubahan terhadap periode sebelumnya');
+ok(/Diskon Rp12\.000 · Retur 2 trx \(Rp30\.000, sudah mengurangi omzet\)/.test(h.replace(/\u00a0/g, ' ')), 'catatan diskon dan retur');
+d = t2(); d.cur.diskon = 0; d.cur.retur_n = 0; h = draw(d); ok(!/Diskon|Retur/.test(h.slice(h.indexOf('kgrid'), h.indexOf('dgrid'))), 'tanpa diskon/retur: catatan tidak muncul');
+S.dtab = undefined; S.dtopm = undefined; h = draw(t2());
+ok(/id="chcard"/.test(h) && />Channel<\/button>/.test(h) && />Pembayaran<\/button>/.test(h) && /chip sm on" data-act="dtab" data-t="ch"/.test(h), 'kartu channel/pembayaran: tab Channel aktif secara bawaan');
+m.dashTab('pay'); let c1 = dom.chcard.innerHTML.replace(/\u00a0/g, ' ');
+ok(S.dtab === 'pay' && /Tunai · 25 trx/.test(c1) && /QRIS · 12 trx/.test(c1) && /Transfer · 3 trx/.test(c1) && /Rp600\.000 · 66,9%/.test(c1) && /class="stack"/.test(c1), 'tab Pembayaran: nama metode, jumlah trx, rupiah, persen, batang komposisi: ' + c1.slice(0, 160));
+ok(/sudah dikurangi retur/.test(c1) && /chip sm on" data-act="dtab" data-t="pay"/.test(c1), 'keterangan neto retur + tab Pembayaran aktif');
+h = draw(t2()); ok(/Tunai · 25 trx/.test(h.replace(/\u00a0/g, ' ')), 'pilihan tab bertahan saat Beranda digambar ulang');
+m.dashTab('ch'); c1 = dom.chcard.innerHTML; ok(/Offline/.test(c1) && !/Tunai/.test(c1) && S.dtab === 'ch', 'kembali ke tab Channel');
+m.dashTab('ngawur'); ok(S.dtab === 'ch', 'nilai tab tidak dikenal => channel');
+d = t2(); d.metode = [{metode: 'tunai', trx: 3, rp: 90000}]; draw(d); m.dashTab('pay'); ok(!/class="stack"/.test(dom.chcard.innerHTML), 'satu metode: tanpa batang komposisi');
+d = t2(); d.metode = [{metode: 'tunai', trx: 3, rp: 90000}, {metode: 'qris', trx: 0, rp: -20000}]; draw(d); m.dashTab('pay'); ok(!/width:-/.test(dom.chcard.innerHTML) && /QRIS/.test(dom.chcard.innerHTML), 'metode bernilai negatif (hanya retur) tidak merusak lebar batang');
+d = t2(); d.metode = [{metode: '<b>x</b>', trx: 1, rp: 1000}]; draw(d); m.dashTab('pay'); ok(!/<b>x<\/b>/.test(dom.chcard.innerHTML), 'nama metode tak dikenal di-escape');
+d = t2(); d.metode = []; draw(d); m.dashTab('pay'); ok(/Belum ada pembayaran/.test(dom.chcard.innerHTML), 'tanpa pembayaran: pesan kosong');
+S.dtab = 'ch';
+
+// ---- produk terlaris: jumlah / omzet / laba ----
+draw(t2()); h = dom.dbody.innerHTML;
+ok(/data-act="dtop" data-t="qty"/.test(h) && /data-act="dtop" data-t="om"/.test(h) && /data-act="dtop" data-t="laba"/.test(h), 'tab Jumlah/Omzet/Laba tersedia');
+m.dashTop('om'); c1 = dom.topcard.innerHTML.replace(/\u00a0/g, ' ');
+ok(S.dtopm === 'om' && c1.indexOf('Bareng Chili Oil 500 g<') < c1.indexOf('Pangsit Kuah Pedas 650 ml<') && /Rp520\.000/.test(c1) && !/ pcs</.test(c1) && !/ ~</.test(c1), 'urut menurut omzet, tampil rupiah, tanpa "~": ' + c1.slice(0, 200));
+m.dashTop('laba'); c1 = dom.topcard.innerHTML.replace(/\u00a0/g, ' ');
+ok(/Makaroni 100 g Level 1/.test(c1) && /Rp70\.000/.test(c1), 'urut menurut laba');
+ok(!/HPP belum lengkap/.test(c1), 'tanpa peringatan HPP: tidak ada catatan');
+d = t2(); d.peringatan = [{aksi: 'hpp', teks: 'x'}]; draw(d); m.dashTop('laba'); ok(/HPP belum lengkap: laba produk bisa lebih tinggi/.test(dom.topcard.innerHTML), 'ada peringatan HPP: laba produk diberi catatan');
+m.dashTop('qty'); ok(/ pcs</.test(dom.topcard.innerHTML) && S.dtopm === 'qty', 'kembali ke jumlah');
+m.dashTop('ngawur'); ok(S.dtopm === 'qty', 'nilai tak dikenal => jumlah');
+d = t2(); delete d.top_om; delete d.top_laba; draw(d); ok(!/data-act="dtop"/.test(dom.dbody.innerHTML), 'server tanpa top_om/top_laba: tanpa tab, tetap tampil jumlah');
+S.dtopm = 'laba'; d = t2(); delete d.top_laba; m.dashTop('laba'); draw(d); ok(/ pcs</.test(dom.dbody.innerHTML), 'mode tersimpan tapi data tidak ada => jatuh ke jumlah');
+S.dtopm = 'qty';
+
+// ---- jam ramai ----
+h = draw(t2()); const jh = h.slice(h.indexOf('Jam ramai'), h.indexOf('Stok bahan perlu'));
+ok(/12\.00–13\.00<\/span><span>11 trx/.test(jh), 'jam terramai: 12.00–13.00, 11 trx');
+ok(jh.indexOf('12.00–13.00') < jh.indexOf('18.00–19.00') && jh.indexOf('18.00–19.00') < jh.indexOf('13.00–14.00'), 'urut menurut transaksi; seri (9 trx) diurut menurut omzet: 18.00 (Rp230.000) sebelum 13.00 (Rp210.000): ' + jh.replace(/<[^>]+>/g, ' ').slice(0, 140));
+ok((jh.match(/class="bar"/g) || []).length === 3 && !/09\.00|23\.00/.test(jh), 'hanya 3 jam teratas');
+ok(m.jamRange(23) === '23.00–00.00' && m.jamRange(0) === '00.00–01.00', 'rentang jam melewati tengah malam');
+ok(/transaksi lama yang diinput belakangan tidak dihitung/.test(jh), 'keterangan sumber data jam');
+d = t2(); d.jam = []; h = draw(d); ok(!/Jam ramai/.test(h), 'tanpa data jam: kartu tidak ditampilkan');
+
+// ---- stok bahan memakai total sebenarnya ----
+d = t2(); d.low = d.low.map((l, i) => i < 9 ? l : {nama: l.nama, stok: 40, satuan: 'gram'}); h = draw(d);
+ok(/14 habis/.test(h) && /1 menipis/.test(h), 'ringkasan memakai jumlah sebenarnya dari server (14 habis, 1 menipis)');
+ok(/Menampilkan 10 dari 15 bahan/.test(h) && !/Daftar dibatasi/.test(h), 'catatan "Menampilkan 10 dari 15"');
+d = t2(); d.low = d.low.slice(0, 2); d.low_habis = 2; d.low_tipis = 0; h = draw(d); ok(!/Menampilkan/.test(h) && /2 habis/.test(h), 'semua tampil: tanpa catatan "Menampilkan"');
+
+// ---- laba produk negatif (HPP > harga jual) tidak merusak batang ----
+d = t2(); d.top_laba = [{nama: 'Produk A', qty: 5, om: 50000, laba: 20000}, {nama: 'Produk Rugi', qty: 9, om: 40000, laba: -15000}]; draw(d); m.dashTop('laba');
+ok(!/width:-/.test(dom.topcard.innerHTML) && /Produk Rugi/.test(dom.topcard.innerHTML) && /-Rp15\.000|Rp-15\.000|−Rp15\.000/.test(dom.topcard.innerHTML.replace(/\u00a0/g, ' ')), 'laba negatif tampil apa adanya dan lebar batang tidak negatif: ' + dom.topcard.innerHTML.slice(-260));
+m.dashTop('qty');
+
+// ---- kunci cache Beranda memuat versi bentuk data (cache lama tanpa kunci tahap 2 diambil ulang) ----
+ok(/const k = A\.dverKey\(\) \+ '\|' \+ A\.today\(\) \+ '\|v2'/.test(src), 'kunci cache Beranda memuat penanda bentuk data |v2');
+ok(/dtab: el => dashTab\(el\.dataset\.t\), dtop: el => dashTop\(el\.dataset\.t\)/.test(src), 'aksi dtab dan dtop terdaftar pada ACT');
+
 console.log('Semua lulus (' + pass + ' pemeriksaan)');
+

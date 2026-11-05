@@ -26,12 +26,12 @@ const qMark = '<span class="q-m" title="HPP belum diisi, laba dan margin belum b
 
 /* ---------- Beranda (dashboard) ---------- */
 function vDash(force) { // force: tombol muat ulang (↻) memaksa ambil ulang dari server
-  $('#main').innerHTML = wrapChips([['hari', 'Hari ini'], ['minggu', '7 hari'], ['bulan', 'Bulan ini']].map(p => '<button class="chip ' + (S.dp === p[0] ? 'on' : '') + '" data-act="dp" data-p="' + p[0] + '">' + p[1] + '</button>').join('') + '<button class="chip chip-reload" data-act="dp" data-p="' + S.dp + '" aria-label="Muat ulang" title="Muat ulang"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Segarkan</button>') + '<div id="dbody"></div>';
+  $('#main').innerHTML = wrapChips([['hari', 'Hari ini'], ['minggu', '7 hari'], ['bulan', 'Bulan ini']].map(p => '<button class="chip ' + (S.dp === p[0] ? 'on' : '') + '" data-act="dp" data-p="' + p[0] + '">' + p[1] + '</button>').join('') + '<button class="chip" data-act="dp" data-p="' + S.dp + '" aria-label="Muat ulang">↻</button>') + '<div id="dbody"></div>';
   /* Hasil disimpan bersama sidik versi data + tanggal ({k, d}). Layar langsung menampilkan hasil tersimpan; laporan penuh diambil hanya bila versi data berubah
      (ada penjualan/biaya/produksi baru), hari berganti, atau ↻ ditekan. Sidik diambil SEBELUM permintaan: bila data bergerak di sela, hasilnya tampak sedikit basi
      dan diambil ulang di kunjungan berikutnya (arah aman). Format lama (tanpa {k, d}) tetap ditampilkan lalu diperbarui. */
   const key = 'dash_' + S.dp, c = LS.get(key, null), want = S.dp, cached = c && c.k !== undefined ? c.d : c;
-  if (cached) drawDash(cached); else $('#dbody').innerHTML = '<div class="dash-skel"><div class="sk sk-hero"></div><div class="kgrid k3"><div class="sk sk-kpi"></div><div class="sk sk-kpi"></div><div class="sk sk-kpi"></div></div><div class="dash-grid"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div></div>';
+  if (cached) drawDash(cached); else $('#dbody').innerHTML = skel(4);
   if (!force && cached && navigator.onLine === false) return;
   A.verSync(force ? 0 : 15000).then(() => {
     if (S.tab !== 'dash' || S.dp !== want || !$('#dbody')) return;
@@ -39,19 +39,8 @@ function vDash(force) { // force: tombol muat ulang (↻) memaksa ambil ulang da
     return api('dashboard.get', {period: want}).then(d => { LS.set(key, {k: k, d: d}); if (S.tab === 'dash' && S.dp === want && $('#dbody')) drawDash(d); });
   }).catch(e => { try { console.error('dashboard', e); } catch (x) {} /* G: detail teknis hanya ke log; pengguna melihat pesan ramah + Coba lagi */ if (!cached && $('#dbody')) $('#dbody').innerHTML = '<div class="empty-s" role="alert"><h3>Data belum bisa dimuat</h3><p>Periksa sambungan internet, lalu coba lagi.</p><button class="btn sec" data-act="dp" data-p="' + esc(S.dp) + '">Coba lagi</button></div>'; });
 }
-function delta(c, p, lab) {
-  if (!p) return '<span class="dlt-pill neutral"><span>—</span> ' + esc(lab) + ' <small>(belum ada data)</small></span>';
-  const x = (c - p) / Math.abs(p) * 100, isUp = x >= 0;
-  return '<span class="dlt-pill ' + (isUp ? 'pos' : 'neg') + '">' +
-    '<span>' + (isUp ? '▲' : '▼') + '</span> ' + pct(Math.abs(x)) + ' <small>' + esc(lab) + '</small>' +
-  '</span>';
-}
-const kpi = (l, v, sub, ic) =>
-  '<div class="kpi">' +
-    '<div class="kpi-head"><span class="kpi-label">' + esc(l) + '</span>' + (ic || '') + '</div>' +
-    '<b>' + v + '</b>' +
-    '<div class="kpi-sub">' + sub + '</div>' +
-  '</div>';
+function delta(c, p, lab) { if (!p) return '<span>—</span> ' + lab + ' (belum ada data)'; const x = (c - p) / Math.abs(p) * 100; return '<span style="color:' + (x >= 0 ? 'var(--ok)' : 'var(--err)') + ';font-weight:800">' + (x >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(x)) + '</span> ' + lab; }
+const kpi = (l, v, sub) => '<div class="kpi"><div class="muted">' + l + '</div><b>' + v + '</b><div class="muted">' + sub + '</div></div>';
 function barChart(ser) {
   const W = 320, H = 130, pad = 18, n = ser.length, max = Math.max(1, ...ser.map(s => s.omzet)), bw = (W - 8) / n; let g = '';
   ser.forEach((s, i) => {
@@ -64,30 +53,14 @@ function barChart(ser) {
 }
 const COL = ['#5B1A14', '#E4570E', '#FFC52E', '#14703A', '#8C7B6E']; // palet token "Dapur Pedas": maroon, cabai, kuning, hijau, abu hangat
 function donut(parts, total) { // batang bertumpuk per channel
-  return '<div class="stack" role="img" aria-label="Komposisi penjualan per channel">' + (total && parts.length ? parts.map((p, i) => '<i style="width:' + (p.omzet / total * 100) + '%;background:' + COL[i % 5] + '" title="' + esc(p.nama) + ' (' + pct(p.omzet / total * 100) + ')"></i>').join('') : '<i style="width:100%;background:var(--sunk)"></i>') + '</div>';
+  return '<div class="stack" role="img" aria-label="Komposisi penjualan per channel">' + parts.map((p, i) => '<i style="width:' + (total ? p.omzet / total * 100 : 0) + '%;background:' + COL[i % 5] + '"></i>').join('') + '</div>';
 }
 const PLAB = {hari: 'hari ini', minggu: '7 hari terakhir', bulan: 'bulan ini'};
 function heroHtml(d, lab) { // kartu utama: omzet, pembanding, batang harian (bagian bawah batang = laba kotor)
   const c = d.cur, p = d.prev, ser = d.series, n = ser.length, max = Math.max(1, ...ser.map(s => s.omzet));
-  const bars = ser.map((s, i) => {
-    const isT = i === n - 1;
-    const hPct = Math.max(4, Math.round(s.omzet / max * 100));
-    const lPct = s.omzet > 0 ? Math.min(100, Math.round(Math.max(s.laba, 0) / s.omzet * 100)) : 0;
-    return '<div data-act="bar" data-b="' + i + '" data-i="' + i + '"' + (isT ? ' class="t"' : '') + ' style="height:' + hPct + '%" title="' + esc(idDate(s.d)) + '"><i style="height:' + lPct + '%"></i></div>';
-  }).join('');
+  const bars = ser.map((s, i) => '<div data-act="bar" data-b="' + i + '" data-i="' + i + '"' + (i === n - 1 ? ' class="t"' : '') + ' style="height:' + Math.max(3, Math.round(s.omzet / max * 100)) + '%"><i style="height:' + (s.omzet > 0 ? Math.min(100, Math.round(Math.max(s.laba, 0) / s.omzet * 100)) : 0) + '%"></i></div>').join('');
   const labs = ser.map((s, i) => '<span>' + (n <= 8 || i % 5 === 0 || i === n - 1 ? s.d.slice(8) : '') + '</span>').join('');
-  return '<div class="hero dash-hero">' +
-    '<div class="hero-top">' +
-      '<div class="hero-main">' +
-        '<small class="hero-label">OMZET ' + esc((PLAB[d.period] || '').toUpperCase()) + '</small>' +
-        '<div class="big">' + rp(c.omzet) + '</div>' +
-      '</div>' +
-      '<div class="dlt">' + delta(c.omzet, p.omzet, lab) + '</div>' +
-    '</div>' +
-    '<div class="hbars bchart" role="img" aria-label="Omzet per hari. Ketuk batang untuk melihat nilai.">' + bars + '</div>' +
-    '<div class="hlab">' + labs + '</div>' +
-    '<div class="btip hero-btip" id="bt" aria-live="polite"><span class="btip-icon">💡</span> Ketuk batang untuk nilai harian (bagian bawah batang = laba kotor)</div>' +
-  '</div>';
+  return '<div class="hero"><small>Omzet ' + (PLAB[d.period] || '') + '</small><div class="big">' + rp(c.omzet) + '</div><div class="dlt">' + delta(c.omzet, p.omzet, lab) + '</div><div class="hbars bchart" role="img" aria-label="Omzet per hari. Ketuk batang untuk melihat nilai.">' + bars + '</div><div class="hlab">' + labs + '</div><div class="btip" id="bt" aria-live="polite">Ketuk batang untuk nilai harian (bagian bawah batang = laba kotor)</div></div>';
 }
 const CMP = {hari: 'vs kemarin', minggu: 'vs 7 hari sebelumnya', bulan: 'vs periode sama bulan lalu'};
 /* Peringatan Beranda dikumpulkan jadi satu ikon (bukan banner yang memakan layar). Ketuk ikon: daftar lengkap, tiap item tetap punya tombol aksinya. */
@@ -111,81 +84,11 @@ function drawBell() {
 function drawDash(d) {
   const c = d.cur, p = d.prev, tot = d.channels.reduce((a, x) => a + x.omzet, 0), maxQ = Math.max(1, ...d.top.map(t => t.qty)), lab = CMP[d.period] || 'vs sebelumnya';
   const days = Math.round((new Date(d.to + 'T12:00:00') - new Date(d.from + 'T12:00:00')) / 86400000) + 1, pto = d.pto || A.addDays(d.from, -1), pfrom = d.pfrom || A.addDays(pto, -(days - 1)); S.dser = d.series;
-
-  const icTrx = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kpi-ic" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>';
-  const icLabaKotor = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kpi-ic" aria-hidden="true"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>';
-  const icLabaBersih = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kpi-ic" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>';
-
-  const chList = d.channels.length ? d.channels.map((x, i) =>
-    '<div class="ch-row">' +
-      '<div class="ch-name"><span class="lgd" style="background:' + COL[i % 5] + '"></span><span>' + esc(x.nama) + '</span></div>' +
-      '<div class="ch-val"><span class="ch-rp">' + rp(x.omzet) + '</span><span class="ch-pct">' + (tot ? pct(x.omzet / tot * 100) : '0%') + '</span></div>' +
-    '</div>'
-  ).join('') : '<div class="muted dc-empty">Belum ada penjualan</div>';
-
-  const topList = d.top.length ? d.top.map((t, i) =>
-    '<div class="top-row">' +
-      '<div class="top-main">' +
-        '<span class="rank-badge rank-' + (i + 1) + '">' + (i + 1) + '</span>' +
-        '<span class="top-nama">' + esc(t.nama) + '</span>' +
-        '<span class="top-qty">' + num(t.qty) + ' <small>pcs</small></span>' +
-      '</div>' +
-      '<div class="bar top-bar"><i style="width:' + Math.round(t.qty / maxQ * 100) + '%"></i></div>' +
-    '</div>'
-  ).join('') : '<div class="muted dc-empty">Belum ada data</div>';
-
-  const lowList = d.low.length ? d.low.map(l =>
-    '<div class="low-row">' +
-      '<div class="low-main"><span class="low-name">' + esc(l.nama) + '</span><span class="tag warn">Menipis</span></div>' +
-      '<div class="low-stk">' + dec(l.stok) + ' <small>' + esc(l.satuan) + '</small></div>' +
-    '</div>'
-  ).join('') : '<div class="stock-safe"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ic-ok" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> <span>Semua stok bahan aman</span></div>';
-
-  const biayaRow = d.biaya ?
-    '<div class="biaya-row">' +
-      '<div class="biaya-main"><span class="biaya-ic">💸</span><span>Biaya operasional</span></div>' +
-      '<b class="biaya-val">' + rp(d.biaya) + '</b>' +
-    '</div>' : '';
-
-  $('#dbody').innerHTML =
-    '<div class="rcaprow">' +
-      '<div class="rcap-info rcap">' +
-        '<span class="rcap-chip rcap-cal"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <b>' + esc(idRange(d.from, d.to)) + '</b></span>' +
-        '<span class="rcap-chip rcap-cmp">vs ' + esc(idRange(pfrom, pto)) + '</span>' +
-        '<span class="rcap-note">Tanpa PPN</span>' +
-      '</div>' +
-      '<span id="wbell"></span>' +
-    '</div>' +
-    heroHtml(d, lab) +
-    '<div class="kgrid k3">' +
-      kpi('Transaksi', num(c.trx), 'Rata-rata ' + rp(c.trx ? c.omzet / c.trx : 0), icTrx) +
-      kpi('Laba kotor', rp(c.laba), '<span id="mgn" class="margin-pill">' + (c.omzet ? pct(c.laba / c.omzet * 100) : '0%') + ' margin</span>', icLabaKotor) +
-      kpi('Laba bersih', rp(d.laba_bersih), 'setelah fee, biaya' + (d.kerugian ? ', kerugian stok ' + rp(d.kerugian) : ''), icLabaBersih) +
-    '</div>' +
-    '<div class="dash-grid">' +
-      '<div class="dash-card">' +
-        '<div class="dc-head">' +
-          '<div class="dc-title"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dc-ic" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span>Saluran Penjualan</span></div>' +
-          '<span class="dc-badge">' + d.channels.length + ' channel</span>' +
-        '</div>' +
-        donut(d.channels, tot) +
-        '<div class="dc-list">' + chList + '</div>' +
-      '</div>' +
-      '<div class="dash-card">' +
-        '<div class="dc-head">' +
-          '<div class="dc-title"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dc-ic dc-ic-hot" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> <span>Produk Terlaris</span></div>' +
-          '<span class="dc-badge">Top ' + d.top.length + '</span>' +
-        '</div>' +
-        '<div class="dc-list">' + topList + '</div>' +
-      '</div>' +
-      '<div class="dash-card">' +
-        '<div class="dc-head">' +
-          '<div class="dc-title"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dc-ic dc-ic-warn" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> <span>Perhatian & Biaya</span></div>' +
-          (d.low.length ? '<span class="dc-badge warn">' + d.low.length + ' menipis</span>' : '<span class="dc-badge ok">Aman</span>') +
-        '</div>' +
-        '<div class="dc-list">' + lowList + (biayaRow ? '<div class="dc-sep"></div>' + biayaRow : '') + '</div>' +
-      '</div>' +
-    '</div>';
+  $('#dbody').innerHTML = '<div class="rcaprow"><p class="muted rcap">' + esc(idRange(d.from, d.to)) + ' · omzet tanpa PPN · pembanding: ' + esc(idRange(pfrom, pto)) + '</p><span id="wbell"></span></div>' + heroHtml(d, lab) + '<div class="kgrid k3">' + kpi('Transaksi', num(c.trx), 'Rata-rata ' + rp(c.trx ? c.omzet / c.trx : 0)) +
+    kpi('Laba kotor', rp(c.laba), '<span id="mgn">' + (c.omzet ? pct(c.laba / c.omzet * 100) : '0%') + ' margin</span>') + kpi('Laba bersih', rp(d.laba_bersih), 'setelah fee, biaya' + (d.kerugian ? ', kerugian stok ' + rp(d.kerugian) : '')) + '</div>' +
+    '<div class="li" style="display:block"><b>Per channel</b><div style="display:block">' + donut(d.channels, tot) + '<div style="flex:1">' + (d.channels.map((x, i) => '<div class="kv"><span><span class="lgd" style="background:' + COL[i % 5] + ';margin-left:0"></span>' + esc(x.nama) + '</span><span>' + (tot ? pct(x.omzet / tot * 100) : '0%') + '</span></div>').join('') || '<span class="muted">Belum ada penjualan</span>') + '</div></div></div>' +
+    '<div class="li" style="display:block"><b>Produk terlaris</b>' + (d.top.map(t => '<div style="margin-top:6px"><div class="kv"><span>' + esc(t.nama) + '</span><span>' + num(t.qty) + ' pcs</span></div><div class="bar"><i style="width:' + Math.round(t.qty / maxQ * 100) + '%"></i></div></div>').join('') || '<div class="muted">Belum ada data</div>') + '</div>' +
+    '<div class="li" style="display:block"><b>Perlu perhatian</b>' + (d.low.map(l => '<div class="kv"><span>' + esc(l.nama) + '</span><span><span class="tag">Menipis</span> ' + dec(l.stok) + ' ' + esc(l.satuan) + '</span></div>').join('') || '<div class="muted">Semua stok bahan aman</div>') + (d.biaya ? kv('Biaya operasional', rp(d.biaya)) : '') + '</div>';
   S.dashRange = {from: d.from, to: d.to};
   S.dwarn = dashWarnings(d); drawBell();
   if (c.trx && !(d.peringatan || []).some(w => w && w.aksi === 'hpp')) hppCheck(d.from, d.to).then(v => { if (!v.n || !$('#wbell')) return; S.dwarn.push({judul: 'Laba belum akurat', teks: v.n + ' produk belum punya resep/HPP: ' + v.names.slice(0, 3).join(', ') + (v.names.length > 3 ? ' dan ' + (v.names.length - 3) + ' lainnya' : ''), tombol: 'Lengkapi di Resep', act: 'go_resep'}); drawBell(); const mg = $('#mgn'); if (mg && c.omzet && c.laba / c.omzet >= .995) mg.innerHTML = qMark + ' margin belum bisa dihitung'; }).catch(() => {});

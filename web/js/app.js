@@ -1432,9 +1432,14 @@ function vStok() {
     wrapChips(cats.map(c => '<button class="chip ' + (c === S.scat ? 'on' : '') + '" data-act="scat" data-c="' + esc(c) + '">' + esc(c === 'Semua' || !bahan ? c : c.charAt(0).toUpperCase() + c.slice(1)) + '</button>').join('')) + '<div id="ssum" class="ssum"></div><div id="slist"></div>';
   stokList();
 }
+/* 0037: tampilan bantu "≈ N pack" dari isi kemasan di Data Master. Hanya tampilan; stok tetap tersimpan dalam satuan utama. */
+function stPack(m) {
+  const isi = Number(m.pack_isi), st = Number(m.stok); if (!m.pack_nama || !(isi > 0) || !isFinite(st) || st === 0) return '';
+  return ' · ≈ ' + (Math.round(st / isi * 10) / 10).toLocaleString('id-ID', {maximumFractionDigits: 1}) + ' ' + m.pack_nama;
+}
 function stokList() {
   const o = can('materials'), cost = can('cost'), edit = can('stockedit'), bahan = S.stab === 'bahan' && o, q = S.sq.toLowerCase(), thr = Number(cfg('stok_menipis')) > 0 ? Number(cfg('stok_menipis')) : 5; let rows;
-  if (bahan) rows = S.data.materials.filter(m => (S.scat === 'Semua' || m.tipe === S.scat) && (!q || (m.nama + ' ' + m.satuan).toLowerCase().indexOf(q) >= 0)).map(m => ({id: m.id, t: 'bahan', name: String(m.nama), lv: '', sub: cost ? 'HPP rata-rata ' + rp(m.hpp_rata2) + '/' + m.satuan : m.satuan, val: qf(m.stok) + ' ' + m.satuan, st: stState(Number(m.stok) || 0, Number(m.stok_minimum) || 0, thr)}));
+  if (bahan) rows = S.data.materials.filter(m => (S.scat === 'Semua' || m.tipe === S.scat) && (!q || (m.nama + ' ' + m.satuan).toLowerCase().indexOf(q) >= 0)).map(m => ({id: m.id, t: 'bahan', name: String(m.nama), lv: '', sub: (cost ? 'HPP rata-rata ' + rp(m.hpp_rata2) + '/' + m.satuan : m.satuan) + stPack(m), val: qf(m.stok) + ' ' + m.satuan, st: stState(Number(m.stok) || 0, Number(m.stok_minimum) || 0, thr)}));
   else rows = S.data.variants.filter(v => (S.scat === 'Semua' || String((pById(v.product_id) || {}).kategori) === S.scat) && (!q || (vName(v) + ' ' + vSub(v) + ' ' + v.sku).toLowerCase().indexOf(q) >= 0)).map(v => ({id: v.id, t: 'varian', name: String(vName(v)), lv: lvText(v.level_pedas), sub: [v.ukuran].filter(Boolean).join('') + (cost ? ' · HPP ' + rp(v.hpp_rata2) : ''), val: num(v.stok), st: stState(Number(v.stok) || 0, 0, thr)}));
   const rank = {out: 0, low: 1, ok: 2}; rows.sort((a, b) => rank[a.st] - rank[b.st] || a.name.localeCompare(b.name, 'id') || a.sub.localeCompare(b.sub, 'id')); // habis dan menipis di atas
   const nOut = rows.filter(r => r.st === 'out').length, nLow = rows.filter(r => r.st === 'low').length, ss = $('#ssum');
@@ -1521,8 +1526,14 @@ function pbRefUpd() {   // perbarui pembanding tanpa menggambar ulang lembar (is
   const id = pbVal('pb_m'), m = pbMat(id), r = $('#pb_ref'), h = /** @type {any} */ ($('#pb_h')), u = $('#pb_unit');
   if (r) r.textContent = pbHint(id); if (h) h.placeholder = pbPlaceholder(id); if (u && m) u.textContent = m.satuan;
 }
-function pbPackDefault(id) {   // ingat nama dan isi kemasan terakhir yang dipakai untuk bahan ini
-  const k = (LS.get('pbpack', {}) || {})[id] || {}, a = /** @type {any} */ ($('#pk_nm')), b = /** @type {any} */ ($('#pk_i'));
+/* Nama dan isi kemasan beli satu bahan. Utama: Data Master (0037, sama di semua perangkat); cadangan: yang diingat di perangkat ini (LS 'pbpack'). */
+function pbPackOf(id) {
+  const m = S.data.materials.find(x => x.id === id), isi = m ? Number(m.pack_isi) : 0;
+  if (m && m.pack_nama && isi > 0) return {nm: String(m.pack_nama), isi: isi, master: true};
+  const k = (LS.get('pbpack', {}) || {})[id] || {}; return {nm: k.nm || '', isi: Number(k.isi) || 0, master: false};
+}
+function pbPackDefault(id) {   // isi nama dan isi kemasan dari Data Master, atau dari yang terakhir dipakai di perangkat ini
+  const k = pbPackOf(id), a = /** @type {any} */ ($('#pk_nm')), b = /** @type {any} */ ($('#pk_i'));
   if (a) a.value = k.nm || ''; if (b) b.value = k.isi ? pbQ(k.isi) : '';
 }
 /* Baca isian form tambah bahan. Mode kemasan: jumlah kemasan x isi per kemasan = jumlah; harga kemasan / isi = harga satuan. */
@@ -1549,11 +1560,11 @@ async function pbAdd() {
     const go = await confirmBox({title: 'Harga berbeda jauh', msg: 'Harga ' + pbRp(x.h) + '/' + x.m.satuan + ' ' + (up ? 'lebih tinggi ' : 'lebih rendah ') + pct + '% dari ' + b.nm + ' (' + pbRp(b.v) + '/' + x.m.satuan + '). Periksa lagi jumlah nol dan satuannya sebelum lanjut.', stay: 'Periksa lagi', leave: 'Harga sudah benar'});
     if (!go) return;
   }
-  if (S.pb.mode === 'kem') { const pk = LS.get('pbpack', {}) || {}; pk[x.id] = {nm: x.nm, isi: x.isi}; LS.set('pbpack', pk); }
+  if (S.pb.mode === 'kem' && !pbPackOf(x.id).master) { const pk = LS.get('pbpack', {}) || {}; pk[x.id] = {nm: x.nm, isi: x.isi}; LS.set('pbpack', pk); }   // cadangan perangkat, hanya bila Data Master belum punya kemasan bahan ini
   S.pb.items.push({id: x.id, qty: x.q, harga: x.h, kem: x.label}); pbTouch(); S.pb.need = (S.pb.need || []).filter(n => n.id !== x.id); const nx = S.pb.need[0]; S.pb.sel = nx ? nx.id : ''; S.pb.selq = nx ? nx.qty : ''; pbSheet();
 }
 function pbSheet() {
-  const m = S.data.materials, pb = S.pb, tot = pb.items.reduce((a, i) => a + i.qty * i.harga, 0), need = (pb.need || []).filter(n => m.some(x => x.id === n.id)), sel = m.some(x => x.id === pb.sel) ? pb.sel : (m[0] ? m[0].id : ''), selM = pbMat(sel), kem = pb.mode === 'kem', pk = (LS.get('pbpack', {}) || {})[sel] || {};
+  const m = S.data.materials, pb = S.pb, tot = pb.items.reduce((a, i) => a + i.qty * i.harga, 0), need = (pb.need || []).filter(n => m.some(x => x.id === n.id)), sel = m.some(x => x.id === pb.sel) ? pb.sel : (m[0] ? m[0].id : ''), selM = pbMat(sel), kem = pb.mode === 'kem', pk = pbPackOf(sel);
   sheet((pb.back ? '<button class="chip" data-act="pbback">← Kembali ke produksi</button>' : '') + '<h2>Pembelian bahan</h2>' +
     (need.length ? '<div class="li" style="display:block"><b>Bahan kurang untuk produksi</b><div class="muted">Ketuk bahan, isi harga beli, lalu Tambah ke daftar.</div><div class="chips">' + need.map(n => { const x = m.find(y => y.id === n.id); return '<button class="chip" data-act="pbfill" data-id="' + esc(n.id) + '" data-q="' + esc(n.qty) + '">' + esc(x.nama) + ' · kurang ' + qf(n.qty) + ' ' + esc(x.satuan) + '</button>'; }).join('') + '</div></div>' : '') +
     '<label>Supplier<select class="inp" data-in="pbsup"><option value="">- tanpa supplier -</option>' + S.data.suppliers.map(s => '<option value="' + esc(s.id) + '"' + (s.id === pb.sup ? ' selected' : '') + '>' + esc(s.nama) + '</option>').join('') + '</select></label>' +
@@ -1645,7 +1656,7 @@ const MT = {
   products: {l: 'Produk', k: 'products', f: [['nama', 'Nama produk'], ['kategori', 'Kategori (mis. Basreng)']], t: r => r.nama + (r.kategori ? ' · ' + r.kategori : '')},
   product_variants: {l: 'Varian', k: 'variants', f: [['product_id', 'Produk', 'ref:products'], ['sku', 'SKU (kosongkan untuk otomatis)'], ['ukuran', 'Ukuran kemasan (mis. 100 g)'], ['level_pedas', 'Level pedas (mis. Level 3)']], t: r => vName(r) + ' · ' + vSub(r)},
   channel_prices: {l: 'Harga jual', k: 'prices', f: [['variant_id', 'Varian', 'ref:variants'], ['channel_id', 'Channel', 'ref:channels'], ['harga_jual', 'Harga jual (Rp)', 'number']], t: r => { const v = vById(r.variant_id); return (v ? vName(v) + ' ' + vSub(v) : '?') + ' · ' + chName(r.channel_id) + ' · ' + rp(r.harga_jual); }},
-  materials: {l: 'Bahan dan kemasan', k: 'materials', f: [['nama', 'Nama'], ['tipe', 'Tipe', 'sel:bahan,kemasan,barang jadi beli'], ['satuan', 'Satuan (kg, gram, pcs)'], ['stok_minimum', 'Stok minimum', 'number'], ['satuan_kecil', 'Satuan kecil untuk resep (opsional, mis. ml)'], ['faktor_kecil', 'Isi satuan kecil per 1 satuan (mis. 1000)', 'number']], t: r => r.nama + ' (' + r.satuan + ')'},
+  materials: {l: 'Bahan dan kemasan', k: 'materials', f: [['nama', 'Nama'], ['tipe', 'Tipe', 'sel:bahan,kemasan,barang jadi beli'], ['satuan', 'Satuan (kg, gram, pcs)'], ['stok_minimum', 'Stok minimum', 'number'], ['satuan_kecil', 'Satuan kecil untuk resep (opsional, mis. ml)'], ['faktor_kecil', 'Isi satuan kecil per 1 satuan (mis. 1000)', 'number'], ['pack_nama', 'Nama kemasan beli (opsional, mis. pack, karung)'], ['pack_isi', 'Isi 1 kemasan dalam satuan bahan (mis. 24)', 'number']], t: r => r.nama + ' (' + r.satuan + ')'},
   suppliers: {l: 'Supplier', k: 'suppliers', f: [['nama', 'Nama'], ['kontak', 'Kontak'], ['catatan', 'Catatan']], t: r => r.nama},
   expenses: {l: 'Biaya operasional', k: 'expenses', f: [['tanggal', 'Tanggal', 'date'], ['kategori', 'Kategori', 'sel:Gas,Listrik,Air,Sewa,Gaji/Tenaga kerja,Transport,Pemasaran,Lain-lain'], ['nominal', 'Nominal (Rp)', 'number'], ['lingkup', 'Dicatat pada', 'sel2:outlet|Outlet aktif,pusat|Pusat (semua outlet; tidak dibagi otomatis)'], ['catatan', 'Catatan']], t: r => String(r.tanggal).slice(0, 10) + ' · ' + r.kategori + ' · ' + rp(r.nominal)},
   channels: {l: 'Channel', k: 'channels', f: [['nama', 'Nama'], ['fee_persen', 'Fee (%)', 'number'], ['fee_tetap', 'Fee tetap (Rp)', 'number'], ['basis_fee', 'Fee dihitung dari', 'sel2:total|Total bayar (termasuk PPN),subtotal|Subtotal (sebelum diskon),omzet|Omzet bersih (tanpa PPN)']], t: r => r.nama + ' · fee ' + (r.fee_persen || 0) + '%'}
@@ -1687,6 +1698,12 @@ async function mSave(id) {
   return busy('Menyimpan data…', async () => {
   const data = readForm(); if (id) data.id = id;
   ['harga_jual', 'fee_persen', 'fee_tetap', 'stok_minimum', 'nominal', 'faktor_kecil'].forEach(k => { if (k in data) data[k] = dnum(data[k]) || 0; });
+  if (S.mt === 'materials') {   // 0037: nama dan isi kemasan beli harus lengkap berdua, atau kosong keduanya
+    const dd = /** @type {any} */ (data), nm = String(dd.pack_nama || '').trim(), isi = dd.pack_isi === '' || dd.pack_isi == null ? 0 : dnum(dd.pack_isi);
+    if ((nm && !(isi > 0)) || (!nm && isi > 0)) { toast('Isi nama kemasan dan isi per kemasan berdua, atau kosongkan keduanya'); return; }
+    if (isi >= 1000000 || nm.length > 30) { toast('Isi kemasan terlalu besar atau nama kemasan terlalu panjang (maks. 30 huruf)'); return; }
+    dd.pack_nama = nm || ''; dd.pack_isi = isi > 0 ? Math.round(isi * 10000) / 10000 : '';
+  }
   try { const rec = await api('master.save', {table: S.mt, data: data}); S.expLoaded = false; if (!patchMaster(S.mt, rec)) await loadData();
     let oe = ''; if (S.mt === 'products' && $('#optf') && rec && rec.id) { try { await optFormSave(rec.id); } catch (e2) { oe = e2.message; } }   // 0032: opsi produk lewat RPC khusus (produk sudah tersimpan)
     closeSheet(); render(); toast(oe ? 'Produk tersimpan, tetapi opsi gagal: ' + oe : 'Tersimpan'); } catch (e) { toast(e.message); }

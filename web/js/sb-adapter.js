@@ -57,7 +57,7 @@ const MANAGE_ROLES = ['owner', 'admin'];
    MIN_SCHEMA = migrasi terakhir yang dibutuhkan klien ini (harus ada di supabase/migrations; dijaga tests/release_check.js).
    Database lebih lama => berhenti dengan pesan jelas (bukan galat 404 acak di tengah transaksi).
    Database mensyaratkan klien lebih baru (min_client) => minta perangkat memperbarui aplikasi. */
-const MIN_SCHEMA = '20261102000036';
+const MIN_SCHEMA = '20261103000037';
 const semverLt = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 let schemaOkAt = 0;
 async function checkSchema(token) {
@@ -88,7 +88,7 @@ const MASTER = {
   products: {t: 'products', m: {nama: 'name', kategori: 'category', aktif: 'active', foto_url: 'photo_url'}},
   product_variants: {t: 'product_variants', m: {product_id: 'product_id', sku: 'sku', ukuran: 'size', level_pedas: 'spice_level', aktif: 'active'}},
   suppliers: {t: 'suppliers', m: {nama: 'name', kontak: 'contact', catatan: 'notes', aktif: 'active'}},
-  materials: {t: 'materials', m: {nama: 'name', tipe: 'type', satuan: 'unit', stok_minimum: 'min_stock', satuan_kecil: 'small_unit', faktor_kecil: 'small_factor', aktif: 'active'}},
+  materials: {t: 'materials', m: {nama: 'name', tipe: 'type', satuan: 'unit', stok_minimum: 'min_stock', satuan_kecil: 'small_unit', faktor_kecil: 'small_factor', pack_nama: 'pack_unit', pack_isi: 'pack_size', aktif: 'active'}},
   channel_prices: {t: 'channel_prices', m: {variant_id: 'variant_id', channel_id: 'channel_id', harga_jual: 'price'}, key: ['variant_id', 'channel_id']}
 };
 const bool = v => v === true || String(v).toUpperCase() === 'TRUE';

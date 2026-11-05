@@ -25,7 +25,7 @@ function boot(role, o) {
     api: async (op, body) => { calls.push({op: op, body: JSON.parse(JSON.stringify(body || {}))}); const r = ctx.__reply[op]; return typeof r === 'function' ? r(body) : r; },
     loadData: async () => { calls.push({op: 'loadData'}); }, newReqId: (() => { let i = 0; return () => 'rid-test-' + (++i); })(),
     confirmBox: async o2 => { confirms.push(o2); return ctx.__confirmAnswer; }, __reply: {}, __confirmAnswer: true};
-  const fn = new Function('ctx', 'with (ctx) {\n' + shared + '\n' + stok + '\nreturn {pbAdd, pbSave, pbSheet, pbTouch, pbRead, pbSetMode, pbRefUpd, pbLastLoad, adjSheet, adjSave, adjHppUpd, pbBase, pbRef, PB_WARN};\n}');
+  const fn = new Function('ctx', 'with (ctx) {\n' + shared + '\n' + stok + '\nreturn {pbAdd, pbSave, pbSheet, pbTouch, pbRead, pbSetMode, pbRefUpd, pbLastLoad, adjSheet, adjSave, adjHppUpd, pbBase, pbRef, PB_WARN, pbPackOf, stPack, stokList};\n}');
   return Object.assign({S: S, els: els, $: $, calls: calls, toasts: toasts, store: store, confirms: confirms, ctx: ctx}, fn(ctx));
 }
 const setSat = (m, id, q, h) => { m.$('#pb_m').value = id; m.$('#pb_q').value = q; m.$('#pb_h').value = h; };
@@ -129,6 +129,22 @@ const setKem = (m, id, nk, nm, isi, hk) => { m.S.pb.mode = 'kem'; m.$('#pb_m').v
   m = boot('stok'); m.S.pbLast = {m1: {harga: 1, waktu: ''}}; m.adjSheet('bahan', 'm1'); m.ctx.__reply['stock.adjust'] = {stok: 9, hpp_rata2: 1}; m.$('#a_s').value = '9'; m.$('#a_r').value = 'opname'; await m.adjSave('bahan', 'm1');
   ok(m.calls.find(c => c.op === 'stock.adjust').body.hpp === '' && !m.confirms.length, 'peran stok yang terkunci tetap bisa koreksi stok (HPP tidak dikirim)');
   m = boot('owner', {hpp: 16000}); m.adjSheet('bahan', 'm1'); m.$('#a_h').value = 'abc'; await m.adjSave('bahan', 'm1'); ok(/tidak valid/.test(m.toasts[0]) && !m.calls.some(c => c.op === 'stock.adjust'), 'HPP bukan angka ditolak sebelum dikirim');
+
+  // ===== 5. kemasan beli di Data Master (0037): isi otomatis dan tampilan "≈ N pack" =====
+  m = boot('owner'); Object.assign(m.S.data.materials[0], {nama: 'Plastik', satuan: 'pcs', stok: 72, pack_nama: 'pack', pack_isi: 24});
+  ok(JSON.stringify(m.pbPackOf('m1')) === '{"nm":"pack","isi":24,"master":true}', 'pbPackOf memakai kemasan dari Data Master');
+  m.store.pbpack = {m1: {nm: 'dus', isi: 10}}; ok(m.pbPackOf('m1').nm === 'pack', 'Data Master menang atas ingatan perangkat');
+  ok(JSON.stringify(m.pbPackOf('m2')) === '{"nm":"","isi":0,"master":false}', 'bahan tanpa kemasan di mana pun: kosong');
+  m.pbSetMode('kem'); m.$('#pb_m').value = 'm1'; m.pbSetMode('kem'); ok(m.$('#pk_nm').value === 'pack' && m.$('#pk_i').value === '24', 'mode per kemasan terisi dari Data Master');
+  setKem(m, 'm1', '3', 'pack', '24', '48000'); const rk = m.pbRead(); ok(rk.q === 72 && rk.h === 2000, '3 pack × 24 pcs @ Rp 48.000 = 72 pcs × Rp 2.000/pcs');
+  await m.pbAdd(); ok(JSON.stringify(m.store.pbpack) === '{"m1":{"nm":"dus","isi":10}}', 'ingatan perangkat tidak ditimpa bila Data Master sudah punya kemasan');
+  m = boot('owner'); setKem(m, 'm2', '1', 'karung', '25', '400000'); await m.pbAdd(); ok(m.store.pbpack && m.store.pbpack.m2.isi === 25, 'tanpa kemasan di Data Master: tetap diingat di perangkat (cadangan)');
+  m = boot('owner'); Object.assign(m.S.data.materials[0], {satuan: 'pcs', stok: 72, pack_nama: 'pack', pack_isi: 24});
+  ok(/≈ 3 pack/.test(m.stPack(m.S.data.materials[0])), '72 pcs dengan isi 24 tampil ≈ 3 pack');
+  m.S.data.materials[0].stok = 80; ok(/≈ 3,3 pack/.test(m.stPack(m.S.data.materials[0])), 'pecahan dibulatkan 1 desimal');
+  m.S.data.materials[0].stok = 0; ok(m.stPack(m.S.data.materials[0]) === '', 'stok 0: tanpa tampilan pack');
+  m.S.data.materials[0].stok = 72; m.stokList(); ok(/≈ 3 pack/.test(m.$('#slist').innerHTML) && !/≈/.test(m.$('#slist').innerHTML.split('Tepung')[0]), 'daftar stok bahan menampilkan ≈ N pack hanya untuk bahan yang punya kemasan');
+  m.S.data.materials[0].pack_isi = null; ok(m.stPack(m.S.data.materials[0]) === '', 'tanpa isi kemasan: tidak ada tampilan pack');
 
   console.log('Semua lulus (' + n + ' pemeriksaan)');
 })().catch(e => { console.error('GAGAL:', e.message); console.error(e.stack.split('\n').slice(0, 4).join('\n')); process.exit(1); });

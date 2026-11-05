@@ -129,6 +129,8 @@ function jamHtml(d) {   // Jam ramai: 3 jam dengan transaksi terbanyak (penjuala
 function dashTab(k) { S.dtab = k === 'pay' ? 'pay' : 'ch'; const e = $('#chcard'); if (e && S.dd) e.innerHTML = chInner(S.dd); }
 function dashTop(k) { S.dtopm = ['om', 'laba'].includes(k) ? k : 'qty'; const e = $('#topcard'); if (e && S.dd) e.innerHTML = topInner(S.dd); }
 function drawDash(d) {
+  /* Server selalu mengirim minimal 7 hari untuk grafik (konteks "Hari ini"). "Bulan ini" hanya menampilkan tanggal bulan berjalan: tanpa hari bulan lalu. */
+  if (d.period === 'bulan') d = Object.assign({}, d, {series: (d.series || []).filter(x => x.d >= d.from && x.d <= d.to)});
   const c = d.cur, p = d.prev, lab = CMP[d.period] || 'vs sebelumnya', t2 = c.pcs !== undefined; S.dd = d;
   const days = Math.round((new Date(d.to + 'T12:00:00') - new Date(d.from + 'T12:00:00')) / 86400000) + 1, pto = d.pto || A.addDays(d.from, -1), pfrom = d.pfrom || A.addDays(pto, -(days - 1)); S.dser = d.series;
   const avg = c.trx ? c.omzet / c.trx : 0, pavg = p && p.trx ? p.omzet / p.trx : 0, sub = x => x ? x + ' ' + lab : '&nbsp;';

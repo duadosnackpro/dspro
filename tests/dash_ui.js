@@ -145,5 +145,17 @@ m.dashTop('qty');
 ok(/const k = A\.dverKey\(\) \+ '\|' \+ A\.today\(\) \+ '\|v2'/.test(src), 'kunci cache Beranda memuat penanda bentuk data |v2');
 ok(/dtab: el => dashTab\(el\.dataset\.t\), dtop: el => dashTop\(el\.dataset\.t\)/.test(src), 'aksi dtab dan dtop terdaftar pada ACT');
 
+// ---- Bulan ini: grafik hanya tanggal bulan berjalan (server mengirim minimal 7 hari, termasuk akhir bulan lalu) ----
+d = base(); d.period = 'bulan'; d.from = '2026-11-01'; d.to = '2026-11-06';
+d.series = ['2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06'].map((x, i) => ({d: x, omzet: 1000 * (i + 1), laba: 100 * i}));
+h = draw(d); const ch = h.slice(h.indexOf('class="hbars'), h.indexOf('Per channel') > 0 ? h.indexOf('Per channel') : h.length), hl = h.slice(h.indexOf('class="hlab"'), h.indexOf('class="hlab"') + 400);
+ok((ch.match(/data-act="bar"/g) || []).length === 6, 'Bulan ini (6 Nov): 6 batang (1-6 Nov), bukan 7: ' + (ch.match(/data-act="bar"/g) || []).length);
+ok(/<span>Min<br>01<\/span>/.test(hl) && /<span>Jum<br>06<\/span>/.test(hl) && !/<br>31</.test(hl), 'label dimulai 01 dan berakhir 06, tanpa 31 bulan lalu');
+ok(S.dser.length === 6 && S.dser[0].d === '2026-11-01', 'S.dser (dipakai ketukan batang) memakai deret yang sama dengan grafik');
+d = base(); d.period = 'bulan'; d.from = '2026-11-01'; d.to = '2026-11-01'; d.series = [{d: '2026-10-26', omzet: 1, laba: 0}, {d: '2026-10-27', omzet: 1, laba: 0}, {d: '2026-10-28', omzet: 1, laba: 0}, {d: '2026-10-29', omzet: 1, laba: 0}, {d: '2026-10-30', omzet: 1, laba: 0}, {d: '2026-10-31', omzet: 1, laba: 0}, {d: '2026-11-01', omzet: 5, laba: 1}];
+h = draw(d); ok(!/hbars/.test(h), 'tanggal 1: hanya 1 hari berjalan => grafik satu batang tidak ditampilkan');
+const orig = base(); orig.period = 'minggu'; draw(orig); ok(S.dser.length === 7, 'periode 7 hari tidak berubah: 7 batang');
+const hr = base(); hr.period = 'hari'; hr.from = '2026-11-05'; hr.to = '2026-11-05'; draw(hr); ok(S.dser.length === 7, 'Hari ini tetap memakai 7 hari sebagai konteks');
+
 console.log('Semua lulus (' + pass + ' pemeriksaan)');
 

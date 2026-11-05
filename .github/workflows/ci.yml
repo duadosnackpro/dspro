@@ -31,6 +31,8 @@ jobs:
         run: npm run test:fe
       - name: Uji klien Realtime (WebSocket palsu)
         run: npm run test:rt
+      - name: Uji sinkronisasi klien (ops_ver)
+        run: npm run test:ops
       - name: Uji printer Bluetooth
         run: npm run test:bt
       - name: Uji logika kewenangan Edge Function

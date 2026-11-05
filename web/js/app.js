@@ -201,8 +201,19 @@ async function api(action, payload, opt) {
   if (!window.SBAPI || !window.SBAPI.enabled()) throw new Error('SUPABASE_URL / SUPABASE_KEY belum diisi di js/config.js');
   const silent = !!(opt && opt.silent); if (!silent) { pending++; netState(); }
   try {
-    return await window.SBAPI.call(action, payload, S.token, t => { S.token = t; LS.set('token', t); });
+    const res = await window.SBAPI.call(action, payload, S.token, t => { S.token = t; LS.set('token', t); });
+    if (OPS_W.test(action)) opsSoon();   // v2.6.9: tulis data operasional berhasil => selaraskan versi data perangkat ini (lihat opsSoon)
+    return res;
   } finally { if (!silent) { pending--; netState(); } }
+}
+/* v2.6.9 (migrasi 0040): aksi tulis yang mengubah data operasional (resep, bahan, pembelian, produksi, retur, biaya, transfer, sesi kas). Server menaikkan ops_ver
+   untuk semuanya; perangkat lain mengetahuinya lewat sinyal Realtime/polling. Perangkat yang menulis menyelaraskan dirinya sendiri di sini, diam-diam
+   (tanpa toast "Data terbaru dimuat"), sehingga cache layar dan Riwayat tidak memakai data sebelum perubahan. */
+const OPS_W = /^(sale\.(return|review)|recipe\.(save|copy)|master\.(save|remove)|stock\.adjust|purchase\.(create|cancel)|production\.(create|record|update|complete|cancel)|transfer\.(create|action)|expense\.void|cash\.move|shift\.(close|reopen|approve)|data\.reset)$/;
+let opsT = null, lastOwnWrite = 0;
+function opsSoon() {
+  lastOwnWrite = Date.now(); clearTimeout(opsT);
+  opsT = setTimeout(async () => { opsT = null; if (!S.data || !S.token || navigator.onLine === false) return; const r = await verSync(0); if (r) redrawFor(r); }, 500);
 }
 /* Animasi loading: overlay untuk aksi simpan/muat ulang, bar di atas untuk semua panggilan server, skeleton untuk daftar */
 async function busy(label, fn) {
@@ -238,13 +249,18 @@ function verSync(maxAge) {
       const p = await api('ping', {}, {silent: true});
       if (p.cat_ver !== undefined) { // server baru
         if (p.cat_ver !== S.data.cat_ver) { await loadData(); return 'cat'; }
+        if (p.ops_ver !== undefined && p.ops_ver !== S.data.ops_ver) { // v2.6.9: resep/bahan/pembelian/produksi/retur/biaya/transfer/sesi kas berubah (di perangkat ini atau lain)
+          S.expLoaded = false; S.rhist = null; VC = {}; await loadData();
+          if (S.data.ops_ver === undefined) S.data.ops_ver = p.ops_ver;   // bootstrap tanpa stempel (ping gagal): jangan memuat ulang terus-menerus
+          return 'cat';
+        }
         if (p.stock_ver !== S.data.stock_ver) { if (await refreshStock()) return 'stock'; await loadData(); return 'cat'; }
       } else if (p.ver !== S.data.ver) { await loadData(); return 'cat'; }
       return '';
     } catch (e) { if (e.auth) { softLogout(); return ''; } return e.server ? '' : null; }
   })().finally(() => { chkP = null; });
 }
-const dverKey = () => S.data ? (S.data.cat_ver !== undefined ? S.data.cat_ver + '~' + S.data.stock_ver : String(S.data.ver)) : ''; // sidik versi data yang dipegang perangkat ini
+const dverKey = () => S.data ? (S.data.cat_ver !== undefined ? S.data.cat_ver + '~' + S.data.stock_ver + (S.data.ops_ver !== undefined ? '~' + S.data.ops_ver : '') : String(S.data.ver)) : ''; // sidik versi data yang dipegang perangkat ini
 function redrawFor(kind) { // tampilkan hasil sinkronisasi; perubahan stok saja cukup menggambar ulang daftar (tanpa menutup pencarian atau menggulung ulang layar)
   if (!$('#sheet').hidden || S.dirty) { S.deferRender = true; return; }
   if (kind === 'stock') {
@@ -290,7 +306,7 @@ const pollEvery = () => S.rt === 'on' ? 180000 : 45000;   // Realtime tersambung
 function pollTick() { if (!S.token || !S.data || document.hidden || navigator.onLine === false) return; if (Date.now() - lastChk >= pollEvery()) checkUpdates(true); }
 async function checkUpdates(force) {
   const r = await verSync(force ? 0 : 30000); if (!r) return;
-  if (r === 'cat') toast('Data terbaru dimuat');
+  if (r === 'cat' && Date.now() - lastOwnWrite > 3000) toast('Data terbaru dimuat');   // perubahan dari tulisan sendiri tidak perlu diberitahukan
   redrawFor(r);
 }
 let flushing = false, flushDelay = 15000, flushTimer = null;
@@ -1903,7 +1919,7 @@ async function returGo() {
     const res = await api('sale.return', {request_id: rid, id: R.id, items: items.map(x => ({variant_id: x.variant_id, opsi: x.opsi, qty: x.qty, restock: x.restock})), alasan: alasan, override_token: tok});
     delete S.retRid[key]; closeSheet();
     Object.keys(res.stok || {}).forEach(id => { const v = vById(id); if (v) v.stok = r6(res.stok[id] - pendingQty(id)); }); LS.set('data', S.data);
-    toast(res.duplicate || res.cached ? 'Retur ini sudah tercatat sebelumnya' : 'Retur tercatat. Kembalikan ' + rp(res.refund) + ' ke pelanggan (' + (res.metode || '') + ')' + (res.buang ? '. ' + res.buang + ' item rusak/dibuang, tidak masuk stok' : '')); if (S.tab === 'riwayat') vRiwayat();
+    toast(res.duplicate || res.cached ? 'Retur ini sudah tercatat sebelumnya' : 'Retur tercatat. Kembalikan ' + rp(res.refund) + ' ke pelanggan (' + (res.metode || '') + ')' + (res.buang ? '. ' + res.buang + ' item rusak/dibuang, tidak masuk stok' : '')); await verSync(0); if (S.tab === 'riwayat') vRiwayat();   // v2.6.9: selaraskan versi (retur mengubah ops_ver) sebelum Riwayat dibaca, bukan memakai cache sebelum retur
   } catch (e) { if (e.auth) softLogout(); else toast(e.server ? e.message : 'Koneksi bermasalah. Ulangi retur yang sama; aman, tidak akan tercatat dua kali.'); }
 }
 /* ---------- Aksi (event delegation) ---------- */

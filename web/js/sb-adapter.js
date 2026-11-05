@@ -57,7 +57,7 @@ const MANAGE_ROLES = ['owner', 'admin'];
    MIN_SCHEMA = migrasi terakhir yang dibutuhkan klien ini (harus ada di supabase/migrations; dijaga tests/release_check.js).
    Database lebih lama => berhenti dengan pesan jelas (bukan galat 404 acak di tengah transaksi).
    Database mensyaratkan klien lebih baru (min_client) => minta perangkat memperbarui aplikasi. */
-const MIN_SCHEMA = '20261105000039';
+const MIN_SCHEMA = '20261105000040';
 const semverLt = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 let schemaOkAt = 0;
 async function checkSchema(token) {
@@ -226,6 +226,16 @@ async function transferList(token) {
   return rows.map(x => ({id: x.id, nomor: x.number, status: x.status, dari_id: x.from_outlet_id, ke_id: x.to_outlet_id, pembuat: x.requested_by, penyetuju: x.approved_by, catatan: x.note || '', dibuat: x.created_at, dikirim_pada: x.sent_at, diterima_pada: x.received_at, items: by[x.id] || []}));
 }
 
+/* v2.6.9 (0040): bootstrap distempel dengan ops_ver. ping dibaca LEBIH DULU daripada bootstrap, jadi bila data operasional berubah di sela keduanya, stempel
+   lebih lama daripada data: ping berikutnya hanya memicu satu pemuatan ulang ekstra, dan data tidak pernah tampak lebih baru daripada stempelnya.
+   Server lama (tanpa ops_ver) atau ping gagal: tanpa stempel; klien mengabaikan ops_ver. */
+async function bootWithOps(token) {
+  let ov; try { const pr = await rpc('ping', withOutlet(), token); ov = pr && pr.ops_ver; } catch (e) { ov = undefined; }
+  const b = toLegacyBoot(await rpc('bootstrap', {outlet_id: outletId}, token));
+  if (ov !== undefined && ov !== null) b.ops_ver = String(ov);
+  return b;
+}
+
 async function call(action, p, token, tokCb) {
   onToken = tokCb || onToken; p = p || {};
   switch (action) {
@@ -235,11 +245,11 @@ async function call(action, p, token, tokCb) {
       if (!r.ok) throw fail(r.status === 429 ? 'Terlalu banyak percobaan. Coba lagi beberapa menit lagi.' : 'Username atau PIN salah.');
       ls.set(LSK.rt, r.body.refresh_token);
       schemaOkAt = 0; try { await checkSchema(r.body.access_token); } catch (e) { ls.set(LSK.rt, null); throw e; }
-      let b; try { b = toLegacyBoot(await rpc('bootstrap', {outlet_id: outletId}, r.body.access_token)); } catch (e) { throw fail('Akun belum diaktifkan di outlet mana pun. Hubungi Owner.'); }
+      let b; try { b = await bootWithOps(r.body.access_token); } catch (e) { throw fail('Akun belum diaktifkan di outlet mana pun. Hubungi Owner.'); }
       lastBoot = b; return {token: r.body.access_token, role: b.user.role, nama: b.user.nama, uid: b.user.uid, pin_lemah: false};
     }
     case 'logout': { schemaOkAt = 0; try { await raw('/auth/v1/logout?scope=local', {method: 'POST'}, token); } catch (e) {} ls.set(LSK.rt, null); ls.set(LSK.outlet, null); outletId = null; myUid = null; lastBoot = null; return {ok: true}; }
-    case 'bootstrap': { await checkSchema(token); const b = toLegacyBoot(await rpc('bootstrap', {outlet_id: outletId}, token)); lastBoot = null; return b; }
+    case 'bootstrap': { await checkSchema(token); const b = await bootWithOps(token); lastBoot = null; return b; }
     case 'ping': { const r = await rpc('ping', withOutlet(), token); return r; }
     case 'stock.get': return rpc('stock_get', withOutlet(), token);
     case 'override.grant': return overrideGrant(p);

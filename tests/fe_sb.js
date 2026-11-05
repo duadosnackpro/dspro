@@ -235,7 +235,7 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
 
   // ---- P0-3: penjaga versi skema ----
   const sg = (reply, cfg) => { const x = load((url, opt, body) => /grant_type=password/.test(url) ? {status: 200, body: {access_token: good, refresh_token: 'r1'}} : /rpc_bootstrap/.test(url) ? {status: 200, body: boot('kasir')} : {status: 404, body: {message: 'x'}}, cfg); x.schema.reply = reply; return x; };
-  let sgx = sg(() => ({status: 200, body: {version: '20261105000039', min_client: '2.3.0'}}), {VERSION: '2.3.1'});
+  let sgx = sg(() => ({status: 200, body: {version: '20261105000040', min_client: '2.3.0'}}), {VERSION: '2.3.1'});
   ok((await sgx.S.call('login', {username: 'tia', pin: '123789'})).uid === 'u1', 'skema sama dengan MIN_SCHEMA => login lolos');
   const nSch = () => sgx.calls.filter(c => /rpc_schema_version/.test(c.url)).length, n1 = nSch();
   await sgx.S.call('bootstrap', {}, good); ok(nSch() === n1, 'hasil pemeriksaan skema disimpan sementara (bootstrap tidak memanggil ulang)');
@@ -244,7 +244,7 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
   ok(sgx.store.sb_rt === undefined || sgx.store.sb_rt === null, 'login yang diblokir skema tidak meninggalkan refresh token');
   sgx = sg(() => ({status: 200, body: {version: '20261027000015', min_client: '2.3.0'}}), {VERSION: '2.3.1'});
   try { await sgx.S.call('login', {username: 'tia', pin: '123789'}); ok(false, 'DB lebih lama harus memblokir'); } catch (e) { ok(e.schema && /20261027000015/.test(e.message), 'DB lebih lama dari MIN_SCHEMA => diblokir'); }
-  sgx = sg(() => ({status: 200, body: {version: '20261105000039', min_client: '9.0.0'}}), {VERSION: '2.3.1'});
+  sgx = sg(() => ({status: 200, body: {version: '20261105000040', min_client: '9.0.0'}}), {VERSION: '2.3.1'});
   try { await sgx.S.call('login', {username: 'tia', pin: '123789'}); ok(false, 'klien terlalu lama harus memblokir'); } catch (e) { ok(e.schema && /terlalu lama/.test(e.message), 'klien lebih lama dari min_client => minta perbarui'); }
   sgx = sg(() => ({status: 200, body: {version: 'unknown', min_client: '2.3.0'}}), {VERSION: '2.3.1'});
   ok((await sgx.S.call('login', {username: 'tia', pin: '123789'})).uid === 'u1', "versi 'unknown' (migrasi tanpa CLI) tidak memblokir klien");
@@ -355,6 +355,31 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
     ok(last.m2.harga === 2500.5, 'purchase.last: bahan yang hanya ada di pembelian lama tetap terisi (desimal dipertahankan)');
     const pq = pu.calls.find(c => /rest\/v1\/purchases\?/.test(c.url)).url;
     ok(/status=neq\.cancelled/.test(pq) && /outlet_id=eq\.o1/.test(pq), 'purchase.last: pembelian dibatalkan diabaikan dan terbatas pada outlet aktif');
+  }
+  // ---- v2.6.9 (0040): bootstrap distempel ops_ver; ping dibaca SEBELUM bootstrap ----
+  {
+    const order = [];
+    const mk = (pingReply) => load((url, opt, body) => {
+      if (/grant_type=password/.test(url)) return {status: 200, body: {access_token: good, refresh_token: 'r1'}};
+      if (/rpc_ping/.test(url)) { order.push('ping'); return pingReply(); }
+      if (/rpc_bootstrap/.test(url)) { order.push('boot'); return {status: 200, body: boot('kasir')}; }
+      return {status: 404, body: {message: 'x'}};
+    });
+    let o = mk(() => ({status: 200, body: {cat_ver: 'c', stock_ver: 's', ops_ver: '42'}}));
+    let b = await o.S.call('bootstrap', {}, good);
+    ok(b.ops_ver === '42', 'bootstrap memuat ops_ver dari ping: ' + b.ops_ver);
+    ok(order.join(',') === 'ping,boot', 'ping dibaca SEBELUM bootstrap (stempel tidak pernah lebih baru dari data): ' + order.join(','));
+    o = mk(() => ({status: 200, body: {cat_ver: 'c', stock_ver: 's'}}));
+    b = await o.S.call('bootstrap', {}, good);
+    ok(b.ops_ver === undefined, 'server lama tanpa ops_ver: bootstrap tanpa stempel');
+    o = mk(() => ({status: 500, body: {message: 'gagal'}}));
+    b = await o.S.call('bootstrap', {}, good);
+    ok(b.ops_ver === undefined && b.user && b.user.uid === 'u1', 'ping gagal: bootstrap tetap berhasil, tanpa stempel');
+    o = mk(() => ({status: 200, body: {cat_ver: 'c', stock_ver: 's', ops_ver: '7'}}));
+    const lg = await o.S.call('login', {username: 'tia', pin: '123789'});
+    ok(lg.uid === 'u1' && o.calls.some(c => /rpc_ping/.test(c.url)), 'login juga lewat jalur bootstrap bercap ops');
+    const pg = await o.S.call('ping', {}, good);
+    ok(pg.ops_ver === '7', 'aksi ping meneruskan ops_ver apa adanya');
   }
   console.log(fail ? 'GAGAL: ' + fail + ' dari ' + (pass + fail) : 'Semua lulus (' + pass + ' pemeriksaan)'); process.exit(fail ? 1 : 0);
 })();

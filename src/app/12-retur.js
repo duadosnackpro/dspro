@@ -26,6 +26,6 @@ async function returGo() {
     const res = await api('sale.return', {request_id: rid, id: R.id, items: items.map(x => ({variant_id: x.variant_id, opsi: x.opsi, qty: x.qty, restock: x.restock})), alasan: alasan, override_token: tok});
     delete S.retRid[key]; closeSheet();
     Object.keys(res.stok || {}).forEach(id => { const v = vById(id); if (v) v.stok = r6(res.stok[id] - pendingQty(id)); }); LS.set('data', S.data);
-    toast(res.duplicate || res.cached ? 'Retur ini sudah tercatat sebelumnya' : 'Retur tercatat. Kembalikan ' + rp(res.refund) + ' ke pelanggan (' + (res.metode || '') + ')' + (res.buang ? '. ' + res.buang + ' item rusak/dibuang, tidak masuk stok' : '')); if (S.tab === 'riwayat') vRiwayat();
+    toast(res.duplicate || res.cached ? 'Retur ini sudah tercatat sebelumnya' : 'Retur tercatat. Kembalikan ' + rp(res.refund) + ' ke pelanggan (' + (res.metode || '') + ')' + (res.buang ? '. ' + res.buang + ' item rusak/dibuang, tidak masuk stok' : '')); await verSync(0); if (S.tab === 'riwayat') vRiwayat();   // v2.6.9: selaraskan versi (retur mengubah ops_ver) sebelum Riwayat dibaca, bukan memakai cache sebelum retur
   } catch (e) { if (e.auth) softLogout(); else toast(e.server ? e.message : 'Koneksi bermasalah. Ulangi retur yang sama; aman, tidak akan tercatat dua kali.'); }
 }

@@ -1,8 +1,6 @@
 /* Duado Snack POS - frontend local-first. Sumber ada di src/app/*.js; tools/build.js menyambungnya menjadi web/js/app.js (jangan mengedit hasil bangun). Data master disimpan di perangkat; transaksi masuk antrean lalu disinkronkan. */
 (function () {
 'use strict';
-/* iOS Safari mengabaikan user-scalable=no: cegah zoom cubit (gesture*) agar layar tidak membesar */
-['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => document.addEventListener(ev, e => e.preventDefault()));
 const C = window.CONFIG || {};
 const $ = s => document.querySelector(s);
 const rp = n => 'Rp\u00a0' + Math.round(Number(n) || 0).toLocaleString('id-ID');

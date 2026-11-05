@@ -68,10 +68,9 @@ const ACT = {
   ohsaran: async () => { const el = $('#oh-saran'); try { const r = await api('overhead.saran', {}); if (r.saran_per_unit == null) { if (el) el.textContent = r.pesan || 'Belum bisa dihitung.'; return; } if (el) el.textContent = 'Bulan ' + r.bulan + ': biaya ' + rp(r.biaya) + ' dibagi ' + num(r.unit) + ' unit = ' + rp(r.saran_per_unit) + ' per bungkus. Diisikan ke kolom di atas; tekan Simpan pengaturan.'; const f = document.querySelector('#sf [data-f="overhead_per_unit"]'), m = document.querySelector('#sf [data-f="metode_overhead"]'); if (m && m.value !== 'per_unit') { m.value = 'per_unit'; m.dispatchEvent(new Event('change', {bubbles: true})); } if (f) { f.value = r.saran_per_unit; f.dispatchEvent(new Event('input', {bubbles: true})); } } catch (e) { toast(e.message); } },
   stab: el => { S.stab = el.dataset.s; S.scat = 'Semua'; S.sq = ''; vStok(); },
   adj: el => adjSheet(el.dataset.t, el.dataset.id), adjsave: el => adjSave(el.dataset.t, el.dataset.id),
-  pbopen: () => { Object.assign(S.pb, {need: [], back: null, sel: '', selq: ''}); pbSheet(); }, pbdel: el => { S.pb.items.splice(el.dataset.i, 1); pbSheet(); }, pbsave: pbSave,
-  pbadd: () => { const q = dnum($('#pb_q').value), h = dnum($('#pb_h').value), id = $('#pb_m').value; if (!id || !(q > 0) || !(h >= 0) || $('#pb_h').value === '') return toast('Isi jumlah dan harga');
-    S.pb.items.push({id: id, qty: q, harga: h}); S.pb.need = (S.pb.need || []).filter(n => n.id !== id); const nx = S.pb.need[0]; S.pb.sel = nx ? nx.id : ''; S.pb.selq = nx ? nx.qty : ''; pbSheet(); },
-  pbfill: el => { const d = dsOf(el); S.pb.sel = d.id; S.pb.selq = Number(d.q); const m = /** @type {any} */ ($('#pb_m')), q = /** @type {any} */ ($('#pb_q')), h = /** @type {any} */ ($('#pb_h')); if (m) m.value = d.id; if (q) q.value = pbQ(d.q); if (h) h.focus(); },
+  pbopen: () => { Object.assign(S.pb, {need: [], back: null, sel: '', selq: ''}); pbSheet(); pbLastLoad(); }, pbdel: el => { S.pb.items.splice(el.dataset.i, 1); pbTouch(); pbSheet(); }, pbsave: pbSave,
+  pbadd: pbAdd, pbmode: el => pbSetMode(el.dataset.m),
+  pbfill: el => { const d = dsOf(el); S.pb.sel = d.id; S.pb.selq = Number(d.q); const m = /** @type {any} */ ($('#pb_m')), q = /** @type {any} */ ($('#pb_q')), h = /** @type {any} */ ($('#pb_h')); if (m) m.value = d.id; pbSetMode('sat'); if (q) q.value = pbQ(d.q); pbRefUpd(); if (h) h.focus(); },
   pbback: () => { const b = S.pb.back; S.pb.back = null; if (b) b(); else closeSheet(); },
   go_master: () => { S.tab = 'master'; render(); }, go_riwayat: () => { S.tab = 'riwayat'; render(); }, go_laporan: () => { S.tab = 'laporan'; render(); }, go_shopee: () => { S.tab = 'shopee'; render(); }, go_resep: () => { S.tab = 'resep'; render(); }, go_cek: () => { S.tab = 'cek'; render(); }, go_users: () => { S.tab = 'users'; render(); }, go_settings: () => { S.tab = 'settings'; render(); },
   expvoid: el => { const why = vOf('xv_r').trim(); if (why.length < 3) return toast('Alasan pembatalan wajib diisi');
@@ -103,12 +102,15 @@ document.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.in; if (!k) return; let v = e.target.value;
   if (k === 'q') { S.q = v; clearTimeout(S.qT); S.qT = setTimeout(() => { if ($('#grid')) grid(); }, 90); return; } // v1.9.9: gabungkan ketikan beruntun menjadi satu penggambaran
   if (k === 'sq') { S.sq = v; return stokList(); }
-  if (k === 'pbsup') { S.pb.sup = v; return; }
-  if (k === 'pbongkir') { S.pb.ongkir = v.replace(/\D/g, ''); return; }
+  if (k === 'pbsup') { S.pb.sup = v; pbTouch(); return; }
+  if (k === 'pbongkir') { S.pb.ongkir = v.replace(/\D/g, ''); pbTouch(); return; }
+  if (k === 'pbmat') { S.pb.sel = v; pbRefUpd(); if (S.pb.mode === 'kem') pbPackDefault(v); pbCalc(); return; }
+  if (k === 'pbcalc') { pbCalc(); return; }
   if (k === 'catatan') { S.catatan = v; return; }
   if (k === 'ref') { S.ref = v; return; }
   if (k === 'diskon' || k === 'terima') { v = v.replace(/\D/g, ''); S[k] = v; return upd(); }
 });
+document.addEventListener('input', e => { if (/** @type {HTMLElement|null} */ (e.target) && /** @type {HTMLElement} */ (e.target).id === 'a_h') adjHppUpd(); });   // peringatan "menimpa HPP" muncul begitu kolom HPP diisi
 document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.chg === 'day') { S.day = e.target.value; vRiwayat(); } });
 document.addEventListener('keydown', e => { const t = /** @type {HTMLElement} */ (e.target); if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('[role="button"][data-act]:not(button)')) { e.preventDefault(); t.click(); return; } /* kartu produk berperan tombol: sebelumnya hanya bisa diketuk/diklik, tidak bisa lewat keyboard */ if (e.key === 'Tab') trapTab(e); if (e.key === 'Escape' && $('#sheet') && !$('#sheet').hidden && (!S.opin || S.opin.kind === 'alasan') && !S.busyOn) { requestCloseSheet(); return; } if (e.key === 'Enter' && $('#lp') && document.activeElement === $('#lp')) doLogin(); });
 

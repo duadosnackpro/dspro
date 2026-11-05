@@ -333,5 +333,25 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
     const sc2 = px.calls.filter(c => /rpc_sale_create/.test(c.url)).pop();
     ok(JSON.stringify(sc2.body.p.items[0].opsi) === '["a","b"]', 'sale.create meneruskan items[].opsi apa adanya (harga dihitung server)');
   }
+  // ---- pembelian: request_id dari klien dipakai apa adanya; purchase.last = harga beli terakhir per bahan ----
+  {
+    const g3 = jwt(Date.now() + 3600e3);
+    const pu = load((url, opt, body) => {
+      if (/grant_type=password/.test(url)) return {status: 200, body: {access_token: g3, refresh_token: 'r4'}};
+      if (/rpc_bootstrap/.test(url)) return {status: 200, body: boot('stok')};
+      if (/rpc_purchase_create/.test(url)) return {status: 200, body: {id: 'pu1', total: 1, materials: []}};
+      if (/rest\/v1\/purchases\?/.test(url)) return {status: 200, body: [{id: 'pa', purchased_at: '2026-11-04T08:00:00Z'}, {id: 'pb', purchased_at: '2026-11-01T08:00:00Z'}]};
+      if (/rest\/v1\/purchase_items\?/.test(url)) return {status: 200, body: [{purchase_id: 'pb', material_id: 'm1', unit_price: '15000.0000'}, {purchase_id: 'pa', material_id: 'm1', unit_price: '16000.0000'}, {purchase_id: 'pb', material_id: 'm2', unit_price: '2500.5000'}]};
+      return {status: 404, body: {message: 'x'}};
+    });
+    await pu.S.call('login', {username: 'tia', pin: '123789'});
+    await pu.S.call('purchase.create', {request_id: 'rq-beli-0001', items: [{material_id: 'm1', qty: 1, harga_satuan: 1}]}, g3);
+    ok(pu.calls.filter(c => /rpc_purchase_create/.test(c.url)).pop().body.p.request_id === 'rq-beli-0001', 'purchase.create meneruskan request_id dari klien (bukan membuat baru)');
+    const last = await pu.S.call('purchase.last', {}, g3);
+    ok(last.m1.harga === 16000 && /2026-11-04/.test(last.m1.waktu), 'purchase.last: harga terakhir = dari pembelian terbaru, bukan yang lebih lama');
+    ok(last.m2.harga === 2500.5, 'purchase.last: bahan yang hanya ada di pembelian lama tetap terisi (desimal dipertahankan)');
+    const pq = pu.calls.find(c => /rest\/v1\/purchases\?/.test(c.url)).url;
+    ok(/status=neq\.cancelled/.test(pq) && /outlet_id=eq\.o1/.test(pq), 'purchase.last: pembelian dibatalkan diabaikan dan terbatas pada outlet aktif');
+  }
   console.log(fail ? 'GAGAL: ' + fail + ' dari ' + (pass + fail) : 'Semua lulus (' + pass + ' pemeriksaan)'); process.exit(fail ? 1 : 0);
 })();

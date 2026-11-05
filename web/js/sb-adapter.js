@@ -280,6 +280,13 @@ async function call(action, p, token, tokCb) {
       const rows = await rest('purchases?select=id,purchased_at,doc_ref,total,status,note,cancel_reason,supplier_id&outlet_id=eq.' + encodeURIComponent(outletId) + '&order=purchased_at.desc&limit=30', token);
       return rows.map(x => ({id: x.id, waktu: x.purchased_at, ref: x.doc_ref || '', total: Number(x.total), status: x.status, catatan: x.note || '', alasan_batal: x.cancel_reason || '', supplier_id: x.supplier_id}));
     }
+    case 'purchase.last': {                                                                                           // harga beli terakhir per bahan (pembanding di lembar pembelian); pembelian dibatalkan diabaikan
+      const ps = await rest('purchases?select=id,purchased_at&outlet_id=eq.' + encodeURIComponent(outletId) + '&status=neq.cancelled&order=purchased_at.desc&limit=40', token), out = {};
+      if (!ps.length) return out;
+      const its = await rest('purchase_items?select=purchase_id,material_id,unit_price&purchase_id=in.(' + ps.map(x => x.id).join(',') + ')', token);
+      ps.forEach(pu => its.forEach(i => { if (i.purchase_id === pu.id && !out[i.material_id]) out[i.material_id] = {harga: Number(i.unit_price), waktu: pu.purchased_at}; }));   // ps sudah urut terbaru dulu: yang pertama ketemu = terakhir
+      return out;
+    }
     case 'purchase.cancel': return rpc('purchase_cancel', {id: p.id, alasan: p.alasan, request_id: p.request_id || uuid()}, token);
     case 'period.lock': return rpc('period_lock_set', {sampai: p.sampai, alasan: p.alasan}, token);                    // F-15 (Owner)
     case 'hpp.backfill': return rpc('hpp_backfill', withOutlet({from: p.from, to: p.to, terapkan: !!p.terapkan}), token);   // F-08

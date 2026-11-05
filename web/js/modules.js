@@ -56,11 +56,26 @@ function donut(parts, total) { // batang bertumpuk per channel
   return '<div class="stack" role="img" aria-label="Komposisi penjualan per channel">' + parts.map((p, i) => '<i style="width:' + (total ? p.omzet / total * 100 : 0) + '%;background:' + COL[i % 5] + '"></i>').join('') + '</div>';
 }
 const PLAB = {hari: 'hari ini', minggu: '7 hari terakhir', bulan: 'bulan ini'};
-function heroHtml(d, lab) { // kartu utama: omzet, pembanding, batang harian (bagian bawah batang = laba kotor)
+const DOW = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const dowOf = d => DOW[new Date(d + 'T12:00:00').getDay()];
+/* "~" di ujung nama = isi kolom level pedas yang berarti "tanpa level"; tidak berguna di Beranda, jadi tidak ditampilkan di sana. */
+const cleanNm = x => String(x == null ? '' : x).replace(/\s*~\s*$/, '');
+const chg = (c, p) => { if (!p || p <= 0) return ''; const x = (c - p) / p * 100; return '<span class="chg" style="color:' + (x >= 0 ? 'var(--ok)' : 'var(--err)') + '">' + (x >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(x)) + '</span>'; };
+function heroHtml(d, lab) { // kartu utama: omzet, pembanding, laba kotor/bersih/margin, lalu batang harian (bagian bawah batang = laba kotor)
   const c = d.cur, p = d.prev, ser = d.series, n = ser.length, max = Math.max(1, ...ser.map(s => s.omzet));
-  const bars = ser.map((s, i) => '<div data-act="bar" data-b="' + i + '" data-i="' + i + '"' + (i === n - 1 ? ' class="t"' : '') + ' style="height:' + Math.max(3, Math.round(s.omzet / max * 100)) + '%"><i style="height:' + (s.omzet > 0 ? Math.min(100, Math.round(Math.max(s.laba, 0) / s.omzet * 100)) : 0) + '%"></i></div>').join('');
-  const labs = ser.map((s, i) => '<span>' + (n <= 8 || i % 5 === 0 || i === n - 1 ? s.d.slice(8) : '') + '</span>').join('');
-  return '<div class="hero"><small>Omzet ' + (PLAB[d.period] || '') + '</small><div class="big">' + rp(c.omzet) + '</div><div class="dlt">' + delta(c.omzet, p.omzet, lab) + '</div><div class="hbars bchart" role="img" aria-label="Omzet per hari. Ketuk batang untuk melihat nilai.">' + bars + '</div><div class="hlab">' + labs + '</div><div class="btip" id="bt" aria-live="polite">Ketuk batang untuk nilai harian (bagian bawah batang = laba kotor)</div></div>';
+  const fee = Number(d.fee_channel) || 0, biaya = Number(d.biaya) || 0, loss = Number(d.kerugian) || 0;
+  const dl = p && p.omzet > 0 ? '<div class="dlt">' + delta(c.omzet, p.omzet, lab) + '</div>' : '';   // tanpa pembanding, baris ini tidak ditampilkan
+  const stats = '<div class="hstats"><div><small>Laba kotor</small><b>' + rp(c.laba) + '</b></div><div><small>Laba bersih</small><b>' + rp(d.laba_bersih) + '</b></div><div><small>Margin</small><b id="mgn">' + (c.omzet ? pct(c.laba / c.omzet * 100) : '0%') + '</b></div></div>';
+  const brk = !c.trx && !(fee || biaya || loss) ? '' : '<div class="hbrk">' + (fee || biaya || loss
+    ? 'Laba kotor ' + rp(c.laba) + (fee ? ' − fee channel ' + rp(fee) : '') + (biaya ? ' − biaya ' + rp(biaya) : '') + (loss ? ' − kerugian stok ' + rp(loss) : '') + ' = laba bersih ' + rp(d.laba_bersih)
+    : 'Belum ada fee, biaya, atau kerugian stok, jadi laba bersih sama dengan laba kotor.') + '</div>';
+  let chart = '';
+  if (n > 1) {   // satu batang (Hari ini) tidak memberi informasi: grafik hanya untuk 7 hari / bulan
+    const bars = ser.map((s, i) => '<div data-act="bar" data-b="' + i + '" data-i="' + i + '"' + (i === n - 1 ? ' class="t"' : '') + ' style="height:' + Math.max(3, Math.round(s.omzet / max * 100)) + '%"><i style="height:' + (s.omzet > 0 ? Math.min(100, Math.round(Math.max(s.laba, 0) / s.omzet * 100)) : 0) + '%"></i></div>').join('');
+    const labs = ser.map((s, i) => '<span>' + (n <= 8 ? dowOf(s.d) + '<br>' + s.d.slice(8) : (i % 5 === 0 || i === n - 1 ? s.d.slice(8) : '')) + '</span>').join('');
+    chart = '<div class="hbars bchart" role="img" aria-label="Omzet per hari. Ketuk batang untuk melihat nilai.">' + bars + '</div><div class="hlab">' + labs + '</div><div class="btip" id="bt" aria-live="polite"></div>';
+  }
+  return '<div class="hero"><small>Omzet ' + (PLAB[d.period] || '') + '</small><div class="big">' + rp(c.omzet) + '</div>' + dl + stats + brk + chart + '</div>';
 }
 const CMP = {hari: 'vs kemarin', minggu: 'vs 7 hari sebelumnya', bulan: 'vs periode sama bulan lalu'};
 /* Peringatan Beranda dikumpulkan jadi satu ikon (bukan banner yang memakan layar). Ketuk ikon: daftar lengkap, tiap item tetap punya tombol aksinya. */
@@ -82,16 +97,32 @@ function drawBell() {
   e.innerHTML = n ? '<button class="wbell" data-act="dwarn" aria-label="' + n + ' peringatan, ketuk untuk melihat">' + warnIcon + '<b>' + n + '</b></button>' : '';
 }
 function drawDash(d) {
-  const c = d.cur, p = d.prev, tot = d.channels.reduce((a, x) => a + x.omzet, 0), maxQ = Math.max(1, ...d.top.map(t => t.qty)), lab = CMP[d.period] || 'vs sebelumnya';
+  const c = d.cur, p = d.prev, tot = d.channels.reduce((a, x) => a + x.omzet, 0), lab = CMP[d.period] || 'vs sebelumnya';
   const days = Math.round((new Date(d.to + 'T12:00:00') - new Date(d.from + 'T12:00:00')) / 86400000) + 1, pto = d.pto || A.addDays(d.from, -1), pfrom = d.pfrom || A.addDays(pto, -(days - 1)); S.dser = d.series;
-  $('#dbody').innerHTML = '<div class="rcaprow"><p class="muted rcap">' + esc(idRange(d.from, d.to)) + ' · omzet tanpa PPN · pembanding: ' + esc(idRange(pfrom, pto)) + '</p><span id="wbell"></span></div>' + heroHtml(d, lab) + '<div class="kgrid k3">' + kpi('Transaksi', num(c.trx), 'Rata-rata ' + rp(c.trx ? c.omzet / c.trx : 0)) +
-    kpi('Laba kotor', rp(c.laba), '<span id="mgn">' + (c.omzet ? pct(c.laba / c.omzet * 100) : '0%') + ' margin</span>') + kpi('Laba bersih', rp(d.laba_bersih), 'setelah fee, biaya' + (d.kerugian ? ', kerugian stok ' + rp(d.kerugian) : '')) + '</div>' +
-    '<div class="li" style="display:block"><b>Per channel</b><div style="display:block">' + donut(d.channels, tot) + '<div style="flex:1">' + (d.channels.map((x, i) => '<div class="kv"><span><span class="lgd" style="background:' + COL[i % 5] + ';margin-left:0"></span>' + esc(x.nama) + '</span><span>' + (tot ? pct(x.omzet / tot * 100) : '0%') + '</span></div>').join('') || '<span class="muted">Belum ada penjualan</span>') + '</div></div></div>' +
-    '<div class="li" style="display:block"><b>Produk terlaris</b>' + (d.top.map(t => '<div style="margin-top:6px"><div class="kv"><span>' + esc(t.nama) + '</span><span>' + num(t.qty) + ' pcs</span></div><div class="bar"><i style="width:' + Math.round(t.qty / maxQ * 100) + '%"></i></div></div>').join('') || '<div class="muted">Belum ada data</div>') + '</div>' +
-    '<div class="li" style="display:block"><b>Perlu perhatian</b>' + (d.low.map(l => '<div class="kv"><span>' + esc(l.nama) + '</span><span><span class="tag">Menipis</span> ' + dec(l.stok) + ' ' + esc(l.satuan) + '</span></div>').join('') || '<div class="muted">Semua stok bahan aman</div>') + (d.biaya ? kv('Biaya operasional', rp(d.biaya)) : '') + '</div>';
+  const avg = c.trx ? c.omzet / c.trx : 0, pavg = p && p.trx ? p.omzet / p.trx : 0, sub = x => x ? x + ' ' + lab : '&nbsp;';
+  /* Per channel: satu channel = satu baris (bukan kartu penuh); lebih dari satu = batang komposisi + rupiah dan persen */
+  const chBody = !d.channels.length ? '<span class="muted">Belum ada penjualan</span>'
+    : d.channels.length === 1 ? '<div class="kv"><span>' + esc(d.channels[0].nama) + '</span><span>' + rp(d.channels[0].omzet) + ' · 100%</span></div>'
+    : donut(d.channels, tot) + d.channels.map((x, i) => '<div class="kv"><span><span class="lgd" style="background:' + COL[i % 5] + ';margin-left:0"></span>' + esc(x.nama) + '</span><span>' + rp(x.omzet) + ' · ' + (tot ? pct(x.omzet / tot * 100) : '0%') + '</span></div>').join('');
+  /* Produk terlaris: 3 teratas, sisanya dilipat */
+  const top = d.top.map(t => ({nama: cleanNm(t.nama), qty: t.qty})), maxQ = Math.max(1, ...top.map(t => t.qty));
+  const trow = t => '<div style="margin-top:6px"><div class="kv"><span>' + esc(t.nama) + '</span><span>' + num(t.qty) + ' pcs</span></div><div class="bar"><i style="width:' + Math.round(t.qty / maxQ * 100) + '%"></i></div></div>';
+  const topBody = !top.length ? '<div class="muted">Belum ada data</div>' : top.slice(0, 3).map(trow).join('') + (top.length > 3 ? '<details class="more"><summary>Lihat ' + (top.length - 3) + ' lainnya</summary>' + top.slice(3).map(trow).join('') + '</details>' : '');
+  /* Stok bahan: yang 0 = Habis (dahulukan), sisanya Menipis; ringkasan jumlah, 3 teratas, sisanya dilipat */
+  const low = d.low || [], habis = low.filter(l => Number(l.stok) <= 0), tipis = low.filter(l => Number(l.stok) > 0), list = habis.concat(tipis);
+  const lrow = l => '<div class="kv"><span>' + esc(l.nama) + '</span><span>' + (Number(l.stok) <= 0 ? '<span class="bdg out">Habis</span>' : '<span class="bdg low">Menipis</span> ' + dec(l.stok) + ' ' + esc(l.satuan)) + '</span></div>';
+  const lowBody = !list.length ? '<div class="muted">Semua stok bahan aman</div>'
+    : '<div class="lsum">' + (habis.length ? '<span class="bdg out">' + num(habis.length) + ' habis</span> ' : '') + (tipis.length ? '<span class="bdg low">' + num(tipis.length) + ' menipis</span>' : '') + '</div>' + list.slice(0, 3).map(lrow).join('') +
+      (list.length > 3 ? '<details class="more"><summary>Lihat ' + (list.length - 3) + ' lainnya</summary>' + list.slice(3).map(lrow).join('') + '</details>' : '') +
+      (list.length >= 10 ? '<div class="muted" style="margin-top:6px">Daftar dibatasi 10 bahan teratas.</div>' : '') + '<button class="btn sec" style="margin-top:8px" data-act="tab" data-t="stok">Buka Stok</button>';
+  $('#dbody').innerHTML = '<div class="rcaprow"><p class="muted rcap">' + esc(idRange(d.from, d.to)) + ' · omzet tanpa PPN · pembanding: ' + esc(idRange(pfrom, pto)) + '</p><span id="wbell"></span></div>' + heroHtml(d, lab) +
+    '<div class="kgrid k2">' + kpi('Transaksi', num(c.trx), sub(chg(c.trx, p && p.trx))) + kpi('Rata-rata per transaksi', rp(avg), sub(chg(avg, pavg))) + '</div>' +
+    '<div class="dgrid"><div class="li" style="display:block"><b>Per channel</b>' + chBody + '</div>' +
+    '<div class="li" style="display:block"><b>Produk terlaris</b>' + topBody + '</div>' +
+    '<div class="li span2" style="display:block"><b>Stok bahan perlu perhatian</b>' + lowBody + '</div></div>';
   S.dashRange = {from: d.from, to: d.to};
   S.dwarn = dashWarnings(d); drawBell();
-  if (c.trx && !(d.peringatan || []).some(w => w && w.aksi === 'hpp')) hppCheck(d.from, d.to).then(v => { if (!v.n || !$('#wbell')) return; S.dwarn.push({judul: 'Laba belum akurat', teks: v.n + ' produk belum punya resep/HPP: ' + v.names.slice(0, 3).join(', ') + (v.names.length > 3 ? ' dan ' + (v.names.length - 3) + ' lainnya' : ''), tombol: 'Lengkapi di Resep', act: 'go_resep'}); drawBell(); const mg = $('#mgn'); if (mg && c.omzet && c.laba / c.omzet >= .995) mg.innerHTML = qMark + ' margin belum bisa dihitung'; }).catch(() => {});
+  if (c.trx && !(d.peringatan || []).some(w => w && w.aksi === 'hpp')) hppCheck(d.from, d.to).then(v => { if (!v.n || !$('#wbell')) return; S.dwarn.push({judul: 'Laba belum akurat', teks: v.n + ' produk belum punya resep/HPP: ' + v.names.slice(0, 3).join(', ') + (v.names.length > 3 ? ' dan ' + (v.names.length - 3) + ' lainnya' : ''), tombol: 'Lengkapi di Resep', act: 'go_resep'}); drawBell(); const mg = $('#mgn'); if (mg && c.omzet && c.laba / c.omzet >= .995) mg.innerHTML = qMark + ' belum akurat'; }).catch(() => {});
 }
 
 /* ---------- Biaya produksi (dipakai pratinjau, sama dengan hitungan server) ---------- */

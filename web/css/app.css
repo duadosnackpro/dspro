@@ -191,7 +191,14 @@ button.li:active,.mi:active{background:var(--sunk)}
 .hbars>div i{position:absolute;left:0;right:0;bottom:0;border-radius:inherit;background:rgba(255,255,255,.38)}
 .hbars>div.t{background:var(--yel)}.hbars>div.t i{background:rgba(58,15,11,.38)}
 .hlab{display:flex;gap:5px;margin-top:6px;font-size:12px;color:#EBD6C5}.hlab span{flex:1;text-align:center;white-space:nowrap}
-.hero .btip{background:rgba(255,255,255,.1);color:#fff;border:0;margin:var(--s3) 0 0}
+.hero .btip{background:rgba(255,255,255,.1);color:#fff;border:0;margin:var(--s3) 0 0}.hero .btip:empty{display:none}
+.hero .hbars{height:80px;margin-top:var(--s3)}.hlab span{white-space:normal;line-height:1.25}
+.hstats{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);margin-top:var(--s3)}.hstats>div{background:rgba(255,255,255,.1);border-radius:var(--r-md);padding:8px 10px;min-width:0}
+.hstats small{display:block;font-size:12px;color:#EBD6C5}.hstats b{display:block;font:800 16px/1.25 var(--head);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.hbrk{font-size:12px;line-height:1.4;color:#EBD6C5;margin-top:var(--s2)}
+.chg{font-weight:800;font-size:12px}.kgrid.k2{grid-template-columns:1fr 1fr!important}
+.lsum{margin:6px 0 4px}.more>summary{cursor:pointer;color:var(--brand);font-weight:700;padding:10px 0 4px;list-style:none}.more>summary::-webkit-details-marker{display:none}
+.more>summary::after{content:' ▾'}.more[open]>summary::after{content:' ▴'}
 .bar{height:6px;background:var(--sunk);border-radius:3px;margin-top:3px}.bar i{display:block;height:6px;background:var(--hot);border-radius:3px}
 .stack{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin:var(--s2) 0 var(--s3)}.stack i{display:block;min-width:2px}
 .rc-sum{display:flex;gap:var(--s2);margin:6px 0 var(--s3)}.rc-sum>div{flex:1;padding:var(--s3) var(--s4);text-align:center}.rc-sum small{display:block;color:var(--mut)}.rc-sum b{font:800 22px var(--head);color:var(--brand)}
@@ -335,6 +342,7 @@ pre.rc{background:#fff;border-radius:12px;padding:12px;font:12px/1.35 ui-monospa
   .grab{display:none}
   #toast{bottom:40px}
 }
+@media (min-width:768px){.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);align-items:start}.dgrid>.li{margin-bottom:0}.dgrid>.span2{grid-column:1/-1}}
 @media (min-width:900px){
   .kright{width:400px}
   .split .grid{grid-template-columns:repeat(auto-fill,minmax(176px,1fr))}

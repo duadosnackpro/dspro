@@ -73,7 +73,8 @@ begin
   perform t.ok((select count(*) = 1 from public.stock_movements where reference_id = sid and movement_type = 'sale'), 'mutasi stok tercatat sebagai penjualan');
 
   -- HPP baris: kosong (NULL) bila HPP rata-rata 0
-  perform t.ok((select hpp_snapshot is not distinct from nullif((select avg_cost from public.inventory_balances where outlet_id = o and variant_id = v1), 0) from public.sale_items where sale_id = sid limit 1), 'HPP baris = HPP rata-rata saat ini (NULL bila 0)');
+  -- avg_cost tidak boleh dibaca role authenticated (lihat grant kolom), jadi baca sebagai superuser
   perform t.logout();
+  perform t.ok((select hpp_snapshot is not distinct from nullif((select avg_cost from public.inventory_balances where outlet_id = o and variant_id = v1), 0) from public.sale_items where sale_id = sid limit 1), 'HPP baris = HPP rata-rata saat ini (NULL bila 0)');
 end $$;
 select 'Tes transaksi lama selesai' as hasil;

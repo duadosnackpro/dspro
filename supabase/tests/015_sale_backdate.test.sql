@@ -1,5 +1,7 @@
 -- Tes migrasi 0038: input transaksi penjualan lama (bertanggal lampau). Dijalankan setelah 001-014.
 \set ON_ERROR_STOP on
+-- Tes ini menguji perilaku TANPA opsi. Produk uji dari 011 beropsi (wajib dipilih sejak 0039), jadi opsinya dimatikan di sini; pengujian opsi ada di 016.
+update public.products set use_options = false where id in (select product_id from public.product_variants where id in (t.id('v1'), t.id('v2')));
 do $$
 declare
   o uuid := t.id('o1'); ch uuid := t.id('ch'); v1 uuid := t.id('v1'); v2 uuid := t.id('v2');

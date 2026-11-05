@@ -57,7 +57,7 @@ const MANAGE_ROLES = ['owner', 'admin'];
    MIN_SCHEMA = migrasi terakhir yang dibutuhkan klien ini (harus ada di supabase/migrations; dijaga tests/release_check.js).
    Database lebih lama => berhenti dengan pesan jelas (bukan galat 404 acak di tengah transaksi).
    Database mensyaratkan klien lebih baru (min_client) => minta perangkat memperbarui aplikasi. */
-const MIN_SCHEMA = '20261105000038';
+const MIN_SCHEMA = '20261105000039';
 const semverLt = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
 let schemaOkAt = 0;
 async function checkSchema(token) {

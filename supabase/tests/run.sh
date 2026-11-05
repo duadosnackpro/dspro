@@ -24,3 +24,4 @@ psql -f tests/012_production_record.test.sql
 psql -f tests/013_production_update_list.test.sql
 psql -f tests/014_material_pack.test.sql
 psql -f tests/015_sale_backdate.test.sql
+psql -f tests/016_sale_backdate_opsi.test.sql

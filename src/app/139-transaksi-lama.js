@@ -1,7 +1,7 @@
 /* ---------- Input transaksi lama (v2.6.7, migrasi 0038; opsi produk v2.6.8, migrasi 0039): penjualan bertanggal lampau, khusus Owner/Admin. Perhitungan dan aturan dijaga server (rpc_sale_backdate).
    Produk beropsi (level, cara masak) memakai pilihan yang sama dengan Kasir (src/app/138-opsi.js); klien hanya mengirim id item opsi (items[].opsi), harga dan snapshot dihitung server. ---------- */
 const BD = {tgl: '', jam: '12:00', ch: '', metode: 'tunai', stok: false, cat: '', items: [], rid: '', done: [], sel: {}};   // rid: sama selama isian tidak berubah (kirim ulang aman), baru bila isian berubah
-const bdBack = '<button class="chip" data-act="tab" data-t="menu" style="align-self:flex-start;margin-bottom:var(--s3)">← Menu</button>';
+const bdBack = '<button class="u-as-start u-mb-s3 chip" data-act="tab" data-t="menu">← Menu</button>';
 const bdP2 = n => ('0' + n).slice(-2);
 const bdYmd = d => d.getFullYear() + '-' + bdP2(d.getMonth() + 1) + '-' + bdP2(d.getDate());
 const bdPayOk = k => { const v = cfg('bayar_' + k); return v == null || v === '' || T(v); };
@@ -15,7 +15,7 @@ function bdItems() {   // daftar item dan total (digambar ulang sebagian supaya 
 }
 function bdDone() {
   const el = $('#bd_done'); if (!el) return; const d = BD.done;
-  el.innerHTML = d.length ? '<h3 style="margin-top:var(--s4)">Tersimpan di sesi ini</h3><div class="muted">' + num(d.length) + ' transaksi · ' + rp(d.reduce((a, x) => a + x.total, 0)) + '</div>' +
+  el.innerHTML = d.length ? '<h3 class="u-mt-s4">Tersimpan di sesi ini</h3><div class="muted">' + num(d.length) + ' transaksi · ' + rp(d.reduce((a, x) => a + x.total, 0)) + '</div>' +
     d.slice(0, 12).map(x => '<div class="li"><div><b>' + esc(x.nomor) + '</b><div class="muted">' + esc(idDate(x.tgl)) + ' ' + esc(String(x.tgl).slice(11, 16)) + ' · ' + esc(String(x.metode).toUpperCase()) + '</div></div><b>' + rp(x.total) + '</b></div>').join('') +
     (d.length > 12 ? '<div class="muted">… dan ' + (d.length - 12) + ' lainnya (lihat di Riwayat)</div>' : '') : '';
 }
@@ -39,15 +39,15 @@ function vLama() {
   $('#main').innerHTML = bdBack +
     '<div class="notice"><span>Untuk penjualan yang terjadi <b>sebelum</b> aplikasi dipakai. Diberi tanggal asli dan tidak masuk laci kasir hari ini. Transaksi hari ini tetap lewat Kasir.</span></div>' +
     '<section class="set-card"><h3>Transaksi</h3>' +
-      '<div class="row2"><div style="flex:1"><label>Tanggal<input class="inp" type="date" data-bd="tgl" max="' + bdYmd(new Date()) + '" value="' + esc(BD.tgl) + '"></label></div><div style="flex:1"><label>Jam<input class="inp" type="time" data-bd="jam" value="' + esc(BD.jam) + '"></label></div></div>' +
+      '<div class="row2"><div class="u-f1"><label>Tanggal<input class="inp" type="date" data-bd="tgl" max="' + bdYmd(new Date()) + '" value="' + esc(BD.tgl) + '"></label></div><div class="u-f1"><label>Jam<input class="inp" type="time" data-bd="jam" value="' + esc(BD.jam) + '"></label></div></div>' +
       '<label>Channel<select class="inp" data-bd="ch">' + chs.map(c => '<option value="' + esc(c.id) + '"' + (c.id === BD.ch ? ' selected' : '') + '>' + esc(c.nama) + '</option>').join('') + '</select></label>' +
       '<label>Metode bayar<select class="inp" data-bd="metode">' + mt.map(m => '<option value="' + m[0] + '"' + (m[0] === BD.metode ? ' selected' : '') + '>' + m[1] + '</option>').join('') + '</select></label>' +
       '<label>Catatan (opsional)<input class="inp" data-bd="cat" maxlength="120" value="' + esc(BD.cat) + '" autocomplete="off"></label></section>' +
     '<section class="set-card"><h3>Item</h3>' +
       '<label>Produk<select class="inp" id="bd_v" data-bdv="1">' + vs.map(v => '<option value="' + esc(v.id) + '">' + esc(v.t) + '</option>').join('') + '</select></label><div id="bd_opt"></div>' +
-      '<div class="row2"><div style="flex:1"><label>Jumlah<input class="inp" id="bd_q" inputmode="decimal" placeholder="1"></label></div><div style="flex:1"><label>Harga satuan (Rp)<input class="inp" id="bd_h" inputmode="decimal"></label></div></div>' +
+      '<div class="row2"><div class="u-f1"><label>Jumlah<input class="inp" id="bd_q" inputmode="decimal" placeholder="1"></label></div><div class="u-f1"><label>Harga satuan (Rp)<input class="inp" id="bd_h" inputmode="decimal"></label></div></div>' +
       '<div class="muted">Harga dikosongkan = harga channel saat ini. Isi bila harga saat itu berbeda.</div>' +
-      '<button class="btn sec" data-act="bd_add">Tambah ke transaksi</button><div id="bd_items" style="margin-top:var(--s3)"></div></section>' +
+      '<button class="btn sec" data-act="bd_add">Tambah ke transaksi</button><div id="bd_items" class="u-mt-s3"></div></section>' +
     '<section class="set-card"><label class="rs-opt"><input type="checkbox" data-bd="stok"' + (BD.stok ? ' checked' : '') + '><span><b>Kurangi stok</b><small>Biarkan mati bila stok akhir nanti dihitung fisik (stok sekarang sudah memuat penjualan ini). Nyalakan bila stok awal sudah dimasukkan sebelum tanggal transaksi.</small></span></label>' +
       '<button class="btn pri big" data-act="bd_save">Simpan transaksi</button><div id="bd_done"></div></section>';
   bdItems(); bdDone(); BD.sel = {}; bdOpt();

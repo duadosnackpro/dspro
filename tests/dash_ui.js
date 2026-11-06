@@ -6,12 +6,12 @@ const code = src.slice(a, b);
 let pass = 0; const ok = (c, m) => { assert(c, m); pass++; };
 const dom = {dbody: {innerHTML: ''}, wbell: {innerHTML: ''}, chcard: {innerHTML: ''}, topcard: {innerHTML: ''}};
 const rp = n => 'Rp' + Math.round(Number(n) || 0).toLocaleString('id-ID'), num = n => String(n), dec = n => String(n);
-const f = new Function('S', 'A', '$', 'esc', 'rp', 'num', 'dec', 'pct', 'kv', 'idRange', 'hppCheck', 'qMark', 'ACT',
+const f = new Function('S', 'A', '$', 'esc', 'rp', 'num', 'dec', 'pct', 'kv', 'idRange', 'idDate', 'hppCheck', 'qMark', 'ACT',
   code + '\nreturn {drawDash, heroHtml, dowOf, cleanNm, chg, dashTab, dashTop, jamHtml, chInner, topInner, jamRange};');
 const S = {};   // dibagi pakai fungsi uji
 const m = f(S, {can: () => true, addDays: (d, n) => d}, sel => dom[sel.slice(1)] || null, s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
   rp, num, dec, x => (Math.round(x * 10) / 10).toString().replace('.', ',') + '%', (x, y, c) => '<div class="kv ' + (c || '') + '"><span>' + x + '</span><span>' + y + '</span></div>',
-  (a, b) => a + ' – ' + b, () => Promise.resolve({n: 0, names: []}), '<q/>', {});
+  (a, b) => a + ' – ' + b, d => 'tgl ' + d, () => Promise.resolve({n: 0, names: []}), '<q/>', {});
 const days = ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'];
 const base = () => ({period: 'minggu', from: '2026-10-30', to: '2026-11-05', pfrom: '2026-10-23', pto: '2026-10-29',
   cur: {omzet: 897000, trx: 40, laba: 178000}, prev: {omzet: 0, trx: 0, laba: 0},
@@ -49,7 +49,7 @@ ok(!/ vs 7 hari sebelumnya/.test(h), 'tanpa data pembanding tidak ada teks pemba
 let d = base(); d.prev = {omzet: 600000, trx: 30, laba: 100000};
 h = draw(d);
 ok(/▲/.test(h) && /vs 7 hari sebelumnya/.test(h), 'dengan pembanding: panah dan teks pembanding tampil');
-ok((h.match(/class="chg"/g) || []).length === 2, 'Transaksi dan rata-rata per transaksi punya panah perubahan sendiri (omzet pakai delta di hero)');
+ok((h.match(/class="chg( [^"]*)?"/g) || []).length === 2, 'Transaksi dan rata-rata per transaksi punya panah perubahan sendiri (omzet pakai delta di hero)');
 d.prev = {omzet: 2000000, trx: 80, laba: 0}; h = draw(d); ok(/▼/.test(h), 'turun => panah turun');
 
 // ---- rincian laba bersih ----
@@ -156,6 +156,15 @@ d = base(); d.period = 'bulan'; d.from = '2026-11-01'; d.to = '2026-11-01'; d.se
 h = draw(d); ok(!/hbars/.test(h), 'tanggal 1: hanya 1 hari berjalan => grafik satu batang tidak ditampilkan');
 const orig = base(); orig.period = 'minggu'; draw(orig); ok(S.dser.length === 7, 'periode 7 hari tidak berubah: 7 batang');
 const hr = base(); hr.period = 'hari'; hr.from = '2026-11-05'; hr.to = '2026-11-05'; draw(hr); ok(S.dser.length === 7, 'Hari ini tetap memakai 7 hari sebagai konteks');
+
+// aksesibilitas grafik Beranda: batang = tombol yang bisa difokus, berlabel nilai, satu perhentian Tab, ringkasan tersembunyi
+{ const h = m.heroHtml(base(), 'minggu'), bars = h.match(/<div role="button"[^>]*data-act="bar"[^>]*>/g) || [];
+  ok(bars.length === 7, 'tiap batang berperan tombol (7)');
+  ok(bars.every(b => /aria-label="tgl [\d-]+: omzet Rp[^"]*laba kotor Rp/.test(b)), 'tiap batang punya label tanggal, omzet, dan laba kotor');
+  ok(bars.filter(b => /tabindex="0"/.test(b)).length === 1 && bars.filter(b => /tabindex="-1"/.test(b)).length === 6, 'roving tabindex: hanya satu batang di urutan Tab');
+  ok(/class="hbars bchart" role="group"[^>]*aria-describedby="bsum"/.test(h) && !/role="img"/.test(h), 'pembungkus role=group (bukan img yang menyembunyikan anak) + deskripsi');
+  ok(/<p class="sr" id="bsum">Grafik omzet 7 hari\. Tertinggi tgl 2026-10-31 Rp300\.000, terendah tgl 2026-10-30 Rp0/.test(h), 'ringkasan tersembunyi: tertinggi dan terendah benar');
+  ok(/class="hlab" aria-hidden="true"/.test(h), 'baris tanggal visual disembunyikan dari pembaca layar (label sudah ada per batang)'); }
 
 console.log('Semua lulus (' + pass + ' pemeriksaan)');
 

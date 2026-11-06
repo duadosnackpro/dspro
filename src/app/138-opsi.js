@@ -121,7 +121,7 @@ function pustakaList() {
     '<button type="button" class="btn pri" data-act="pgrp" data-id="">+ Tambah grup</button><button type="button" class="btn sec" data-act="close">Tutup</button>');
 }
 const pgRow = i => '<div class="opt-row" data-pr="' + esc(i.id || '') + '"><div class="row2"><label>Nama pilihan<input class="inp" data-pn maxlength="40" value="' + esc(i.nama || '') + '"></label>' +
-  '<label>Tambah harga (Rp)<input class="inp" data-pd inputmode="numeric" value="' + esc(i.selisih_harga || 0) + '"></label></div>' +
+  '<label>Tambah harga (Rp)<input class="inp" data-pd data-rp inputmode="numeric" autocomplete="off" value="' + esc(rpIn(i.selisih_harga || 0)) + '"></label></div>' +
   '<label class="sw sm"><input type="checkbox" data-pa' + (i.aktif === false ? '' : ' checked') + '><span class="sw-t" aria-hidden="true"></span><span class="sw-l">Aktif</span></label></div>';
 function pustakaEdit(id) {
   const P = S.pus || {groups: [], items: []}, g = id ? P.groups.find(x => x.id === id) : {nama: '', urutan: P.groups.length + 1, aktif: true};

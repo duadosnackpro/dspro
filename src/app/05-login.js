@@ -1,5 +1,6 @@
 /* ---------- Login ---------- */
 function renderLogin(msg) {
+  RF.tab = 'login'; document.title = 'Masuk · Duado Snack';
   $('#app').innerHTML = '<div class="login"><div class="lg-hero"><img src="icons/icon-192.png" alt="Duado Snack" width="116" height="116"><h1 class="wordmark">DUADO SNACK</h1><p>Jajanan Cemilan Pedas</p></div><div class="lg-card">' +
     '<label>Username<input id="lu" class="inp" autocomplete="username" autocapitalize="none" value="' + esc(LS.get('lastUser', '')) + '"></label>' +
     '<label>PIN atau kata sandi<input id="lp" class="inp" type="password" autocomplete="current-password"></label>' +

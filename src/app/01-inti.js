@@ -10,8 +10,19 @@ function dnum(s) {
   if (typeof s === 'number') return s; s = String(s == null ? '' : s).trim().replace(/\s/g, ''); if (!s) return NaN;
   s = /^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s) && !/^0\./.test(s) ? s.replace(/\./g, '').replace(',', '.') : s.replace(',', '.'); return Number(s);
 }
+/* kolom uang bilangan bulat: tampil dengan pemisah ribuan (100.000) selagi mengetik; nilai tetap terbaca oleh dnum() dan pembersih \D */
+const rpIn = v => { const d = String(v == null ? '' : v).replace(/\D/g, '').replace(/^0+(?=\d)/, ''); return d.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
 const qf = n => (Math.round(Number(n) * 1000) / 1000).toLocaleString('id-ID', {maximumFractionDigits: 3});
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* Nilai tampilan yang dihitung saat jalan (lebar/tinggi batang, lebar logo dan QR) tidak boleh memakai atribut style karena CSP tidak lagi mengizinkannya (style-src-attr dicabut).
+   Markup menuliskannya di data-dw (lebar) atau data-dh (tinggi) berupa persen, mis. "42%"; dynStyle() memasangnya lewat CSSOM, yang tidak dibatasi CSP.
+   Dipanggil oleh MutationObserver di 14-mulai.js untuk setiap simpul baru, sehingga innerHTML di mana pun otomatis tertangani sebelum layar digambar. */
+const DYN_PCT = /^\d+(\.\d+)?%$/;
+function dynStyle(root) {
+  if (!root || root.nodeType !== 1) return;
+  const set = el => { const w = el.getAttribute('data-dw'), h = el.getAttribute('data-dh'); if (w != null && DYN_PCT.test(w)) el.style.width = w; if (h != null && DYN_PCT.test(h)) el.style.height = h; };
+  set(root); root.querySelectorAll('[data-dw],[data-dh]').forEach(set);
+}
 /* Penyimpanan lokal: IndexedDB (kapasitas besar, tidak memblokir layar) dengan cermin di memori agar pembacaan tetap sinkron.
    Cadangan ke localStorage bila IndexedDB tidak tersedia. Data lama di localStorage dimigrasi sekali. Kunci penting (antrean, keranjang) ditulis seketika; token sesi sengaja tidak dijurnal ke localStorage. */
 const Store = (() => {

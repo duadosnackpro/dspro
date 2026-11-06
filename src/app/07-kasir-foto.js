@@ -24,8 +24,8 @@ function vKasir() {
   grid(); if (wide) mountCart(); qstatUpd();
 }
 const isOff = v => priceOf(v.id, S.ch) == null || (T(cfg('blokir_stok_minus')) && (Number(v.stok) || 0) <= 0);
-const TILE = [['#E0A23C', '#B8741E'], ['#E07B3C', '#9E4514'], ['#C9482A', '#8A2410'], ['#D9A441', '#8F5A1C'], ['#B8602A', '#6B1409'], ['#E7B25A', '#C07A22']];
-const tileOf = v => { let h = 0; String(v.product_id || v.id).split('').forEach(c => { h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return TILE[h % TILE.length]; };
+const TILES = 6; // 6 nada foto; pasangan warnanya ada di CSS sebagai token (--tn0-a ... --tn5-b) dan dipakai lewat kelas tn0..tn5
+const tileOf = v => { let h = 0; String(v.product_id || v.id).split('').forEach(c => { h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return 'tn' + (h % TILES); };
 /* ===== v1.9.1 (tahap 2): foto produk. Foto = satu per PRODUK (semua varian memakainya), disimpan di Supabase Storage (bucket product-photos); products.photo_url menyimpan alamatnya ===== */
 const fotoOf = p => p && /^https:\/\//.test(p.foto_url || '') ? p.foto_url : '';
 const photoInner = (p, name) => '<span class="ini">' + esc(String(name).trim().charAt(0).toUpperCase()) + '</span>' + (fotoOf(p) ? '<img src="' + esc(fotoOf(p)) + '" alt="" crossorigin="anonymous" referrerpolicy="no-referrer" decoding="async" loading="lazy" data-foto="1">' : '');
@@ -58,7 +58,7 @@ async function fotoPrepare(file) { // -> {b64, bytes}. File kecil (WebP/JPEG <= 
 function fotoInner(id) {
   const p = S.data.products.find(x => x.id === id); if (!p) return '';
   const t = tileOf({id: id}), has = !!fotoOf(p);
-  return '<div class="fprev ph" style="--t1:' + t[0] + ';--t2:' + t[1] + '">' + photoInner(p, p.nama) + '</div><div class="fact"><b>Foto produk</b><span class="muted">Tampil di halaman Kasir untuk semua varian. Dikecilkan otomatis (±480 px, ±30 KB).</span><div class="row2"><button class="btn sec sm" data-act="fotopick">' + (has ? 'Ganti foto' : 'Pilih foto') + '</button>' + (has ? '<button class="btn dan sm" data-act="fotodel">Hapus foto</button>' : '') + '</div></div>';
+  return '<div class="fprev ph ' + t + '">' + photoInner(p, p.nama) + '</div><div class="fact"><b>Foto produk</b><span class="muted">Tampil di halaman Kasir untuk semua varian. Dikecilkan otomatis (±480 px, ±30 KB).</span><div class="row2"><button class="btn sec sm" data-act="fotopick">' + (has ? 'Ganti foto' : 'Pilih foto') + '</button>' + (has ? '<button class="btn dan sm" data-act="fotodel">Hapus foto</button>' : '') + '</div></div>';
 }
 const fotoBox = id => id ? '<input type="file" id="foto_file" accept="image/*" hidden><div class="fbox" id="fbox">' + fotoInner(id) + '</div>' : '<p class="muted">Simpan produk dulu, lalu buka lagi untuk menambahkan foto.</p>';
 function fotoApply(pid, url) {
@@ -98,7 +98,7 @@ function cardHtml(v) {
   const pr = priceOf(v.id, S.ch), st = Number(v.stok) || 0, q = cartQty(v.id), off = isOff(v), lv = lvText(v.level_pedas), t = tileOf(v);
   const stk = st <= 0 ? '' : st <= 5 ? '<span class="stk low">Sisa ' + num(st) + '</span>' : '<span class="stk">Stok ' + num(st) + '</span>';
   const bad = pr == null ? '<span class="badge-out warn">Harga?</span>' : st <= 0 ? '<span class="badge-out">HABIS</span>' : '';
-  return '<div class="ph" style="--t1:' + t[0] + ';--t2:' + t[1] + '">' + photoHtml(v) + bad + heat(v.level_pedas) + '</div><div class="bd"><b class="pn">' + esc(vName(v)) + (lv ? ' <span class="lvt">· ' + esc(lv) + '</span>' : '') + '</b>' + (v.ukuran ? '<div class="pm"><span class="sz">' + esc(v.ukuran) + '</span></div>' : '') +
+  return '<div class="ph ' + t + '">' + photoHtml(v) + bad + heat(v.level_pedas) + '</div><div class="bd"><b class="pn">' + esc(vName(v)) + (lv ? ' <span class="lvt">· ' + esc(lv) + '</span>' : '') + '</b>' + (v.ukuran ? '<div class="pm"><span class="sz">' + esc(v.ukuran) + '</span></div>' : '') +
     '<div class="pf"><div class="pp"><span class="pr">' + (pr == null ? 'Harga belum diatur' : rp(pr)) + '</span>' + stk + '</div>' +
     (q && hasOpt(v) ? '<span class="opt-in">' + q + ' dipesan</span><span class="plus' + (off ? ' dis' : '') + '" aria-hidden="true">+</span>' : q ? '<div class="step"><button data-act="dec1" data-v="' + esc(v.id) + '" aria-label="Kurangi ' + esc(vName(v)) + '">−</button><b>' + q + '</b><button data-act="inc1" data-v="' + esc(v.id) + '" aria-label="Tambah ' + esc(vName(v)) + '">+</button></div>' : '<span class="plus' + (off ? ' dis' : '') + '" aria-hidden="true">+</span>') + '</div></div>';
 }
@@ -148,7 +148,8 @@ function dropFromCart(id) {
   S.cart[i].qty--; if (S.cart[i].qty <= 0) S.cart.splice(i, 1); saveCart(); updCard(id); syncCart();
 }
 const payMethods = () => ['tunai', 'transfer', 'qris'].filter(m => { const v = cfg('bayar_' + m); return v === undefined || v === '' || T(v); }); // whitelist dari Pengaturan
-const methodChips = () => payMethods().map(m => '<button class="chip ' + (S.metode === m ? 'on' : '') + '" aria-pressed="' + (S.metode === m) + '" data-act="metode" data-m="' + m + '">' + m.toUpperCase() + '</button>').join('');
+const methodChips = () => { const L = payMethods(), cur = L.indexOf(S.metode) >= 0 ? S.metode : L[0];   // pilihan tunggal: role=radio, hanya yang terpilih di urutan Tab
+  return L.map(m => '<button type="button" role="radio" class="chip ' + (S.metode === m ? 'on' : '') + '" aria-checked="' + (S.metode === m) + '" tabindex="' + (m === cur ? 0 : -1) + '" data-act="metode" data-m="' + m + '">' + m.toUpperCase() + '</button>').join(''); };
 function cartLines() {
   const el = $('#cl'); if (!el) return;
   if (!S.cart.length) { delete LIM.cart; el.innerHTML = '<div class="cp-empty">' + svg('kasir', 34) + '<p>Ketuk produk di sebelah kiri untuk menambahkannya ke pesanan.</p></div>'; return; }
@@ -160,12 +161,12 @@ function cashBox() {
   if (S.metode !== 'tunai') { const mn = Number(cfg('bayar_referensi_min')), req = mn > 0 && calc().total >= mn;   // F-10: referensi transfer/QRIS untuk rekonsiliasi dengan mutasi penyedia
     el.innerHTML = '<p class="muted">Pembayaran ' + esc(S.metode.toUpperCase()) + ' dicatat lunas saat disimpan.</p><label>No. referensi ' + (req ? '(wajib)' : '(disarankan)') + '<input class="inp" data-in="ref" maxlength="60" autocomplete="off" placeholder="Dari bukti ' + esc(S.metode.toUpperCase()) + '" value="' + esc(S.ref || '') + '"></label>'; return; }
   const t = calc().total, q = [t].concat([5000, 10000, 20000, 50000, 100000].map(n => Math.ceil(t / n) * n)).filter((x, i, a) => x > 0 && a.indexOf(x) === i).slice(0, 4);
-  el.innerHTML = '<label>Uang diterima (Rp)<input class="inp" data-in="terima" inputmode="numeric" placeholder="' + num(t) + '" value="' + esc(S.terima) + '"></label><div class="chips">' + q.map((x, i) => '<button class="chip" data-act="qk" data-n="' + x + '">' + (i === 0 ? 'Uang pas' : num(x)) + '</button>').join('') + '</div>';
+  el.innerHTML = '<label>Uang diterima (Rp)<input class="inp" data-in="terima" data-rp inputmode="numeric" autocomplete="off" placeholder="' + num(t) + '" value="' + esc(rpIn(S.terima)) + '"></label><div class="chips">' + q.map((x, i) => '<button class="chip" data-act="qk" data-n="' + x + '">' + (i === 0 ? 'Uang pas' : num(x)) + '</button>').join('') + '</div>';
 }
 function cartInner(panel) {
   return (panel ? '<div class="cp-h"><h2>Pesanan</h2><span class="muted">' + esc(chName(S.ch)) + '</span></div>' : '<div class="grab"></div><div class="sh-h"><h2>Pembayaran</h2><span class="muted">' + esc(chName(S.ch)) + '</span></div>') +
-    '<div id="cl"></div><div id="addons"></div><div class="paybox"><div class="chips" id="mchips">' + methodChips() + '</div><div id="cashbox"></div></div>' +
-    '<details class="more"' + (S.diskon || S.catatan ? ' open' : '') + '><summary>Diskon dan catatan</summary><label>Diskon (Rp)<input class="inp" data-in="diskon" inputmode="numeric" value="' + esc(S.diskon) + '"></label><label>Catatan<input class="inp" data-in="catatan" value="' + esc(S.catatan) + '"></label></details>' +
+    '<div id="cl"></div><div id="addons"></div><div class="paybox"><div class="chips" id="mchips" role="radiogroup" aria-label="Metode pembayaran">' + methodChips() + '</div><div id="cashbox"></div></div>' +
+    '<details class="more"' + (S.diskon || S.catatan ? ' open' : '') + '><summary>Diskon dan catatan</summary><label>Diskon (Rp)<input class="inp" data-in="diskon" data-rp inputmode="numeric" autocomplete="off" value="' + esc(rpIn(S.diskon)) + '"></label><label>Catatan<input class="inp" data-in="catatan" value="' + esc(S.catatan) + '"></label></details>' +
     '<div id="tot"></div><button class="btn pri big" id="paybtn" data-act="pay">Bayar</button>';
 }
 function addonsRender() { // menu pembayaran: "Tambahan" seperti retail modern (kantong kresek, dll.)
@@ -246,6 +247,6 @@ function showReceipt(rc) {
 function refreshRc() { // pratinjau + cetak browser: logo (bila aktif) di atas teks struk
   const el = $('#rtxt'); if (!el || !S.rc) return; const lg = logoOn(), u = lg ? logoURL(lg) : '', w = rcWidth();
   el.className = 'rc' + (w === 48 ? ' w48' : '');
-  el.innerHTML = (u ? '<img class="lg-cv lg-rc" alt="Logo" src="' + u + '" style="width:' + logoPct(lg) + '">' : '') + docHtml(receiptDoc(S.rc, {w: w, rich: true, logo: lg}), w);
+  el.innerHTML = (u ? '<img class="lg-cv lg-rc" alt="Logo" src="' + u + '" data-dw="' + logoPct(lg) + '">' : '') + docHtml(receiptDoc(S.rc, {w: w, rich: true, logo: lg}), w);
 }
 

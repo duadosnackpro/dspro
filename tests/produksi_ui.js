@@ -20,7 +20,7 @@ function boot(role) {
     sheet: h => { els.__sheet = h; }, closeSheet: () => { els.__sheet = ''; }, toast: m => toasts.push(m), busy: (l, fn) => fn(), skel: () => '<skel>',
     api: async (op, body) => { calls.push({op: op, body: body}); if (!respond[op]) return {}; return respond[op](body); },
     vload: (op, body, paint, opt) => { calls.push({op: 'vload:' + op, body: body, opt: opt}); paint(respond['list'] ? respond['list'](body) : [], false); },
-    dnum: s => Number(String(s).replace(',', '.')), r6: x => Math.round(Number(x) * 1e6) / 1e6, wrapChips: h => '<div class="chips">' + h + '</div>',
+    dnum: s => Number(String(s).replace(',', '.')), rpIn: v => String(v == null ? '' : v).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.'), r6: x => Math.round(Number(x) * 1e6) / 1e6, wrapChips: h => '<div class="chips">' + h + '</div>',
     emptyState: (i, t, d, a) => '<empty>' + t + '|' + d + (a || '') + '</empty>', idDate: d => d, idRange: () => '', today: () => '2026-11-05', addDays: (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + k); return x.toISOString().slice(0, 10); },
     vById: id => S.data.variants.find(v => v.id === id) && Object.assign({stok: 0, hpp_rata2: 0}, S.data.variants.find(v => v.id === id)), vName: v => v.id === 'v1' ? 'Basreng' : 'Keripik', vSub: () => '100g',
     can: cap => ({stockedit: ['owner', 'admin', 'supervisor', 'stok'], approve: ['owner', 'admin', 'supervisor'], produce: ['owner', 'admin', 'supervisor', 'produksi']}[cap] || []).indexOf(role) >= 0,

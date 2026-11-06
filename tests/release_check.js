@@ -37,11 +37,21 @@ if (cm) {
   ok(d['default-src'] && d['default-src'].join() === "'none'", "default-src 'none'");
   ok(d['script-src'] && d['script-src'].join() === "'self'", "script-src hanya 'self'");
   ok(!/unsafe-(inline|eval)/.test((d['script-src'] || []).join(' ')), 'script-src tanpa unsafe-inline/unsafe-eval');
+  ok(!/unsafe-(inline|eval)/.test((d['style-src'] || []).join(' ')) && !d['style-src-attr'] && !d['style-src-elem'], "style-src hanya 'self': tanpa unsafe-inline, tanpa style-src-attr/elem (nomor 8)");
   ok((d['object-src'] || []).join() === "'none'" && (d['base-uri'] || []).join() === "'none'", "object-src dan base-uri 'none'");
   ok(!(d['connect-src'] || []).some(x => x === '*' || x === 'https:'), 'connect-src tidak memakai wildcard');
 }
 ok(!/\son[a-z]+\s*=/i.test(html), 'index.html tanpa atribut handler inline');
 ['js/app.js', 'js/modules.js'].forEach(f => { const t = rd(f); ok(!/\son(click|error|load|change|input|submit|keydown|keyup)=["']/.test(t), f + ' tanpa atribut handler inline (diblokir CSP)'); ok(!/\beval\(|new Function\(/.test(t), f + ' tanpa eval/new Function'); ok(!/createElement\(['"]style['"]\)/.test(t), f + ' tidak menyisipkan elemen <style> (diblokir CSP)'); });
+
+// nomor 8: tidak ada atribut style="" di markup yang dihasilkan JS (CSP melarangnya); nilai dinamis lewat data-dw/data-dh + dynStyle()
+['js/app.js', 'js/modules.js', 'js/sb-adapter.js', 'index.html'].forEach(f => { const t = rd(f); ok(!/\sstyle=\\?["']/.test(t) && !/setAttribute\(\s*['"]style['"]/.test(t), f + ' tanpa atribut style="" dan tanpa setAttribute("style")'); });
+// nomor 13: warna hanya didefinisikan di token (blok :root); aturan lain dan JS memakai var(--...)
+{ const i = css.indexOf(':root{'), j = css.indexOf('\n}\n', i), rest = css.slice(0, i) + css.slice(j); const hex = rest.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || [];
+  ok(!hex.length, 'app.css: tidak ada #hex/rgba di luar blok :root (ditemukan: ' + hex.slice(0, 5).join(' ') + ')'); }
+['js/app.js', 'js/modules.js'].forEach(f => { const t = rd(f).split('\n').filter(l => !/fillStyle|getContext|toDataURL|canvas/.test(l)).join('\n'); const hex = t.match(/(['"` ])#[0-9a-fA-F]{6}\b/g) || []; ok(!hex.length, f + ': tidak ada warna #hex tertanam di markup (kecuali kanvas); ditemukan ' + hex.length); });
+// nomor 15: berkas aturan desain yang dirujuk app.css baris 5 ada
+ok(fs.existsSync(path.join(__dirname, '../design-system/duado-pos/MASTER.md')), 'design-system/duado-pos/MASTER.md ada (dirujuk app.css)');
 
 ok((css.match(/:root\s*\{/g) || []).length === 1, 'CSS hanya punya satu blok :root (ada ' + (css.match(/:root\s*\{/g) || []).length + ')');
 const ad = rd('js/sb-adapter.js'), minSchema = (ad.match(/const MIN_SCHEMA = '(\d+)'/) || [])[1], migDir = path.join(__dirname, '../supabase/migrations');

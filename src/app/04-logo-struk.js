@@ -125,7 +125,7 @@ function logoSheet() {
     '<div class="lg-paper"><canvas id="lg_cv" class="lg-cv" aria-label="Pratinjau logo"></canvas></div><p class="muted c" id="lg_info"></p>' +
     (e.color ? '<div class="lg-note">Logo berwarna terdeteksi. Warna tidak bisa dicetak, jadi gambar perlu diubah ke hitam-putih.</div>' +
       '<label class="sw"><input type="checkbox" data-lg="bw" checked><span class="sw-t" aria-hidden="true"></span><span class="sw-l"><b>Ubah ke hitam-putih (B&amp;W)</b><small>Aktif: garis dan teks tegas, cocok untuk logo. Nonaktif: halftone (titik-titik) agar gradasi tetap terlihat.</small></span></label>' : '') +
-    '<label>Ketebalan hitam<input type="range" class="lg-rng" data-lg="thr" min="20" max="235" value="' + e.thr + '"></label><p class="muted" style="margin:-6px 0 8px">Bagian terang (mis. kuning) ikut hilang? Geser ke kanan. Terlalu pekat? Geser ke kiri.</p>' +
+    '<label>Ketebalan hitam<input type="range" class="lg-rng" data-lg="thr" min="20" max="235" value="' + e.thr + '"></label><p class="m-up6 muted">Bagian terang (mis. kuning) ikut hilang? Geser ke kanan. Terlalu pekat? Geser ke kiri.</p>' +
     '<label class="sw"><input type="checkbox" data-lg="inv"><span class="sw-t" aria-hidden="true"></span><span class="sw-l"><b>Balik hitam dan putih</b><small>Aktifkan bila logo berwarna putih atau latarnya transparan.</small></span></label>' +
     '<label>Ukuran logo (% lebar kertas)<select class="inp" data-lg="pct">' + pcts.map(p => '<option value="' + p + '"' + (p === e.pct ? ' selected' : '') + '>' + p + '%</option>').join('') + '</select></label>' +
     '<div class="row2"><button class="btn sec" data-act="close">Batal</button><button class="btn pri" data-act="logosave">Simpan logo</button></div>');
@@ -143,7 +143,7 @@ async function logoDel() {
 function logoCard() { // isi kartu "Logo struk" di Pengaturan (di luar tombol-tombol sakelar)
   const lg = logoGet(), url = lg ? logoURL(lg) : '';
   return '<input type="file" id="logo_file" accept="image/*" hidden>' + (lg ?
-    '<div class="lg-paper">' + (url ? '<img class="lg-cv" alt="Logo struk" src="' + url + '" style="width:' + logoPct(lg) + '">' : '') + '</div><p class="muted c">' + lg.w + ' × ' + lg.h + ' titik · lebar ± ' + (lg.w / 8) + ' mm · ' + (lg.mode === 'h' ? 'halftone' : 'hitam-putih') + '</p>' :
+    '<div class="lg-paper">' + (url ? '<img class="lg-cv" alt="Logo struk" src="' + url + '" data-dw="' + logoPct(lg) + '">' : '') + '</div><p class="muted c">' + lg.w + ' × ' + lg.h + ' titik · lebar ± ' + (lg.w / 8) + ' mm · ' + (lg.mode === 'h' ? 'halftone' : 'hitam-putih') + '</p>' :
     '<p class="muted">Belum ada logo. Pilih gambar (PNG, JPG, atau WebP); aplikasi mengubahnya menjadi hitam-putih untuk printer thermal.</p>') +
     '<div class="row2"><button class="btn sec sm" data-act="logopick">' + (lg ? 'Ganti logo' : 'Pilih gambar logo') + '</button>' + (lg ? '<button class="btn dan sm" data-act="logodel">Hapus logo</button>' : '') + '</div>';
 }

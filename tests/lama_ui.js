@@ -4,7 +4,7 @@ let n = 0; const ok = (c, m) => { assert(c, m); n++; };
 const rd = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 const inti = rd('src/app/01-inti.js'), src = rd('src/app/139-transaksi-lama.js'), opsi = rd('src/app/138-opsi.js');   // 139 memakai logika opsi Kasir dari 138
 const pick = re => { const m = inti.match(re); assert(m, 'tidak ditemukan di 01-inti.js: ' + re); return m[0]; };
-const shared = pick(/function dnum\(s\) \{[\s\S]*?\n\}/) + '\n' + pick(/const T = [^\n]*\n/) + '\n' + pick(/const vOf = [^\n]*\n/) + '\n' + pick(/const newReqId = [^\n]*\n/);
+const shared = pick(/function dnum\(s\) \{[\s\S]*?\n\}/) + '\n' + pick(/const rpIn = [^\n]*\n/) + '\n' + pick(/const T = [^\n]*\n/) + '\n' + pick(/const vOf = [^\n]*\n/) + '\n' + pick(/const newReqId = [^\n]*\n/);
 
 function boot(o) {
   o = o || {};

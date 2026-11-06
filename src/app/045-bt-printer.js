@@ -70,7 +70,7 @@ function btBadge() {
   return '<button class="badge ' + cls + '" data-act="btstat">' + esc(txt) + '</button>';
 }
 function btFailBox() {
-  return BT.fail ? '<div class="notice"><span>' + esc('Struk belum tercetak: ' + BT.fail.msg) + '</span><span style="display:flex;gap:6px;flex:none"><button class="chip" data-act="rawbt">Cetak ulang</button>' + (isAndroid() && btRoute() !== 'rawbt' ? '<button class="chip" data-act="btraw">Pakai RawBT</button>' : '') + '</span></div>' : '';
+  return BT.fail ? '<div class="notice"><span>' + esc('Struk belum tercetak: ' + BT.fail.msg) + '</span><span class="bt-acts"><button class="chip" data-act="rawbt">Cetak ulang</button>' + (isAndroid() && btRoute() !== 'rawbt' ? '<button class="chip" data-act="btraw">Pakai RawBT</button>' : '') + '</span></div>' : '';
 }
 function btInfo() {
   const rt = btRoute(), p = LS.get('btprof', null) || {}; if (rt === 'rawbt') return '<p class="muted">Pasangkan dan uji printer di aplikasi RawBT dulu. Pesan galat dari RawBT tidak terbaca oleh aplikasi ini.</p>';
@@ -101,7 +101,7 @@ function btUi() { /** @type {NodeListOf<HTMLElement>} */ (document.querySelector
 function btDiagCard() {
   const kv = btKv;
   return '<div class="card-s"><h3>Printer Bluetooth</h3>' + kv('Android (RawBT)', isAndroid() ? 'Ya' : 'Tidak') + kv('iPhone / iPad', isIOS() ? 'Ya' : 'Tidak') + kv('Web Bluetooth (BLE langsung)', navigator.bluetooth ? 'Tersedia' : 'Tidak tersedia') + kv('Web Serial (klasik, komputer)', btHasSerial() ? 'Tersedia' : 'Tidak tersedia') +
-    '<p class="muted" style="margin-top:8px"><b>Jalur cetak utama</b></p>' + btBox('sw') + btBox('st') + btBox('info') + btBox('act') + btBox('adv') +
+    '<p class="u-mt8 muted"><b>Jalur cetak utama</b></p>' + btBox('sw') + btBox('st') + btBox('info') + btBox('act') + btBox('adv') +
     '<p class="muted">Printer klasik (SPP): Android lewat RawBT, komputer lewat jalur Klasik. iPhone/iPad hanya mendukung printer BLE (Bluefy).</p></div>';
 }
 
@@ -244,10 +244,10 @@ async function printBT(rc, o) {
 }
 function iosHelp() {
   sheet('<div class="grab"></div><h2>Cetak dari iPhone</h2><p class="muted">Safari dan Chrome di iPhone tidak bisa mengirim data ke printer Bluetooth. Pilihan yang bisa dipakai:</p>' +
-    '<div class="li" style="display:block"><b>1. Browser dengan Web Bluetooth</b><div class="muted">Pasang browser seperti Bluefy, buka alamat aplikasi ini di sana, lalu tekan Cetak Bluetooth. Printer harus tipe <b>BLE</b>; printer Bluetooth klasik (kebanyakan printer murah) tidak dikenali iPhone.</div><button class="btn sec sm" data-act="copyurl">Salin alamat aplikasi</button></div>' +
-    '<div class="li" style="display:block"><b>2. AirPrint atau PDF</b><div class="muted">Tombol Cetak memakai menu cetak iOS (printer AirPrint, atau simpan sebagai PDF).</div><button class="btn sec sm" data-act="print">Cetak</button></div>' +
-    '<div class="li" style="display:block"><b>3. Bagikan struk</b><div class="muted">Kirim ke WhatsApp atau aplikasi printer lain lewat menu bagikan iOS.</div><button class="btn sec sm" data-act="share">Bagikan…</button></div>' +
-    '<div class="li" style="display:block"><b>4. Android + RawBT</b><div class="muted">Untuk printer Bluetooth klasik, gunakan HP Android dengan aplikasi RawBT.</div></div><button class="btn pri" data-act="close">Mengerti</button>');
+    '<div class="u-blk li"><b>1. Browser dengan Web Bluetooth</b><div class="muted">Pasang browser seperti Bluefy, buka alamat aplikasi ini di sana, lalu tekan Cetak Bluetooth. Printer harus tipe <b>BLE</b>; printer Bluetooth klasik (kebanyakan printer murah) tidak dikenali iPhone.</div><button class="btn sec sm" data-act="copyurl">Salin alamat aplikasi</button></div>' +
+    '<div class="u-blk li"><b>2. AirPrint atau PDF</b><div class="muted">Tombol Cetak memakai menu cetak iOS (printer AirPrint, atau simpan sebagai PDF).</div><button class="btn sec sm" data-act="print">Cetak</button></div>' +
+    '<div class="u-blk li"><b>3. Bagikan struk</b><div class="muted">Kirim ke WhatsApp atau aplikasi printer lain lewat menu bagikan iOS.</div><button class="btn sec sm" data-act="share">Bagikan…</button></div>' +
+    '<div class="u-blk li"><b>4. Android + RawBT</b><div class="muted">Untuk printer Bluetooth klasik, gunakan HP Android dengan aplikasi RawBT.</div></div><button class="btn pri" data-act="close">Mengerti</button>');
 }
 
 /* ----- aksi kasir (dipanggil dari ACT) ----- */

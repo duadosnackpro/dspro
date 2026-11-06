@@ -6,7 +6,7 @@ let n = 0; const ok = (c, m) => { assert(c, m); n++; };
 const rd = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 const inti = rd('src/app/01-inti.js'), stok = rd('src/app/09-stok-pembelian.js');
 const pick = re => { const m = inti.match(re); assert(m, 'tidak ditemukan di 01-inti.js: ' + re); return m[0]; };
-const shared = pick(/function dnum\(s\) \{[\s\S]*?\n\}/) + '\n' + pick(/const CAPS = \{[\s\S]*?\};\n/) + '\n' + pick(/const can = [^\n]*\n/);
+const shared = pick(/function dnum\(s\) \{[\s\S]*?\n\}/) + '\n' + pick(/const rpIn = [^\n]*\n/) + '\n' + pick(/const CAPS = \{[\s\S]*?\};\n/) + '\n' + pick(/const can = [^\n]*\n/);
 
 function boot(role, o) {
   o = o || {};

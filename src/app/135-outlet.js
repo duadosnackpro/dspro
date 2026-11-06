@@ -8,7 +8,7 @@ function outletLabel() {
   return '<small>' + esc(outletName()) + '</small>' + (many ? '<button class="linkbtn" data-act="outlet" aria-label="Ganti outlet aktif">Ganti outlet</button>' : '');
 }
 function outletSheet() {
-  sheet('<h2>Pilih outlet</h2><p class="muted">Data stok, penjualan, dan kas mengikuti outlet yang dipilih.</p>' + pickable().map(o => '<button class="li" style="width:100%;border:0;font:inherit;text-align:left;margin-top:8px" data-act="outpick" data-id="' + esc(o.id) + '"><span><b>' + esc(o.code) + '</b> ' + esc(o.name) + ' <span class="muted">' + (o.kind === 'kitchen' ? 'Dapur' : 'Toko') + '</span></span>' + (S.data.outlet && o.id === S.data.outlet.id ? '<span class="badge ok">Aktif</span>' : '<span class="muted">Pilih</span>') + '</button>').join('') + '<button class="btn sec" data-act="close">Tutup</button>');
+  sheet('<h2>Pilih outlet</h2><p class="muted">Data stok, penjualan, dan kas mengikuti outlet yang dipilih.</p>' + pickable().map(o => '<button class="li-flat u-mt8 li" data-act="outpick" data-id="' + esc(o.id) + '"><span><b>' + esc(o.code) + '</b> ' + esc(o.name) + ' <span class="muted">' + (o.kind === 'kitchen' ? 'Dapur' : 'Toko') + '</span></span>' + (S.data.outlet && o.id === S.data.outlet.id ? '<span class="badge ok">Aktif</span>' : '<span class="muted">Pilih</span>') + '</button>').join('') + '<button class="btn sec" data-act="close">Tutup</button>');
 }
 async function outletPick(id) {
   if (S.data.outlet && id === S.data.outlet.id) return closeSheet();
@@ -23,7 +23,7 @@ async function outletPick(id) {
 function vOutlets() {
   const rows = S.data.outlets || [], st = {active: 'Aktif', inactive: 'Nonaktif', closed: 'Ditutup'};
   $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><p class="muted">' + rows.filter(o => o.status === 'active').length + ' outlet aktif</p><button class="btn pri" data-act="oedit" data-id="">+ Tambah outlet</button>' +
-    rows.map(o => '<button class="li" style="width:100%;border:0;font:inherit;text-align:left;margin-top:8px" data-act="oedit" data-id="' + esc(o.id) + '"><span><b>' + esc(o.code) + '</b> ' + esc(o.name) + '<br><span class="muted">' + (o.kind === 'kitchen' ? 'Dapur/gudang produksi' : 'Toko') + (o.address ? ' · ' + esc(o.address) : '') + '</span></span><span class="badge ' + (o.status === 'active' ? 'ok' : 'off') + '">' + st[o.status] + '</span></button>').join('');
+    rows.map(o => '<button class="li-flat u-mt8 li" data-act="oedit" data-id="' + esc(o.id) + '"><span><b>' + esc(o.code) + '</b> ' + esc(o.name) + '<br><span class="muted">' + (o.kind === 'kitchen' ? 'Dapur/gudang produksi' : 'Toko') + (o.address ? ' · ' + esc(o.address) : '') + '</span></span><span class="badge ' + (o.status === 'active' ? 'ok' : 'off') + '">' + st[o.status] + '</span></button>').join('');
 }
 async function oeditSheet(id) {
   const o = id ? S.data.outlets.find(x => x.id === id) : {kind: 'store', status: 'active'};

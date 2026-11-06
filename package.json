@@ -1,6 +1,6 @@
 {
   "name": "duado-pos",
-  "version": "2.6.13",
+  "version": "2.6.15",
   "private": true,
   "description": "Duado Snack POS: klien web statis (GitHub Pages) + backend Supabase",
   "scripts": {
@@ -11,7 +11,7 @@
     "test:release": "node tests/release_check.js",
     "test:fe": "node tests/fe_sb.js",
     "test:bt": "node tests/bt_printer.js",
-    "test": "npm run build:check && npm run test:release && npm run test:fe && npm run test:rt && npm run test:dash && npm run test:bt && npm run test:edge && npm run test:opsi && npm run test:prod && npm run test:beli && npm run test:lama && npm run test:ops && npm run test:dashui && npm run test:nav",
+    "test": "npm run build:check && npm run test:release && npm run test:fe && npm run test:rt && npm run test:dash && npm run test:bt && npm run test:edge && npm run test:opsi && npm run test:prod && npm run test:beli && npm run test:lama && npm run test:ops && npm run test:dashui && npm run test:nav && npm run test:a11y",
     "check": "npm run lint && npm run typecheck && npm test",
     "test:edge": "node --experimental-strip-types --test supabase/functions/admin-users/authz_test.ts",
     "test:rt": "node tests/realtime.js",
@@ -22,7 +22,8 @@
     "test:lama": "node tests/lama_ui.js",
     "test:ops": "node tests/ops_sync.js",
     "test:dashui": "node tests/dash_ui.js",
-    "test:nav": "node tests/nav_dialog_ui.js"
+    "test:nav": "node tests/nav_dialog_ui.js",
+    "test:a11y": "node tests/a11y_ui.js"
   },
   "devDependencies": {
     "@eslint/js": "9.17.0",

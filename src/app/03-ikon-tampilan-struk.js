@@ -192,7 +192,7 @@ function qrBitmap(text, maxW) { // QR -> bitmap 1-bit (zona tenang 2 modul), mod
 function qrImg(text) { // pratinjau layar
   if (typeof document === 'undefined') return '<span class="qrbox">QR</span>';
   const b = qrBitmap(text, paperDots()); if (!b) return '<i>(isi QR terlalu panjang, maks. 120 karakter)</i>';
-  const cv = document.createElement('canvas'); logoPaint(cv, b); return '<img class="lg-cv" alt="QR" src="' + cv.toDataURL('image/png') + '" style="width:' + Math.min(100, b.w / paperDots() * 100).toFixed(1) + '%">';
+  const cv = document.createElement('canvas'); logoPaint(cv, b); return '<img class="lg-cv" alt="QR" src="' + cv.toDataURL('image/png') + '" data-dw="' + Math.min(100, b.w / paperDots() * 100).toFixed(1) + '%">';
 }
 function escpos(rc) { // byte ESC/POS untuk printer thermal (dikirim lewat RawBT atau BLE langsung)
   const lg = logoOn(), w = rcWidth(), D = receiptDoc(rc, {w: w, rich: true, logo: lg}), out = [0x1B, 0x40], add = a => { for (const c of ascii(a)) out.push(c.charCodeAt(0)); out.push(10); };

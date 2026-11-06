@@ -39,28 +39,28 @@ function vDash(force) { // force: tombol muat ulang (↻) memaksa ambil ulang da
     return api('dashboard.get', {period: want}).then(d => { LS.set(key, {k: k, d: d}); if (S.tab === 'dash' && S.dp === want && $('#dbody')) drawDash(d); });
   }).catch(e => { try { console.error('dashboard', e); } catch (x) {} /* G: detail teknis hanya ke log; pengguna melihat pesan ramah + Coba lagi */ if (!cached && $('#dbody')) $('#dbody').innerHTML = '<div class="empty-s" role="alert"><h3>Data belum bisa dimuat</h3><p>Periksa sambungan internet, lalu coba lagi.</p><button class="btn sec" data-act="dp" data-p="' + esc(S.dp) + '">Coba lagi</button></div>'; });
 }
-function delta(c, p, lab) { if (!p) return '<span>—</span> ' + lab + ' (belum ada data)'; const x = (c - p) / Math.abs(p) * 100; return '<span style="color:' + (x >= 0 ? 'var(--ok)' : 'var(--err)') + ';font-weight:800">' + (x >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(x)) + '</span> ' + lab; }
+function delta(c, p, lab) { if (!p) return '<span>—</span> ' + lab + ' (belum ada data)'; const x = (c - p) / Math.abs(p) * 100; return '<span class="' + (x >= 0 ? 'u-ok' : 'u-err') + ' u-b8">' + (x >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(x)) + '</span> ' + lab; }
 const kpi = (l, v, sub) => '<div class="kpi"><div class="muted">' + l + '</div><b>' + v + '</b><div class="muted">' + sub + '</div></div>';
 function barChart(ser) {
   const W = 320, H = 130, pad = 18, n = ser.length, max = Math.max(1, ...ser.map(s => s.omzet)), bw = (W - 8) / n; let g = '';
   ser.forEach((s, i) => {
     const h = Math.max(1, Math.round(s.omzet / max * (H - pad - 14))), lh = Math.max(0, Math.round(Math.max(s.laba, 0) / max * (H - pad - 14))), x = 4 + i * bw + bw * .15, w = bw * .7;
-    g += '<rect data-b="' + i + '" x="' + x + '" y="' + (H - pad - h) + '" width="' + w + '" height="' + h + '" rx="3" fill="#E4570E"/><rect data-b="' + i + '" x="' + x + '" y="' + (H - pad - lh) + '" width="' + w + '" height="' + lh + '" rx="3" fill="#5B1A14"/>';
-    if (n <= 8 || i % 5 === 0) g += '<text x="' + (x + w / 2) + '" y="' + (H - 4) + '" font-size="10" text-anchor="middle" fill="#6A5851">' + s.d.slice(8) + '</text>';
-    g += '<rect data-act="bar" data-i="' + i + '" x="' + (4 + i * bw) + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent" style="cursor:pointer"/>'; // area ketuk selebar kolom
+    g += '<rect data-b="' + i + '" x="' + x + '" y="' + (H - pad - h) + '" width="' + w + '" height="' + h + '" rx="3" class="bc-o"/><rect data-b="' + i + '" x="' + x + '" y="' + (H - pad - lh) + '" width="' + w + '" height="' + lh + '" rx="3" class="bc-l"/>';
+    if (n <= 8 || i % 5 === 0) g += '<text x="' + (x + w / 2) + '" y="' + (H - 4) + '" font-size="10" text-anchor="middle" class="bc-t">' + s.d.slice(8) + '</text>';
+    g += '<rect data-act="bar" data-i="' + i + '" x="' + (4 + i * bw) + '" y="0" width="' + bw + '" height="' + H + '" class="bc-hit"/>'; // area ketuk selebar kolom
   });
   return '<svg class="bchart" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Omzet dan laba kotor per hari. Ketuk batang untuk melihat nilai.">' + g + '</svg>';
 }
-const COL = ['#5B1A14', '#E4570E', '#FFC52E', '#14703A', '#8C7B6E']; // palet token "Dapur Pedas": maroon, cabai, kuning, hijau, abu hangat
+/* Warna grafik ada di CSS sebagai token (--ch1 ... --ch5, kelas ch1 ... ch5; batang Beranda: bc-o, bc-l, bc-t). Jangan menanam #hex di sini. */
 function donut(parts, total) { // batang bertumpuk per channel
-  return '<div class="stack" role="img" aria-label="Komposisi penjualan per channel">' + parts.map((p, i) => '<i style="width:' + (total ? p.omzet / total * 100 : 0) + '%;background:' + COL[i % 5] + '"></i>').join('') + '</div>';
+  return '<div class="stack" role="img" aria-label="Komposisi penjualan per channel">' + parts.map((p, i) => '<i class="ch' + (i % 5 + 1) + '" data-dw="' + (total ? p.omzet / total * 100 : 0) + '%"></i>').join('') + '</div>';
 }
 const PLAB = {hari: 'hari ini', minggu: '7 hari terakhir', bulan: 'bulan ini'};
 const DOW = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const dowOf = d => DOW[new Date(d + 'T12:00:00').getDay()];
 /* "~" di ujung nama = isi kolom level pedas yang berarti "tanpa level"; tidak berguna di Beranda, jadi tidak ditampilkan di sana. */
 const cleanNm = x => String(x == null ? '' : x).replace(/\s*~\s*$/, '');
-const chg = (c, p) => { if (!p || p <= 0) return ''; const x = (c - p) / p * 100; return '<span class="chg" style="color:' + (x >= 0 ? 'var(--ok)' : 'var(--err)') + '">' + (x >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(x)) + '</span>'; };
+const chg = (c, p) => { if (!p || p <= 0) return ''; const x = (c - p) / p * 100; return '<span class="chg ' + (x >= 0 ? 'u-ok' : 'u-err') + '">' + (x >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(x)) + '</span>'; };
 function heroHtml(d, lab) { // kartu utama: omzet, pembanding, laba kotor/bersih/margin, lalu batang harian (bagian bawah batang = laba kotor)
   const c = d.cur, p = d.prev, ser = d.series, n = ser.length, max = Math.max(1, ...ser.map(s => s.omzet));
   const fee = Number(d.fee_channel) || 0, biaya = Number(d.biaya) || 0, loss = Number(d.kerugian) || 0;
@@ -71,9 +71,11 @@ function heroHtml(d, lab) { // kartu utama: omzet, pembanding, laba kotor/bersih
     : 'Belum ada fee, biaya, atau kerugian stok, jadi laba bersih sama dengan laba kotor.') + '</div>';
   let chart = '';
   if (n > 1) {   // satu batang (Hari ini) tidak memberi informasi: grafik hanya untuk 7 hari / bulan
-    const bars = ser.map((s, i) => '<div data-act="bar" data-b="' + i + '" data-i="' + i + '"' + (i === n - 1 ? ' class="t"' : '') + ' style="height:' + Math.max(3, Math.round(s.omzet / max * 100)) + '%"><i style="height:' + (s.omzet > 0 ? Math.min(100, Math.round(Math.max(s.laba, 0) / s.omzet * 100)) : 0) + '%"></i></div>').join('');
+    const bars = ser.map((s, i) => '<div role="button" tabindex="' + (i === n - 1 ? 0 : -1) + '" aria-pressed="false" aria-label="' + esc(idDate(s.d) + ': omzet ' + rp(s.omzet) + ', laba kotor ' + rp(s.laba)) + '" data-act="bar" data-b="' + i + '" data-i="' + i + '"' + (i === n - 1 ? ' class="t"' : '') + ' data-dh="' + Math.max(3, Math.round(s.omzet / max * 100)) + '%"><i data-dh="' + (s.omzet > 0 ? Math.min(100, Math.round(Math.max(s.laba, 0) / s.omzet * 100)) : 0) + '%"></i></div>').join('');
+    const hi = ser.reduce((a, x) => x.omzet > a.omzet ? x : a, ser[0]), lo = ser.reduce((a, x) => x.omzet < a.omzet ? x : a, ser[0]);
     const labs = ser.map((s, i) => '<span>' + (n <= 8 ? dowOf(s.d) + '<br>' + s.d.slice(8) : (i % 5 === 0 || i === n - 1 ? s.d.slice(8) : '')) + '</span>').join('');
-    chart = '<div class="hbars bchart" role="img" aria-label="Omzet per hari. Ketuk batang untuk melihat nilai.">' + bars + '</div><div class="hlab">' + labs + '</div><div class="btip" id="bt" aria-live="polite"></div>';
+    chart = '<p class="sr" id="bsum">Grafik omzet ' + n + ' hari. Tertinggi ' + esc(idDate(hi.d)) + ' ' + rp(hi.omzet) + ', terendah ' + esc(idDate(lo.d)) + ' ' + rp(lo.omzet) + '. Tiap batang berisi omzet dan laba kotor harian.</p>' +
+      '<div class="hbars bchart" role="group" aria-label="Omzet per hari" aria-describedby="bsum">' + bars + '</div><div class="hlab" aria-hidden="true">' + labs + '</div><div class="btip" id="bt" aria-live="polite"></div>';
   }
   return '<div class="hero"><small>Omzet ' + (PLAB[d.period] || '') + '</small><div class="big">' + rp(c.omzet) + '</div>' + dl + stats + brk + chart + '</div>';
 }
@@ -105,18 +107,18 @@ function chInner(d) {   // Penjualan per channel / per pembayaran
   const head = '<b>' + (pay ? 'Penjualan per' : 'Per channel') + '</b>' + (pay ? dtabs('dtab', tab, [['ch', 'Channel'], ['pay', 'Pembayaran']]) : '');
   if (tab === 'pay') {
     const ptot = pay.reduce((a, x) => a + Math.max(0, Number(x.rp) || 0), 0), parts = pay.filter(x => Number(x.rp) > 0).map(x => ({omzet: Number(x.rp)}));
-    return head + (!pay.length ? '<span class="muted">Belum ada pembayaran</span>' : (parts.length > 1 ? donut(parts, ptot) : '') + pay.map((x, i) => '<div class="kv"><span>' + (parts.length > 1 ? '<span class="lgd" style="background:' + COL[i % 5] + ';margin-left:0"></span>' : '') + esc(PAYN[x.metode] || x.metode) + ' · ' + num(x.trx) + ' trx</span><span>' + rp(x.rp) + (ptot ? ' · ' + pct(Math.max(0, Number(x.rp)) / ptot * 100) : '') + '</span></div>').join('') +
+    return head + (!pay.length ? '<span class="muted">Belum ada pembayaran</span>' : (parts.length > 1 ? donut(parts, ptot) : '') + pay.map((x, i) => '<div class="kv"><span>' + (parts.length > 1 ? '<span class="lgd u-ml0 ch' + (i % 5 + 1) + '"></span>' : '') + esc(PAYN[x.metode] || x.metode) + ' · ' + num(x.trx) + ' trx</span><span>' + rp(x.rp) + (ptot ? ' · ' + pct(Math.max(0, Number(x.rp)) / ptot * 100) : '') + '</span></div>').join('') +
       '<div class="muted dcap">Jumlah dibayar, sudah dikurangi retur.</div>');
   }
   return head + (!d.channels.length ? '<span class="muted">Belum ada penjualan</span>'
     : d.channels.length === 1 ? '<div class="kv"><span>' + esc(d.channels[0].nama) + '</span><span>' + rp(d.channels[0].omzet) + ' · 100%</span></div>'
-    : donut(d.channels, tot) + d.channels.map((x, i) => '<div class="kv"><span><span class="lgd" style="background:' + COL[i % 5] + ';margin-left:0"></span>' + esc(x.nama) + '</span><span>' + rp(x.omzet) + ' · ' + (tot ? pct(x.omzet / tot * 100) : '0%') + '</span></div>').join(''));
+    : donut(d.channels, tot) + d.channels.map((x, i) => '<div class="kv"><span><span class="lgd u-ml0 ch' + (i % 5 + 1) + '"></span>' + esc(x.nama) + '</span><span>' + rp(x.omzet) + ' · ' + (tot ? pct(x.omzet / tot * 100) : '0%') + '</span></div>').join(''));
 }
 function topInner(d) {   // Produk terlaris: urut menurut jumlah, omzet, atau laba kotor
   const alt = d.top_om !== undefined && d.top_laba !== undefined, m = alt && ['om', 'laba'].includes(S.dtopm) ? S.dtopm : 'qty';
   const src = m === 'om' ? d.top_om : m === 'laba' ? d.top_laba : d.top, val = t => m === 'om' ? Number(t.om) : m === 'laba' ? Number(t.laba) : Number(t.qty);
   const rows = (src || []).map(t => ({nama: cleanNm(t.nama), v: val(t)})), mx = Math.max(1, ...rows.map(t => Math.abs(t.v)));
-  const row = t => '<div style="margin-top:6px"><div class="kv"><span>' + esc(t.nama) + '</span><span>' + (m === 'qty' ? num(t.v) + ' pcs' : rp(t.v)) + '</span></div><div class="bar"><i style="width:' + Math.max(0, Math.round(t.v / mx * 100)) + '%"></i></div></div>';
+  const row = t => '<div class="u-mt6"><div class="kv"><span>' + esc(t.nama) + '</span><span>' + (m === 'qty' ? num(t.v) + ' pcs' : rp(t.v)) + '</span></div><div class="bar"><i data-dw="' + Math.max(0, Math.round(t.v / mx * 100)) + '%"></i></div></div>';
   const hppWarn = m === 'laba' && (d.peringatan || []).some(w => w && w.aksi === 'hpp') ? '<div class="muted dcap">HPP belum lengkap: laba produk bisa lebih tinggi dari kenyataan.</div>' : '';
   return '<b>Produk terlaris</b>' + (alt ? dtabs('dtop', m, [['qty', 'Jumlah'], ['om', 'Omzet'], ['laba', 'Laba']]) : '') +
     (!rows.length ? '<div class="muted">Belum ada data</div>' : rows.slice(0, 3).map(row).join('') + (rows.length > 3 ? '<details class="more"><summary>Lihat ' + (rows.length - 3) + ' lainnya</summary>' + rows.slice(3).map(row).join('') + '</details>' : '')) + hppWarn;
@@ -124,7 +126,7 @@ function topInner(d) {   // Produk terlaris: urut menurut jumlah, omzet, atau la
 function jamHtml(d) {   // Jam ramai: 3 jam dengan transaksi terbanyak (penjualan kasir, jam lokal outlet)
   const j = (Array.isArray(d.jam) ? d.jam : []).slice().sort((a, b) => b.trx - a.trx || b.omzet - a.omzet).slice(0, 3); if (!j.length) return '';
   const mx = Math.max(1, ...j.map(x => x.trx));
-  return '<div class="li" style="display:block"><b>Jam ramai</b>' + j.map(x => '<div style="margin-top:6px"><div class="kv"><span>' + jamRange(Number(x.jam)) + '</span><span>' + num(x.trx) + ' trx · ' + rp(x.omzet) + '</span></div><div class="bar"><i style="width:' + Math.round(x.trx / mx * 100) + '%"></i></div></div>').join('') + '<div class="muted dcap">Penjualan kasir; transaksi lama yang diinput belakangan tidak dihitung.</div></div>';
+  return '<div class="u-blk li"><b>Jam ramai</b>' + j.map(x => '<div class="u-mt6"><div class="kv"><span>' + jamRange(Number(x.jam)) + '</span><span>' + num(x.trx) + ' trx · ' + rp(x.omzet) + '</span></div><div class="bar"><i data-dw="' + Math.round(x.trx / mx * 100) + '%"></i></div></div>').join('') + '<div class="muted dcap">Penjualan kasir; transaksi lama yang diinput belakangan tidak dihitung.</div></div>';
 }
 function dashTab(k) { S.dtab = k === 'pay' ? 'pay' : 'ch'; const e = $('#chcard'); if (e && S.dd) e.innerHTML = chInner(S.dd); }
 function dashTop(k) { S.dtopm = ['om', 'laba'].includes(k) ? k : 'qty'; const e = $('#topcard'); if (e && S.dd) e.innerHTML = topInner(S.dd); }
@@ -138,17 +140,17 @@ function drawDash(d) {
   const low = d.low || [], habis = low.filter(l => Number(l.stok) <= 0), tipis = low.filter(l => Number(l.stok) > 0), list = habis.concat(tipis);
   const nh = d.low_habis !== undefined ? Number(d.low_habis) : habis.length, nt = d.low_tipis !== undefined ? Number(d.low_tipis) : tipis.length;
   const lrow = l => '<div class="kv"><span>' + esc(l.nama) + '</span><span>' + (Number(l.stok) <= 0 ? '<span class="bdg out">Habis</span>' : '<span class="bdg low">Menipis</span> ' + dec(l.stok) + ' ' + esc(l.satuan)) + '</span></div>';
-  const lowNote = d.low_habis !== undefined ? (list.length < nh + nt ? '<div class="muted" style="margin-top:6px">Menampilkan ' + num(list.length) + ' dari ' + num(nh + nt) + ' bahan.</div>' : '') : (list.length >= 10 ? '<div class="muted" style="margin-top:6px">Daftar dibatasi 10 bahan teratas.</div>' : '');
+  const lowNote = d.low_habis !== undefined ? (list.length < nh + nt ? '<div class="u-mt6 muted">Menampilkan ' + num(list.length) + ' dari ' + num(nh + nt) + ' bahan.</div>' : '') : (list.length >= 10 ? '<div class="u-mt6 muted">Daftar dibatasi 10 bahan teratas.</div>' : '');
   const lowBody = !list.length ? '<div class="muted">Semua stok bahan aman</div>'
     : '<div class="lsum">' + (nh ? '<span class="bdg out">' + num(nh) + ' habis</span> ' : '') + (nt ? '<span class="bdg low">' + num(nt) + ' menipis</span>' : '') + '</div>' + list.slice(0, 3).map(lrow).join('') +
-      (list.length > 3 ? '<details class="more"><summary>Lihat ' + (list.length - 3) + ' lainnya</summary>' + list.slice(3).map(lrow).join('') + '</details>' : '') + lowNote + '<button class="btn sec" style="margin-top:8px" data-act="tab" data-t="stok">Buka Stok</button>';
+      (list.length > 3 ? '<details class="more"><summary>Lihat ' + (list.length - 3) + ' lainnya</summary>' + list.slice(3).map(lrow).join('') + '</details>' : '') + lowNote + '<button class="u-mt8 btn sec" data-act="tab" data-t="stok">Buka Stok</button>';
   const notes = []; if (Number(c.diskon) > 0) notes.push('Diskon ' + rp(c.diskon)); if (Number(c.retur_n) > 0) notes.push('Retur ' + num(c.retur_n) + ' trx (' + rp(c.retur_rp) + ', sudah mengurangi omzet)');
   $('#dbody').innerHTML = '<div class="rcaprow"><p class="muted rcap">' + esc(idRange(d.from, d.to)) + ' · omzet tanpa PPN · pembanding: ' + esc(idRange(pfrom, pto)) + '</p><span id="wbell"></span></div>' + heroHtml(d, lab) +
     '<div class="kgrid ' + (t2 ? 'k3' : 'k2') + '">' + kpi('Transaksi', num(c.trx), sub(chg(c.trx, p && p.trx))) + (t2 ? kpi('Produk terjual', num(c.pcs) + ' pcs', sub(chg(c.pcs, p && p.pcs))) : '') + kpi('Rata-rata / transaksi', rp(avg), sub(chg(avg, pavg))) + '</div>' +
     (notes.length ? '<p class="muted dnote">' + notes.join(' · ') + '</p>' : '') +
-    '<div class="dgrid"><div class="li" style="display:block" id="chcard">' + chInner(d) + '</div>' +
-    '<div class="li" style="display:block" id="topcard">' + topInner(d) + '</div>' + jamHtml(d) +
-    '<div class="li span2" style="display:block"><b>Stok bahan perlu perhatian</b>' + lowBody + '</div></div>';
+    '<div class="dgrid"><div class="u-blk li" id="chcard">' + chInner(d) + '</div>' +
+    '<div class="u-blk li" id="topcard">' + topInner(d) + '</div>' + jamHtml(d) +
+    '<div class="u-blk li span2"><b>Stok bahan perlu perhatian</b>' + lowBody + '</div></div>';
   S.dashRange = {from: d.from, to: d.to};
   S.dwarn = dashWarnings(d); drawBell();
   if (c.trx && !(d.peringatan || []).some(w => w && w.aksi === 'hpp')) hppCheck(d.from, d.to).then(v => { if (!v.n || !$('#wbell')) return; S.dwarn.push({judul: 'Laba belum akurat', teks: v.n + ' produk belum punya resep/HPP: ' + v.names.slice(0, 3).join(', ') + (v.names.length > 3 ? ' dan ' + (v.names.length - 3) + ' lainnya' : ''), tombol: 'Lengkapi di Resep', act: 'go_resep'}); drawBell(); const mg = $('#mgn'); if (mg && c.omzet && c.laba / c.omzet >= .995) mg.innerHTML = qMark + ' belum akurat'; }).catch(() => {});
@@ -168,8 +170,8 @@ function costOf(items, rec, batch, qty, tk, oh) {
   const total = bahan + kem + tkv + ohv; return {lines: lines, short: lines.filter(l => !l.ok), bahan: bahan, kem: kem, tk: tkv, oh: ohv, total: total, hpp: qty > 0 ? total / qty : 0};
 }
 function costHtml(c) {
-  return '<div class="li" style="display:block">' + c.lines.map(l => '<div class="kv"><span>' + esc(l.nama) + '</span><span style="' + (l.ok ? '' : 'color:var(--err);font-weight:800') + '">' + dec(l.q) + ' ' + esc(l.satuan) + ' (stok ' + dec(l.stok) + ')' + (l.ok ? '' : ' KURANG') + '</span></div>').join('') + '</div>' +
-    '<div class="li" style="display:block">' + kv('Bahan baku', rp(c.bahan)) + kv('Kemasan', rp(c.kem)) + kv('Tenaga kerja', rp(c.tk)) + kv('Overhead', rp(c.oh)) + kv('Total biaya', rp(c.total), 'big') + kv('HPP per unit', rp(c.hpp), 'big') + '</div>';
+  return '<div class="u-blk li">' + c.lines.map(l => '<div class="kv"><span>' + esc(l.nama) + '</span><span' + (l.ok ? '' : ' class="u-err u-b8"') + '>' + dec(l.q) + ' ' + esc(l.satuan) + ' (stok ' + dec(l.stok) + ')' + (l.ok ? '' : ' KURANG') + '</span></div>').join('') + '</div>' +
+    '<div class="u-blk li">' + kv('Bahan baku', rp(c.bahan)) + kv('Kemasan', rp(c.kem)) + kv('Tenaga kerja', rp(c.tk)) + kv('Overhead', rp(c.oh)) + kv('Total biaya', rp(c.total), 'big') + kv('HPP per unit', rp(c.hpp), 'big') + '</div>';
 }
 
 /* ---------- Bahan kurang: pintasan ke Pembelian ---------- */
@@ -212,10 +214,10 @@ const JN = {batch: 'Batch', pesanan: 'Per pesanan', repack: 'Repack'};
 const pflOn = (f, p) => p === 'all' ? !f.from && !f.to : p === 'today' ? f.from === A.today() && f.to === A.today() : f.to === A.today() && f.from === A.addDays(A.today(), -6);
 function vProduksi(force) {
   const f = S.pfl || (S.pfl = {from: '', to: ''});
-  $('#main').innerHTML = '<div class="row2"><button class="btn pri" data-act="prec">+ Catat produksi selesai</button><button class="btn sec" data-act="pnew">Buat rencana</button></div>' + (A.own() ? '<button class="chip" style="margin-top:8px" data-act="go_resep">Resep →</button>' : '') +
-    '<div class="row2" style="margin-top:10px"><div style="flex:1"><label>Dari tanggal<input type="date" class="inp" data-chg="pfrom" value="' + esc(f.from) + '"></label></div><div style="flex:1"><label>Sampai<input type="date" class="inp" data-chg="pto" value="' + esc(f.to) + '"></label></div></div>' +
+  $('#main').innerHTML = '<div class="row2"><button class="btn pri" data-act="prec">+ Catat produksi selesai</button><button class="btn sec" data-act="pnew">Buat rencana</button></div>' + (A.own() ? '<button class="u-mt8 chip" data-act="go_resep">Resep →</button>' : '') +
+    '<div class="u-mt10 row2"><div class="u-f1"><label>Dari tanggal<input type="date" class="inp" data-chg="pfrom" value="' + esc(f.from) + '"></label></div><div class="u-f1"><label>Sampai<input type="date" class="inp" data-chg="pto" value="' + esc(f.to) + '"></label></div></div>' +
     A.wrapChips([['all', 'Semua'], ['today', 'Hari ini'], ['7d', '7 hari']].map(x => '<button class="chip ' + (pflOn(f, x[0]) ? 'on' : '') + '" data-act="pfq" data-p="' + x[0] + '">' + x[1] + '</button>').join('')) +
-    '<div id="plist" style="margin-top:10px">' + skel(3) + '</div>';
+    '<div id="plist" class="u-mt10">' + skel(3) + '</div>';
   prodLoad(force);
 }
 function prodLoad(force) {
@@ -227,7 +229,7 @@ function drawProd() {
   const el = $('#plist'); if (!el) return;
   el.innerHTML = S.prod.map(o => {
     const st = o.status, tag = st === 'selesai' ? '<span class="tag grn">Selesai</span>' : st === 'rencana' ? '<span class="tag">Rencana</span>' : '<span class="tag red">Batal</span>';
-    return '<button class="li" style="width:100%;border:0;font:inherit;text-align:left" data-act="pdetail" data-id="' + esc(o.id) + '"><div><b>' + esc(vLabel(o.variant_id)) + '</b><div class="muted">' + esc(JN[o.jenis] || o.jenis) + ' · ' + num(o.jumlah_batch) + ' batch · ' + (st === 'selesai' && o.tanggal_selesai ? 'selesai ' + esc(String(o.tanggal_selesai).slice(0, 10)) : esc(String(o.tanggal).slice(0, 10))) + '</div></div><div class="r">' + tag +
+    return '<button class="li-flat li" data-act="pdetail" data-id="' + esc(o.id) + '"><div><b>' + esc(vLabel(o.variant_id)) + '</b><div class="muted">' + esc(JN[o.jenis] || o.jenis) + ' · ' + num(o.jumlah_batch) + ' batch · ' + (st === 'selesai' && o.tanggal_selesai ? 'selesai ' + esc(String(o.tanggal_selesai).slice(0, 10)) : esc(String(o.tanggal).slice(0, 10))) + '</div></div><div class="r">' + tag +
       (st === 'selesai' ? '<div class="muted">' + num(o.qty_hasil) + ' pcs · HPP ' + rp(o.hpp_per_unit) + '</div>' : '') + '</div></button>';
   }).join('') + (S.prod.length >= 200 ? '<p class="muted">Menampilkan 200 produksi terbaru. Persempit filter tanggal untuk melihat yang lain.</p>' : '') || (S.pfl && (S.pfl.from || S.pfl.to) ? emptyState('produksi', 'Tidak ada produksi', 'Tidak ada produksi pada rentang tanggal ini.', '<button class="btn sec" data-act="pfq" data-p="all">Tampilkan semua</button>') : S.data.recipes.length ? emptyState('produksi', 'Belum ada produksi', 'Catat produksi pertama untuk menambah stok produk jadi dan menghitung HPP otomatis.', '<button class="btn pri" data-act="prec">+ Catat produksi selesai</button>') : emptyState('produksi', 'Belum ada produksi', 'Buat resep dulu agar kebutuhan bahan dan HPP bisa dihitung otomatis.', '<button class="btn pri" data-act="redit" data-id="">Buat resep pertama</button>'));
 }
@@ -249,7 +251,7 @@ function pv() {
 function prodDetail(id) {
   const o = S.prod.find(x => x.id === id); if (!o) return;
   let h = '<h2>' + esc(vLabel(o.variant_id)) + '</h2><p class="muted">' + esc(JN[o.jenis] || o.jenis) + ' · ' + num(o.jumlah_batch) + ' batch · dibuat ' + esc(String(o.tanggal).slice(0, 16)) + (o.status === 'selesai' && o.tanggal_selesai ? ' · selesai ' + esc(String(o.tanggal_selesai).slice(0, 16)) : '') + (o.catatan ? ' · ' + esc(o.catatan) : '') + '</p>';
-  if (o.status === 'selesai') h += '<div class="li" style="display:block">' + kv('Hasil standar', num(o.qty_standar)) + kv('Hasil aktual', num(o.qty_hasil)) + kv('Susut', num(o.qty_standar - o.qty_hasil)) + kv('Bahan baku', rp(o.bahan)) + kv('Kemasan', rp(o.kemasan)) + kv('Tenaga kerja', rp(o.tenaga_kerja)) + kv('Overhead', rp(o.overhead)) + kv('Total biaya', rp(o.total), 'big') + kv('HPP per unit', rp(o.hpp_per_unit), 'big') + '</div>';
+  if (o.status === 'selesai') h += '<div class="u-blk li">' + kv('Hasil standar', num(o.qty_standar)) + kv('Hasil aktual', num(o.qty_hasil)) + kv('Susut', num(o.qty_standar - o.qty_hasil)) + kv('Bahan baku', rp(o.bahan)) + kv('Kemasan', rp(o.kemasan)) + kv('Tenaga kerja', rp(o.tenaga_kerja)) + kv('Overhead', rp(o.overhead)) + kv('Total biaya', rp(o.total), 'big') + kv('HPP per unit', rp(o.hpp_per_unit), 'big') + '</div>';
   else if (o.status === 'rencana') h += '<button class="btn pri" data-act="pdone" data-id="' + esc(id) + '">Selesaikan produksi</button><button class="btn sec" data-act="pedit" data-id="' + esc(id) + '">Ubah jumlah batch</button><button class="btn dan" data-act="pcancel" data-id="' + esc(id) + '">Batalkan rencana</button>';
   else h += '<p class="muted">Produksi ini dibatalkan.</p>';
   sheet(h + '<button class="btn sec" data-act="close">Tutup</button>');
@@ -263,14 +265,14 @@ function prodDone(id) {
 function prodDoneSheet() {
   const o = S.prod.find(x => x.id === S.pd.id); if (!o) return;
   sheet('<h2>Selesaikan produksi</h2><p class="muted">' + esc(vLabel(o.variant_id)) + ' · ' + num(o.jumlah_batch) + ' batch · standar ' + num(o.qty_standar) + ' unit</p><label>Hasil aktual (unit jadi)<input class="inp" data-pd="qty" inputmode="decimal" value="' + esc(S.pd.qty) + '"></label>' +
-    '<div class="row2"><div style="flex:1"><label>Tenaga kerja (Rp)<input class="inp" data-pd="tk" inputmode="numeric" placeholder="otomatis" value="' + esc(S.pd.tk) + '"></label></div><div style="flex:1"><label>Overhead (Rp)<input class="inp" data-pd="oh" inputmode="numeric" placeholder="otomatis" value="' + esc(S.pd.oh) + '"></label></div></div><div id="pdv"></div><button class="btn pri" id="pdbtn" data-act="pdosave">Selesaikan dan masukkan ke stok</button>');
+    '<div class="row2"><div class="u-f1"><label>Tenaga kerja (Rp)<input class="inp" data-pd="tk" data-rp inputmode="numeric" autocomplete="off" placeholder="otomatis" value="' + esc(A.rpIn(S.pd.tk)) + '"></label></div><div class="u-f1"><label>Overhead (Rp)<input class="inp" data-pd="oh" data-rp inputmode="numeric" autocomplete="off" placeholder="otomatis" value="' + esc(A.rpIn(S.pd.oh)) + '"></label></div></div><div id="pdv"></div><button class="btn pri" id="pdbtn" data-act="pdosave">Selesaikan dan masukkan ke stok</button>');
   pdv();
 }
 function pdv() {
   const o = S.prod.find(x => x.id === S.pd.id), rec = S.data.recipes.find(r => r.id === o.recipe_id), q = N(S.pd.qty), el = $('#pdv'); if (!el) return;
   if (!(q > 0)) { el.innerHTML = '<p class="err">Isi hasil aktual</p>'; return; }
   const c = costOf(recItems(rec.id), rec, Number(o.jumlah_batch), q, S.pd.tk, S.pd.oh), v = A.vById(o.variant_id), pos = Math.max(Number(v && v.stok) || 0, 0), lama = Number(v && v.hpp_rata2) || 0, baru = (pos * lama + q * c.hpp) / (pos + q);
-  el.innerHTML = costHtml(c) + '<div class="li" style="display:block">' + kv('Susut vs standar', dec(o.qty_standar - q) + ' unit') + kv('HPP produk (rata-rata)', rp(lama) + ' → ' + rp(baru)) + '</div>' + shortHtml(c, 'done', 'Tidak bisa diselesaikan sebelum stok cukup.');
+  el.innerHTML = costHtml(c) + '<div class="u-blk li">' + kv('Susut vs standar', dec(o.qty_standar - q) + ' unit') + kv('HPP produk (rata-rata)', rp(lama) + ' → ' + rp(baru)) + '</div>' + shortHtml(c, 'done', 'Tidak bisa diselesaikan sebelum stok cukup.');
   const b = $('#pdbtn'); if (b) b.disabled = c.short.length > 0;
 }
 
@@ -317,8 +319,8 @@ function recNew() {
   sheet('<h2>Catat produksi selesai</h2><p class="muted">Bahan terpotong dan stok produk jadi bertambah sekaligus. Hasil aktual dikosongkan = sesuai standar.</p><div class="chips">' +
     Object.keys(JN).map(k => '<button class="chip ' + (f.jenis === k ? 'on' : '') + '" data-act="prjenis" data-j="' + k + '">' + JN[k] + '</button>').join('') + '</div>' +
     (recs.length ? recField('rec', f, recs) +
-      '<div class="row2"><div style="flex:1"><label>Jumlah batch<input class="inp" data-pq="batch" inputmode="decimal" value="' + esc(f.batch) + '"></label></div><div style="flex:1"><label>Hasil aktual (unit)<input class="inp" data-pq="qty" inputmode="decimal" placeholder="sesuai standar" value="' + esc(f.qty) + '"></label></div></div>' +
-      '<div class="row2"><div style="flex:1"><label>Tenaga kerja (Rp)<input class="inp" data-pq="tk" inputmode="numeric" placeholder="otomatis" value="' + esc(f.tk) + '"></label></div><div style="flex:1"><label>Overhead (Rp)<input class="inp" data-pq="oh" inputmode="numeric" placeholder="otomatis" value="' + esc(f.oh) + '"></label></div></div>' +
+      '<div class="row2"><div class="u-f1"><label>Jumlah batch<input class="inp" data-pq="batch" inputmode="decimal" value="' + esc(f.batch) + '"></label></div><div class="u-f1"><label>Hasil aktual (unit)<input class="inp" data-pq="qty" inputmode="decimal" placeholder="sesuai standar" value="' + esc(f.qty) + '"></label></div></div>' +
+      '<div class="row2"><div class="u-f1"><label>Tenaga kerja (Rp)<input class="inp" data-pq="tk" data-rp inputmode="numeric" autocomplete="off" placeholder="otomatis" value="' + esc(A.rpIn(f.tk)) + '"></label></div><div class="u-f1"><label>Overhead (Rp)<input class="inp" data-pq="oh" data-rp inputmode="numeric" autocomplete="off" placeholder="otomatis" value="' + esc(A.rpIn(f.oh)) + '"></label></div></div>' +
       '<label>' + (f.jenis === 'pesanan' ? 'Referensi pesanan (nama/nomor)' : 'Catatan') + '<input class="inp" data-pq="catatan" value="' + esc(f.catatan) + '"></label><div id="prv"></div>' +
       '<button class="btn pri" id="prbtn" data-act="prsave">Simpan produksi selesai</button>'
       : '<p class="muted">Belum ada resep untuk jenis ini. Buat di Produksi, Resep.</p>') + '<button class="btn sec" data-act="close">Batal</button>');
@@ -329,7 +331,7 @@ function rpv() {
   if (!c.rec || !(c.b > 0)) { el.innerHTML = ''; if (btn) btn.disabled = true; return; }
   if (!(c.q > 0)) { el.innerHTML = '<p class="err">Hasil aktual harus lebih dari 0</p>'; if (btn) btn.disabled = true; return; }
   const k = costOf(recItems(c.rec.id), c.rec, c.b, c.q, c.f.tk, c.f.oh), v = A.vById(c.rec.variant_id), pos = Math.max(Number(v && v.stok) || 0, 0), lama = Number(v && v.hpp_rata2) || 0, baru = (pos * lama + c.q * k.hpp) / (pos + c.q);
-  el.innerHTML = '<p class="muted">Hasil standar ' + num(c.std) + ' unit</p>' + costHtml(k) + '<div class="li" style="display:block">' + kv('Susut vs standar', dec(c.std - c.q) + ' unit') + kv('HPP produk (rata-rata)', rp(lama) + ' → ' + rp(baru)) + '</div>' +
+  el.innerHTML = '<p class="muted">Hasil standar ' + num(c.std) + ' unit</p>' + costHtml(k) + '<div class="u-blk li">' + kv('Susut vs standar', dec(c.std - c.q) + ' unit') + kv('HPP produk (rata-rata)', rp(lama) + ' → ' + rp(baru)) + '</div>' +
     shortHtml(k, 'rec', 'Catat pembelian dulu atau kurangi jumlah batch.');
   if (btn) btn.disabled = k.short.length > 0;
 }
@@ -355,7 +357,7 @@ async function prodRun(op, body, after) {
 
 /* ---------- Resep ---------- */
 function vResep() {
-  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button> <button class="chip" data-act="tab" data-t="produksi">Produksi</button><button class="btn pri" data-act="redit" data-id="" style="margin-top:8px">+ Resep baru</button><div style="height:8px"></div>' +
+  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button> <button class="chip" data-act="tab" data-t="produksi">Produksi</button><button class="u-mt8 btn pri" data-act="redit" data-id="">+ Resep baru</button><div class="u-h8"></div>' +
     (S.data.recipes.map(r => { const c = costOf(recItems(r.id), r, 1, Number(r.hasil_standar), '', '');
       return '<div class="li rl"><button class="rl-main" data-act="redit" data-id="' + esc(r.id) + '"><div><b>' + esc(r.nama) + '</b><div class="muted">' + esc(vLabel(r.variant_id)) + ' · ' + esc(JN[r.jenis] || r.jenis) + ' · ' + num(r.hasil_standar) + ' unit/batch</div></div><div class="r"><div class="muted">HPP estimasi</div><b>' + rp(c.hpp) + '</b></div></button><button class="chip" data-act="rdup" data-id="' + esc(r.id) + '" aria-label="Duplikat resep ' + esc(r.nama) + '">Duplikat</button></div>'; }).join('') ||
       emptyState('produksi', 'Belum ada resep', 'Resep menentukan bahan per batch dan hasilnya, sehingga HPP produk dihitung otomatis.', '<button class="btn pri" data-act="redit" data-id="">Buat resep pertama</button>'));
@@ -368,7 +370,7 @@ function dupSheet(id) {
   S.dp2 = {src: id, nama: r.nama, sel: {}};
   sheet('<div class="grab"></div><h2>Duplikat resep</h2><p class="muted">Menyalin <b>' + esc(r.nama) + '</b>: ' + items.length + ' bahan, hasil ' + dec(r.hasil_standar) + ' unit per batch, tenaga kerja ' + rp(r.tenaga_kerja || 0) + '. Pilih varian tujuan. Setelah dibuat, tiap resep bisa disesuaikan (mis. jumlah cabai untuk level lebih pedas).</p>' +
     '<label>Nama dasar resep<input class="inp" data-dp="nama" value="' + esc(r.nama) + '"></label>' +
-    (vs.length ? '<div class="set-card" style="padding:4px 12px;max-height:38vh;overflow:auto">' + vs.map(v => { const hr = hasR(v.id); return '<label class="sw"><input type="checkbox" data-dv="' + esc(v.id) + '"><span class="sw-t" aria-hidden="true"></span><span class="sw-l"><b>' + esc(A.vName(v) + ' ' + A.vSub(v)) + '</b><small>' + (hr.length ? 'Sudah punya resep: ' + esc(hr.join(', ')) : 'Belum punya resep') + '</small></span></label>'; }).join('') + '</div>' : '<p class="muted">Tidak ada varian lain. Tambahkan varian di Data Master dulu.</p>') +
+    (vs.length ? '<div class="sc-scroll set-card">' + vs.map(v => { const hr = hasR(v.id); return '<label class="sw"><input type="checkbox" data-dv="' + esc(v.id) + '"><span class="sw-t" aria-hidden="true"></span><span class="sw-l"><b>' + esc(A.vName(v) + ' ' + A.vSub(v)) + '</b><small>' + (hr.length ? 'Sudah punya resep: ' + esc(hr.join(', ')) : 'Belum punya resep') + '</small></span></label>'; }).join('') + '</div>' : '<p class="muted">Tidak ada varian lain. Tambahkan varian di Data Master dulu.</p>') +
     '<div class="muted" id="dpn" aria-live="polite">Belum ada varian dipilih</div><div class="muted" id="dpx"></div><button class="btn pri" id="dpbtn" data-act="dpsave" disabled>Buat salinan</button><button class="btn sec" data-act="close">Batal</button>');
 }
 const dupName = v => (S.dp2.nama.trim() || 'Resep') + ' · ' + (A.vName(v) + ' ' + A.vSub(v)).replace(/^\s+|\s+$/g, '');
@@ -414,12 +416,12 @@ function rfSheet() {
   const f = S.rf, mats = S.data.materials, ri = S.ri; if (!mats.some(x => x.id === ri.m)) ri.m = mats[0] ? mats[0].id : '';
   const old = /** @type {any} */ (document.querySelector('#sheet .sheet')), keep = old && !$('#sheet').hidden ? old.scrollTop : 0; // tetap di posisi gulir yang sama setelah tambah/hapus bahan
   const adder = mats.length ? '<div class="card-s ri-add"><label>Bahan<select class="inp" id="ri_m" data-ri="m">' + mats.map(x => '<option value="' + esc(x.id) + '"' + (x.id === ri.m ? ' selected' : '') + '>' + esc(x.nama) + ' (' + esc(x.satuan) + ')</option>').join('') + '</select></label>' +
-    '<div class="row2 ri-add-r"><div style="flex:2"><label id="ri_l">Jumlah per batch</label><input class="inp" id="ri_q" data-ri="q" inputmode="decimal" placeholder="mis. 0,5" value="' + esc(ri.q) + '"></div><div style="flex:1.2" id="ri_uw"><label>Satuan</label><select class="inp" id="ri_u" data-ri="u"></select></div></div>' +
-    '<div class="chips" id="ri_ch"></div><div class="muted" id="ri_h" style="min-height:18px"></div><button class="btn pri" data-act="riadd">+ Tambah ke resep</button></div>'
+    '<div class="row2 ri-add-r"><div class="u-f2"><label id="ri_l">Jumlah per batch</label><input class="inp" id="ri_q" data-ri="q" inputmode="decimal" placeholder="mis. 0,5" value="' + esc(ri.q) + '"></div><div class="u-f12" id="ri_uw"><label>Satuan</label><select class="inp" id="ri_u" data-ri="u"></select></div></div>' +
+    '<div class="chips" id="ri_ch"></div><div class="u-minh18 muted" id="ri_h"></div><button class="btn pri" data-act="riadd">+ Tambah ke resep</button></div>'
     : '<div class="card-s"><p class="muted">Belum ada bahan di Data Master. Tambahkan dulu bahan dan kemasan yang dipakai resep.</p><button class="btn pri" data-act="rimat">Buka Data Master, Bahan</button></div>';
   sheet('<div class="grab"></div><h2>' + (f.id ? 'Ubah resep' : 'Resep baru') + '</h2><label>Nama resep<input class="inp" data-rf="nama" value="' + esc(f.nama) + '"></label><label>Produk hasil (varian)<select class="inp" data-rf="variant_id">' + S.data.variants.map(v => '<option value="' + esc(v.id) + '"' + (v.id === f.variant_id ? ' selected' : '') + '>' + esc(A.vName(v) + ' ' + A.vSub(v)) + '</option>').join('') + '</select></label>' +
     '<label>Jenis<select class="inp" data-rf="jenis"><option value="batch"' + (f.jenis === 'batch' ? ' selected' : '') + '>Batch (produksi sendiri)</option><option value="repack"' + (f.jenis === 'repack' ? ' selected' : '') + '>Repack (kemas ulang)</option></select></label>' +
-    '<div class="row2"><div style="flex:1"><label>Hasil standar per batch (unit)<input class="inp" data-rf="hasil_standar" inputmode="decimal" value="' + esc(f.hasil_standar) + '"></label></div><div style="flex:1"><label>Tenaga kerja per batch (Rp)<input class="inp" data-rf="tenaga_kerja" inputmode="decimal" value="' + esc(f.tenaga_kerja) + '"></label></div></div>' +
+    '<div class="row2"><div class="u-f1"><label>Hasil standar per batch (unit)<input class="inp" data-rf="hasil_standar" inputmode="decimal" value="' + esc(f.hasil_standar) + '"></label></div><div class="u-f1"><label>Tenaga kerja per batch (Rp)<input class="inp" data-rf="tenaga_kerja" inputmode="decimal" value="' + esc(f.tenaga_kerja) + '"></label></div></div>' +
     '<div class="sh-h ri-h"><b>Bahan per batch</b><span class="muted">' + f.items.length + ' bahan</span></div>' +
     adder + /* tombol tambah di ATAS daftar: tidak perlu gulir ke bawah walau bahannya banyak */
     (f.items.length ? '<div class="sh-h ri-h"><b>Sudah ditambahkan</b><span class="muted">ubah jumlah langsung di kolomnya</span></div>' + f.items.map(riRow).join('') : '<p class="muted">Belum ada bahan.</p>') +
@@ -442,7 +444,7 @@ function rfv() {
   const el = $('#rfv'); if (!el) return; const f = S.rf, q = N(f.hasil_standar);
   if (!f.items.length || !(q > 0)) { el.innerHTML = '<p class="muted">Tambahkan bahan dan isi hasil standar untuk melihat estimasi HPP.</p>'; return; }
   const c = costOf(f.items, {tenaga_kerja: f.tenaga_kerja}, 1, q, '', ''), v = A.vById(f.variant_id), cur = v ? Number(v.hpp_rata2) || 0 : 0;
-  el.innerHTML = '<div class="li" style="display:block"><b>Estimasi per batch</b>' + kv('Bahan baku', rp(c.bahan)) + kv('Kemasan', rp(c.kem)) + kv('Tenaga kerja', rp(c.tk)) + kv('Overhead', rp(c.oh)) + kv('HPP per unit (estimasi)', rp(c.hpp), 'big') + kv('HPP produk saat ini', rp(cur)) +
+  el.innerHTML = '<div class="u-blk li"><b>Estimasi per batch</b>' + kv('Bahan baku', rp(c.bahan)) + kv('Kemasan', rp(c.kem)) + kv('Tenaga kerja', rp(c.tk)) + kv('Overhead', rp(c.oh)) + kv('HPP per unit (estimasi)', rp(c.hpp), 'big') + kv('HPP produk saat ini', rp(cur)) +
     '<p class="muted">HPP dan stok berubah otomatis saat produksi diselesaikan, bukan saat resep disimpan.</p>' + (v && Number(v.stok) >= 0 ? '<button class="btn sec sm" data-act="rhpp">Pakai estimasi sebagai HPP awal produk</button>' : '') + '</div>';
 }
 
@@ -460,11 +462,11 @@ function setPreset() {
 function vLaporan(skipRun) {
   const RTYPES = rtypes(); if (!RTYPES.some(t => t[0] === S.rt)) S.rt = RTYPES[0][0];
   const noDate = ['stok', 'hpp', 'transit', 'konsolidasi_stok'].indexOf(S.rt) >= 0, tabs = RTYPES.map(t => '<button class="chip ' + (S.rt === t[0] ? 'on' : '') + '" data-act="rt" data-t="' + t[0] + '">' + t[1] + '</button>').join('');
-  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="rt-chips" style="margin-top:8px">' + wrapChips(tabs) + '</div>' +
-    '<label class="rt-sel" style="margin-top:8px">Jenis laporan<select class="inp" data-chg="rtsel">' + RTYPES.map(t => '<option value="' + t[0] + '"' + (S.rt === t[0] ? ' selected' : '') + '>' + t[1] + '</option>').join('') + '</select></label>' +
-    (S.rt === 'opsi' ? '<label style="margin-top:8px">Produk<select class="inp" data-chg="ropt"><option value="">- pilih produk beropsi -</option>' + (S.data.products || []).filter(p => p.pakai_opsi).map(p => '<option value="' + esc(p.id) + '"' + (S.ropt === p.id ? ' selected' : '') + '>' + esc(p.nama) + '</option>').join('') + '</select></label>' : '') +
+  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-mt8 rt-chips">' + wrapChips(tabs) + '</div>' +
+    '<label class="u-mt8 rt-sel">Jenis laporan<select class="inp" data-chg="rtsel">' + RTYPES.map(t => '<option value="' + t[0] + '"' + (S.rt === t[0] ? ' selected' : '') + '>' + t[1] + '</option>').join('') + '</select></label>' +
+    (S.rt === 'opsi' ? '<label class="u-mt8">Produk<select class="inp" data-chg="ropt"><option value="">- pilih produk beropsi -</option>' + (S.data.products || []).filter(p => p.pakai_opsi).map(p => '<option value="' + esc(p.id) + '"' + (S.ropt === p.id ? ' selected' : '') + '>' + esc(p.nama) + '</option>').join('') + '</select></label>' : '') +
     (noDate ? '' : wrapChips(PRE.map(p => '<button class="chip ' + (S.rpre === p[0] ? 'on' : '') + '" data-act="rpre" data-p="' + p[0] + '">' + p[1] + '</button>').join('')) + '<p class="muted rcap">' + esc(idRange(S.rfrom, S.rto)) + '</p>' +
-      (S.rpre === 'custom' ? '<div class="row2"><div style="flex:1"><label>Dari<input type="date" class="inp" data-rg="rfrom" value="' + S.rfrom + '"></label></div><div style="flex:1"><label>Sampai<input type="date" class="inp" data-rg="rto" value="' + S.rto + '"></label></div></div><button class="btn pri" data-act="rrun" style="margin-top:0">Tampilkan</button>' : '')) + '<div id="rres" style="margin-top:10px"></div>';
+      (S.rpre === 'custom' ? '<div class="row2"><div class="u-f1"><label>Dari<input type="date" class="inp" data-rg="rfrom" value="' + S.rfrom + '"></label></div><div class="u-f1"><label>Sampai<input type="date" class="inp" data-rg="rto" value="' + S.rto + '"></label></div></div><button class="u-mt0 btn pri" data-act="rrun">Tampilkan</button>' : '')) + '<div id="rres" class="u-mt10"></div>';
   if (!skipRun) runReport();
 }
 /* 0032: laporan "Per opsi": jumlah bersih (penjualan - retur) per item opsi untuk satu produk, dalam bentuk laporan generik (tabel, CSV, WhatsApp). */
@@ -500,8 +502,8 @@ function runReport() {
       (r.peringatan ? '<div class="warn-b" role="alert"><div><b>Perhatian:</b> ' + esc(r.peringatan) + '</div></div>' : '') +
       (r.notes || []).map(n => '<div class="warn-b" role="alert"><div><b>Perhatian:</b> ' + esc(n) + '</div></div>').join('') +
       (r.type === 'penjualan' ? '<p class="muted rcap">Tabel dirinci per produk/varian, sedangkan Transaksi dihitung per nota. Satu nota bisa berisi banyak produk, jadi jumlah baris tidak sama dengan jumlah transaksi. Total omzet semua baris = ' + rp(r.sumOm) + '. Rata-rata per transaksi = Omzet ÷ Transaksi (omzet tanpa PPN, setelah diskon dan retur).' + (r.hidden ? ' ' + r.hidden + ' produk bernilai 0 (neto setelah retur) disembunyikan.' : '') + '</p>' : '') +
-      (r.summary.length ? '<div class="kgrid" style="margin-top:8px">' + r.summary.map(s => kpi(esc(s.label), /^Margin/.test(s.label) ? '<span class="mgv" data-v="' + s.value + '">' + fmtCell(s.value, s.fmt) + '</span>' : fmtCell(s.value, s.fmt), '')).join('') + '</div>' : '') +
-      (r.rows.length ? '<div class="tw"><table><thead><tr>' + r.columns.map((c, i) => '<th class="' + (r.fmt[i] === 'txt' ? '' : 'n') + '">' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' +
+      (r.summary.length ? '<div class="u-mt8 kgrid">' + r.summary.map(s => kpi(esc(s.label), /^Margin/.test(s.label) ? '<span class="mgv" data-v="' + s.value + '">' + fmtCell(s.value, s.fmt) + '</span>' : fmtCell(s.value, s.fmt), '')).join('') + '</div>' : '') +
+      (r.rows.length ? '<div class="tw" role="region" tabindex="0" aria-label="Tabel ' + esc(r.title) + '"><table><caption class="sr">' + esc(r.title) + ', ' + (['stok', 'hpp', 'transit', 'konsolidasi_stok'].indexOf(want) >= 0 ? 'kondisi saat ini' : esc(idRange(r.from, r.to))) + '</caption><thead><tr>' + r.columns.map((c, i) => '<th scope="col" class="' + (r.fmt[i] === 'txt' ? '' : 'n') + '">' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' +
         r.rows.map(row => '<tr>' + row.map((v, i) => '<td class="' + (r.fmt[i] === 'txt' ? '' : 'n') + '">' + cell(row, i, v) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' :
         emptyState('laporan', 'Tidak ada data', 'Belum ada data pada periode ini. Pilih periode lain.', '')) +
       '<div class="row2"><button class="btn sec" data-act="rcsv">Unduh CSV</button><button class="btn sec" data-act="rwa">Bagikan WhatsApp</button></div>';
@@ -556,15 +558,15 @@ function shBuild() {
 }
 function vShopee() {
   const sh = S.sh, res = S.shRes;
-  let h = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="li" style="display:block;margin-top:8px"><b>Impor pesanan Shopee</b><p class="muted">Ekspor pesanan dari Shopee Seller Centre, simpan sebagai <b>CSV (UTF-8)</b>, lalu pilih file di bawah. Pesanan diberi tanggal asli dan memotong stok. Aman diimpor ulang: pesanan yang sudah masuk dilewati.</p><input type="file" id="shfile" accept=".csv,.txt,text/csv" class="inp" style="padding-top:10px"></div>';
+  let h = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-blk u-mt8 li"><b>Impor pesanan Shopee</b><p class="muted">Ekspor pesanan dari Shopee Seller Centre, simpan sebagai <b>CSV (UTF-8)</b>, lalu pilih file di bawah. Pesanan diberi tanggal asli dan memotong stok. Aman diimpor ulang: pesanan yang sudah masuk dilewati.</p><input type="file" id="shfile" accept=".csv,.txt,text/csv" class="u-pt10 inp"></div>';
   if (sh) {
     const opts = (cur) => '<option value="-1">(tidak ada)</option>' + sh.header.map((x, i) => '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + esc(x) + '</option>').join('');
     const b = shBuild();
-    h += '<div class="li" style="display:block"><b>Petakan kolom</b>' + SM.map(m => '<label>' + m[1] + '<select class="inp" data-sm="' + m[0] + '">' + opts(sh.map[m[0]]) + '</select></label>').join('') + '</div>' +
-      '<div class="li" style="display:block">' + kv('Baris data', num(sh.data.length)) + kv('Pesanan siap impor', num(b.orders.length)) + kv('Dilewati (batal/belum bayar)', num(b.skipped)) + kv('Baris tidak lengkap', num(b.bad)) + '<label style="margin-top:8px"><input type="checkbox" id="sh_ign" checked> Abaikan stok kurang (pesanan sudah terjadi di Shopee)</label></div>' +
+    h += '<div class="u-blk li"><b>Petakan kolom</b>' + SM.map(m => '<label>' + m[1] + '<select class="inp" data-sm="' + m[0] + '">' + opts(sh.map[m[0]]) + '</select></label>').join('') + '</div>' +
+      '<div class="u-blk li">' + kv('Baris data', num(sh.data.length)) + kv('Pesanan siap impor', num(b.orders.length)) + kv('Dilewati (batal/belum bayar)', num(b.skipped)) + kv('Baris tidak lengkap', num(b.bad)) + '<label class="u-mt8"><input type="checkbox" id="sh_ign" checked> Abaikan stok kurang (pesanan sudah terjadi di Shopee)</label></div>' +
       '<button class="btn pri" data-act="shgo"' + (b.orders.length ? '' : ' disabled') + '>Impor ' + num(b.orders.length) + ' pesanan</button>';
   }
-  if (res) h += '<div class="li" style="display:block"><b>Hasil impor</b>' + kv('Berhasil', num(res.ok)) + kv('Sudah ada (dilewati)', num(res.duplikat)) + kv('Gagal', num(res.gagal.length)) + res.gagal.slice(0, 15).map(g => '<div class="muted">• ' + esc(g.order_id) + ': ' + esc(g.error) + '</div>').join('') + (res.gagal.length > 15 ? '<div class="muted">… dan ' + (res.gagal.length - 15) + ' lainnya</div>' : '') + '</div>';
+  if (res) h += '<div class="u-blk li"><b>Hasil impor</b>' + kv('Berhasil', num(res.ok)) + kv('Sudah ada (dilewati)', num(res.duplikat)) + kv('Gagal', num(res.gagal.length)) + res.gagal.slice(0, 15).map(g => '<div class="muted">• ' + esc(g.order_id) + ': ' + esc(g.error) + '</div>').join('') + (res.gagal.length > 15 ? '<div class="muted">… dan ' + (res.gagal.length - 15) + ' lainnya</div>' : '') + '</div>';
   $('#main').innerHTML = h;
 }
 async function shGo() {
@@ -602,21 +604,21 @@ function checks() {
 const vLabel2 = v => typeof v === 'string' ? v : A.vName(v) + ' ' + A.vSub(v);
 function vCek() {
   const c = checks(), err = c.filter(x => x.lv === 'err').length;
-  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="li" style="display:block;margin-top:8px"><b>Pemeriksaan data</b><p class="muted">Mengecek kelengkapan data master di perangkat ini (sesuai data terakhir yang dimuat). ' + (c.length ? err + ' hal perlu diperbaiki, ' + (c.length - err) + ' catatan.' : 'Semua data lengkap.') + '</p></div>' +
-    c.map(x => '<div class="li" style="display:block"><div class="kv"><b>' + esc(x.title) + '</b><span class="tag ' + (x.lv === 'err' ? 'red' : '') + '">' + (x.lv === 'err' ? 'Perbaiki' : 'Info') + ' · ' + x.items.length + '</span></div>' +
+  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-blk u-mt8 li"><b>Pemeriksaan data</b><p class="muted">Mengecek kelengkapan data master di perangkat ini (sesuai data terakhir yang dimuat). ' + (c.length ? err + ' hal perlu diperbaiki, ' + (c.length - err) + ' catatan.' : 'Semua data lengkap.') + '</p></div>' +
+    c.map(x => '<div class="u-blk li"><div class="kv"><b>' + esc(x.title) + '</b><span class="tag ' + (x.lv === 'err' ? 'red' : '') + '">' + (x.lv === 'err' ? 'Perbaiki' : 'Info') + ' · ' + x.items.length + '</span></div>' +
       '<div class="muted">' + x.items.slice(0, 8).map(esc).join(', ') + (x.items.length > 8 ? ' dan ' + (x.items.length - 8) + ' lainnya' : '') + '</div>' + (x.hint ? '<div class="muted">' + esc(x.hint) + '</div>' : '') +
-      '<div style="margin-top:6px">' + x.extra + '<button class="chip" data-act="cekgo" data-t="' + x.go + '">Buka</button></div></div>').join('') +
-    '<div class="li" style="display:block"><b>Kesesuaian stok</b><p class="muted">Membandingkan stok setiap item dengan jumlah riwayat mutasinya di server. Selisih berarti ada perubahan stok di luar aplikasi (misalnya diedit langsung di Google Sheets).</p><button class="btn sec" data-act="caudit" style="margin-top:0">Periksa stok sekarang</button><div id="caud"></div></div>';
+      '<div class="u-mt6">' + x.extra + '<button class="chip" data-act="cekgo" data-t="' + x.go + '">Buka</button></div></div>').join('') +
+    '<div class="u-blk li"><b>Kesesuaian stok</b><p class="muted">Membandingkan stok setiap item dengan jumlah riwayat mutasinya di server. Selisih berarti ada perubahan stok di luar aplikasi (misalnya diedit langsung di Google Sheets).</p><button class="u-mt0 btn sec" data-act="caudit">Periksa stok sekarang</button><div id="caud"></div></div>';
 }
 async function stockAudit() {
   const el = $('#caud'); el.innerHTML = skel(2);
   try {
     const r = await api('stock.audit', {}); if (!$('#caud')) return;
-    $('#caud').innerHTML = '<p class="muted">' + num(r.diperiksa) + ' item diperiksa.</p>' + (r.selisih.length ? r.selisih.map(x => '<div class="li" style="display:block"><div class="kv"><b>' + esc(x.nama) + '</b><span class="tag red">Selisih ' + dec(x.selisih) + '</span></div><div class="muted">Stok tercatat ' + dec(x.stok) + ' · menurut riwayat ' + dec(x.riwayat) + '</div>' +
-      '<button class="chip" data-act="creco" data-t="' + x.tipe + '" data-id="' + esc(x.id) + '">Terima stok tercatat</button> <button class="chip" data-act="adj" data-t="' + x.tipe + '" data-id="' + esc(x.id) + '">Hitung ulang (opname)</button></div>').join('') : '<p style="color:var(--ok);font-weight:800">Semua stok sesuai dengan riwayat.</p>') +
-      (r.penjualan_proses && r.penjualan_proses.length ? '<div class="li" style="display:block"><div class="kv"><b>Transaksi tersangkut (status proses)</b><span class="tag red">' + r.penjualan_proses.length + '</span></div><div class="muted">Penulisan terhenti di tengah. Selesaikan bila datanya lengkap, atau batalkan.</div>' + r.penjualan_proses.map(x => '<div class="kv" style="margin-top:6px"><span>' + esc(x.nomor) + ' · ' + esc(x.tanggal) + ' · ' + rp(x.total) + '</span><span><button class="chip" data-act="srec" data-a="selesai" data-id="' + esc(x.id) + '">Selesaikan</button> <button class="chip" data-act="srec" data-a="batal" data-id="' + esc(x.id) + '">Batalkan</button></span></div>').join('') + '</div>' : '') +
-      (r.selisih_total && r.selisih_total.length ? '<div class="li" style="display:block"><div class="kv"><b>Total struk berbeda dari server</b><span class="tag red">' + r.selisih_total.length + '</span></div><div class="muted">' + r.selisih_total.map(x => esc(x.nomor) + ' (struk ' + rp(x.total_klien) + ', server ' + rp(x.total) + ')').join(', ') + '</div></div>' : '') +
-      (r.penjualan_tanpa_item && r.penjualan_tanpa_item.length ? '<div class="li" style="display:block"><div class="kv"><b>Penjualan tanpa rincian item</b><span class="tag red">' + r.penjualan_tanpa_item.length + '</span></div><div class="muted">' + r.penjualan_tanpa_item.map(x => esc(x.nomor) + ' (' + rp(x.total) + ')').join(', ') + '</div><div class="muted">Transaksi ini tersimpan setengah. Periksa tab sales dan sale_items di Google Sheets.</div></div>' : '<p class="muted">Tidak ada penjualan tanpa rincian item.</p>');
+    $('#caud').innerHTML = '<p class="muted">' + num(r.diperiksa) + ' item diperiksa.</p>' + (r.selisih.length ? r.selisih.map(x => '<div class="u-blk li"><div class="kv"><b>' + esc(x.nama) + '</b><span class="tag red">Selisih ' + dec(x.selisih) + '</span></div><div class="muted">Stok tercatat ' + dec(x.stok) + ' · menurut riwayat ' + dec(x.riwayat) + '</div>' +
+      '<button class="chip" data-act="creco" data-t="' + x.tipe + '" data-id="' + esc(x.id) + '">Terima stok tercatat</button> <button class="chip" data-act="adj" data-t="' + x.tipe + '" data-id="' + esc(x.id) + '">Hitung ulang (opname)</button></div>').join('') : '<p class="u-ok u-b8">Semua stok sesuai dengan riwayat.</p>') +
+      (r.penjualan_proses && r.penjualan_proses.length ? '<div class="u-blk li"><div class="kv"><b>Transaksi tersangkut (status proses)</b><span class="tag red">' + r.penjualan_proses.length + '</span></div><div class="muted">Penulisan terhenti di tengah. Selesaikan bila datanya lengkap, atau batalkan.</div>' + r.penjualan_proses.map(x => '<div class="u-mt6 kv"><span>' + esc(x.nomor) + ' · ' + esc(x.tanggal) + ' · ' + rp(x.total) + '</span><span><button class="chip" data-act="srec" data-a="selesai" data-id="' + esc(x.id) + '">Selesaikan</button> <button class="chip" data-act="srec" data-a="batal" data-id="' + esc(x.id) + '">Batalkan</button></span></div>').join('') + '</div>' : '') +
+      (r.selisih_total && r.selisih_total.length ? '<div class="u-blk li"><div class="kv"><b>Total struk berbeda dari server</b><span class="tag red">' + r.selisih_total.length + '</span></div><div class="muted">' + r.selisih_total.map(x => esc(x.nomor) + ' (struk ' + rp(x.total_klien) + ', server ' + rp(x.total) + ')').join(', ') + '</div></div>' : '') +
+      (r.penjualan_tanpa_item && r.penjualan_tanpa_item.length ? '<div class="u-blk li"><div class="kv"><b>Penjualan tanpa rincian item</b><span class="tag red">' + r.penjualan_tanpa_item.length + '</span></div><div class="muted">' + r.penjualan_tanpa_item.map(x => esc(x.nomor) + ' (' + rp(x.total) + ')').join(', ') + '</div><div class="muted">Transaksi ini tersimpan setengah. Periksa tab sales dan sale_items di Google Sheets.</div></div>' : '<p class="muted">Tidak ada penjualan tanpa rincian item.</p>');
   } catch (e) { if ($('#caud')) $('#caud').innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }
 }
 
@@ -627,7 +629,7 @@ Object.assign(ACT, {
   creco: el => busy('Menyelaraskan riwayat…', async () => { try { await api('stock.reconcile', {tipe: el.dataset.t, id: el.dataset.id}); toast('Riwayat disesuaikan'); stockAudit(); } catch (e) { toast(e.message); } }),
   dp: el => { const again = el.dataset.p === S.dp; S.dp = el.dataset.p; vDash(again); },
   dtab: el => dashTab(el.dataset.t), dtop: el => dashTop(el.dataset.t),
-  bar: el => { const s = (S.dser || [])[Number(el.dataset.i)], bt = $('#bt'); if (!s || !bt) return; bt.innerHTML = '<b>' + esc(idDate(s.d)) + '</b> · Omzet <b>' + rp(s.omzet) + '</b> · Laba kotor <b>' + rp(s.laba) + '</b>'; document.querySelectorAll('.bchart [data-b]').forEach(r => { r.style.opacity = r.dataset.b === el.dataset.i ? 1 : .35; }); },
+  bar: el => { const s = (S.dser || [])[Number(el.dataset.i)], bt = $('#bt'); if (!s || !bt) return; bt.innerHTML = '<b>' + esc(idDate(s.d)) + '</b> · Omzet <b>' + rp(s.omzet) + '</b> · Laba kotor <b>' + rp(s.laba) + '</b>'; document.querySelectorAll('.bchart [data-b]').forEach(r => { const on = r.dataset.b === el.dataset.i; r.style.opacity = on ? 1 : .35; if (r.getAttribute('role') === 'button') r.setAttribute('aria-pressed', on ? 'true' : 'false'); }); },
   rpre: el => { S.rpre = el.dataset.p; if (S.rpre !== 'custom') setPreset(); vLaporan(S.rpre === 'custom'); },
   pnew: () => { S.rsq = ''; prodNew(); }, pjenis: el => { S.pform.jenis = el.dataset.j; S.rsq = ''; prodNew(); },
   pedit: el => prodEdit(el.dataset.id), pesave: () => busy('Menyimpan perubahan…', prodEditSave),
@@ -693,6 +695,11 @@ document.addEventListener('input', e => {
   else if (d.dv) { S.dp2.sel[d.dv] = t.checked; dupUpd(); }
   else if (d.ri) { S.ri[d.ri] = t.value; if (d.ri === 'm') S.ri.u = 'main'; riRefresh(d.ri !== 'q'); }
   else if (d.rg) S[d.rg] = t.value;
+});
+document.addEventListener('keydown', e => {   // grafik Beranda: satu perhentian Tab, panah/Home/End berpindah antar batang (roving tabindex)
+  const t = /** @type {any} */ (e.target); if (!t || !t.matches || !t.matches('.hbars [data-act="bar"]') || !/^(ArrowLeft|ArrowRight|Home|End)$/.test(e.key)) return;
+  const all = Array.from(t.parentNode.querySelectorAll('[data-act="bar"]')), i = all.indexOf(t), j = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : Math.min(all.length - 1, Math.max(0, i + (e.key === 'ArrowRight' ? 1 : -1)));
+  e.preventDefault(); all.forEach(b => b.setAttribute('tabindex', '-1')); all[j].setAttribute('tabindex', '0'); all[j].focus();
 });
 document.addEventListener('change', e => {
   const t = /** @type {any} */ (e.target);

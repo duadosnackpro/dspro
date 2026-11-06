@@ -13,7 +13,7 @@ async function vTransfer() {
 }
 function trDraw() {
   const el = $('#trl'); if (!el) return; const me = S.data.outlet && S.data.outlet.id;
-  el.innerHTML = (S.trs || []).map(t => '<button class="li" style="width:100%;border:0;font:inherit;text-align:left;margin-top:8px" data-act="trdetail" data-id="' + esc(t.id) + '"><span><b>' + esc(t.nomor) + '</b><div class="muted">' + (t.dari_id === me ? 'Ke ' + esc(trOutletName(t.ke_id)) : 'Dari ' + esc(trOutletName(t.dari_id))) + ' · ' + t.items.length + ' item</div></span><span class="tag ' + (TR_TAG[t.status] || '') + '">' + esc(TR_ST[t.status] || t.status) + '</span></button>').join('') ||
+  el.innerHTML = (S.trs || []).map(t => '<button class="li-flat u-mt8 li" data-act="trdetail" data-id="' + esc(t.id) + '"><span><b>' + esc(t.nomor) + '</b><div class="muted">' + (t.dari_id === me ? 'Ke ' + esc(trOutletName(t.ke_id)) : 'Dari ' + esc(trOutletName(t.dari_id))) + ' · ' + t.items.length + ' item</div></span><span class="tag ' + (TR_TAG[t.status] || '') + '">' + esc(TR_ST[t.status] || t.status) + '</span></button>').join('') ||
     emptyState('stok', 'Belum ada transfer', 'Kirim stok produk jadi atau bahan ke outlet lain. Stok asal berkurang saat dikirim, stok tujuan bertambah saat diterima.', '');
 }
 function trNewSheet() {
@@ -27,7 +27,7 @@ function trNewDraw() {
   if (!pool.some(x => x[0] === f.item)) f.item = pool[0] ? pool[0][0] : '';
   sheet('<h2>Transfer baru</h2><p class="muted">Dari ' + esc(outletName()) + '</p><label>Tujuan<select class="inp" data-tf="to">' + others.map(o => '<option value="' + esc(o.id) + '"' + (o.id === f.to ? ' selected' : '') + '>' + esc(o.code + ' · ' + o.name) + '</option>').join('') + '</select></label>' +
     '<div class="chips"><button class="chip ' + (f.kind === 'variant' ? 'on' : '') + '" data-act="trkind" data-k="variant">Produk jadi</button>' + (S.data.materials ? '<button class="chip ' + (f.kind === 'material' ? 'on' : '') + '" data-act="trkind" data-k="material">Bahan</button>' : '') + '</div>' +
-    '<label>Item<select class="inp" data-tf="item">' + pool.map(x => '<option value="' + esc(x[0]) + '"' + (x[0] === f.item ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('') + '</select></label><div class="row2"><input class="inp" data-tf="qty" inputmode="decimal" placeholder="Jumlah" aria-label="Jumlah" value="' + esc(f.qty) + '"><button class="btn sec" data-act="tradd">Tambah</button></div>' +
+    '<label>Item<select class="inp" data-tf="item">' + pool.map(x => '<option value="' + esc(x[0]) + '"' + (x[0] === f.item ? ' selected' : '') + '>' + esc(x[1]) + '</option>').join('') + '</select></label><div class="row2"><input class="inp" data-tf="qty" inputmode="decimal" autocomplete="off" placeholder="Jumlah" aria-label="Jumlah item yang dikirim" value="' + esc(f.qty) + '"><button class="btn sec" data-act="tradd">Tambah</button></div>' +
     f.items.map((x, i) => '<div class="kv"><span>' + esc(trItemName({tipe: x.item_type, item_id: x.item_id})) + '</span><span>' + qf(x.qty) + ' <button class="chip" data-act="trdel" data-i="' + i + '">Hapus</button></span></div>').join('') +
     '<label>Catatan<input class="inp" data-tf="catatan" value="' + esc(f.catatan) + '"></label><button class="btn pri" data-act="trsave" data-aj="1">Buat dan ajukan</button><button class="btn sec" data-act="trsave" data-aj="0">Simpan sebagai draft</button>');
 }
@@ -42,7 +42,7 @@ function trDetail(id) {
   if ((mine || (dest && st === 'sent')) && ['draft', 'submitted', 'approved', 'sent'].indexOf(st) >= 0 && can('transfer') && (st !== 'sent' || can('approve'))) acts += btn('cancel', st === 'sent' ? 'Batalkan dan kembalikan ke asal' : 'Batalkan', 'dan');
   const recv = dest && st === 'sent';
   sheet('<h2>' + esc(t.nomor) + '</h2><p class="muted">' + esc(trOutletName(t.dari_id)) + ' → ' + esc(trOutletName(t.ke_id)) + ' · ' + esc(TR_ST[st] || st) + (t.catatan ? ' · ' + esc(t.catatan) : '') + '</p>' +
-    '<div class="li" style="display:block">' + t.items.map((it, i) => '<div class="kv"><span>' + esc(trItemName(it)) + '</span><span>' + (recv ? '<input class="inp" style="width:90px" data-rc="' + i + '" inputmode="decimal" aria-label="Jumlah diterima ' + esc(trItemName(it)) + '" value="' + esc(it.dikirim) + '"> ' : (it.diterima != null ? qf(it.diterima) + ' / ' : '') + qf(it.dikirim != null ? it.dikirim : it.diminta) + ' ') + esc(trUnit(it)) + (it.selisih ? ' <span class="tag red">selisih ' + qf(it.selisih) + '</span>' : '') + '</span></div>').join('') + '</div>' +
+    '<div class="u-blk li">' + t.items.map((it, i) => '<div class="kv"><span>' + esc(trItemName(it)) + '</span><span>' + (recv ? '<input class="u-w90 inp" data-rc="' + i + '" inputmode="decimal" aria-label="Jumlah diterima ' + esc(trItemName(it)) + '" value="' + esc(it.dikirim) + '"> ' : (it.diterima != null ? qf(it.diterima) + ' / ' : '') + qf(it.dikirim != null ? it.dikirim : it.diminta) + ' ') + esc(trUnit(it)) + (it.selisih ? ' <span class="tag red">selisih ' + qf(it.selisih) + '</span>' : '') + '</span></div>').join('') + '</div>' +
     (recv ? '<p class="muted">Isi jumlah yang benar-benar diterima. Selisih dicatat di audit.</p>' : '') + acts + '<button class="btn sec" data-act="close">Tutup</button>');
 }
 async function trAct(id, a) {

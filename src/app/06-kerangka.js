@@ -1,18 +1,36 @@
 /* ---------- Kerangka ---------- */
+/* Judul layar (v2.6.14): dipakai untuk <h1> tersembunyi, document.title, dan pengumuman pembaca layar saat pindah layar. */
+const TAB_TITLE = {dash: 'Beranda', kasir: 'Kasir', riwayat: 'Riwayat penjualan', stok: 'Stok', produksi: 'Produksi', menu: 'Menu', master: 'Data Master', users: 'Pengguna', settings: 'Pengaturan', resep: 'Resep', laporan: 'Laporan', shopee: 'Impor pesanan Shopee', cek: 'Periksa data', diag: 'Diagnostik dan tes cetak', tutup: 'Buka dan tutup kasir', transfer: 'Transfer stok', outlets: 'Outlet', reset: 'Reset data transaksi', lama: 'Input transaksi lama'};
+const RF = {tab: ''};   // layar yang terakhir digambar; '' = belum pernah (muat awal tidak merebut fokus)
 const MENU_TABS = ['menu', 'master', 'users', 'settings', 'resep', 'laporan', 'shopee', 'cek', 'diag', 'tutup', 'transfer'];
 function render() {
   if (!S.token || !S.data) return renderLogin();
   if (!tabAllowed(S.tab)) S.tab = homeTab();
   navTrack();
+  const fa = /** @type {any} */ (document.activeElement), navT = fa && fa.closest && fa.closest('#app .nav') && fa.dataset ? fa.dataset.t : '', tabChanged = S.tab !== RF.tab, firstDraw = RF.tab === '';
   const d = S.data; if (!S.ch || !d.channels.some(c => c.id === S.ch)) S.ch = d.channels[0] && d.channels[0].id;
   const o = own(), tabs = [['dash', 'Beranda'], ['kasir', 'Kasir'], ['riwayat', 'Riwayat'], ['stok', 'Stok'], ['produksi', 'Produksi'], ['menu', 'Menu']].filter(t => tabAllowed(t[0]) && !(o && t[0] === 'riwayat')),
     inMenu = MENU_TABS.concat(o ? ['riwayat'] : []).indexOf(S.tab) >= 0;
-  $('#app').innerHTML = '<header class="top"><img class="logo" src="icons/icon-192.png" alt="" width="38" height="38"><div class="brand"><b class="wordmark">' + esc(String(d.settings.nama_usaha || 'Duado Snack').toUpperCase()) + '</b>' + outletLabel() + '</div><button class="badge" id="badge" data-act="queue" aria-label="Status sinkronisasi"></button></header><div class="accent"></div><main id="main"></main><div id="cartbar"></div>' +
+  $('#app').innerHTML = '<header class="top"><img class="logo" src="icons/icon-192.png" alt="" width="38" height="38"><div class="brand"><b class="wordmark">' + esc(String(d.settings.nama_usaha || 'Duado Snack').toUpperCase()) + '</b>' + outletLabel() + '</div><button class="badge" id="badge" data-act="queue" aria-label="Status sinkronisasi"></button></header><div class="accent"></div><h1 class="sr" id="stitle" tabindex="-1"></h1><main id="main"></main><div id="cartbar"></div>' +
     '<nav class="nav" aria-label="Menu utama">' + tabs.map(t => { const on = S.tab === t[0] || (t[0] === 'menu' && inMenu); return '<button data-act="tab" data-t="' + t[0] + '"' + (on ? ' aria-current="page"' : '') + ' class="' + (on ? 'on' : '') + '"><span class="ni">' + svg(t[0], 22) + '</span><span>' + t[1] + '</span></button>'; }).join('') + '</nav>';
   badge();
   (APP.views[S.tab] || vKasir)();
   cartbar(); btTick(); navSync();
+  screenFocus(navT, tabChanged, firstDraw);
 }
+/* Fokus dan judul sesudah menggambar ulang (render() mengganti seluruh #app, jadi fokus selalu jatuh ke body).
+   - Judul dokumen selalu mengikuti layar. - Fokus pada tombol nav: dikembalikan ke tombol nav yang sama (layar berganti: diumumkan lewat region status).
+   - Layar berganti lewat jalan lain (tombol di isi layar, Back, login): fokus ke <h1>. - Muat awal dan lembar terbuka: fokus tidak direbut. */
+function screenFocus(navT, tabChanged, firstDraw) {
+  const ttl = TAB_TITLE[S.tab] || S.tab, h = $('#stitle'); if (h) h.textContent = ttl;
+  document.title = ttl + ' · ' + String((S.data && S.data.settings && S.data.settings.nama_usaha) || 'Duado Snack');
+  RF.tab = S.tab;
+  const sh = $('#sheet'); if (firstDraw || (sh && !sh.hidden)) return;
+  const opt = {preventScroll: true};
+  if (navT) { const b = /** @type {any} */ ($('#app .nav [data-t="' + navT + '"]')); if (b) b.focus(opt); if (tabChanged) announce(ttl); return; }
+  if (tabChanged && h) h.focus(opt);
+}
+function announce(t) { const el = $('#sann'); if (!el) return; el.textContent = ''; setTimeout(() => { el.textContent = t; }, 60); }
 function badge() {
   const b = $('#badge');
   if (b) {
@@ -64,12 +82,12 @@ function queueSheet() {
   S.qopen = true; const all = S.data ? mineAll() : S.queue, off = !navigator.onLine, rev = all.filter(q => q.status === 'review'), mineQ = rev.concat(all.filter(q => q.status !== 'review')), retryable = rev.filter(q => !qinfo(q).auth).length;
   const secs = n => n < 60 ? n + ' detik' : Math.round(n / 60) + ' menit', next = S.nextFlush && S.nextFlush > Date.now() ? 'Percobaan otomatis berikutnya sekitar ' + secs(Math.round((S.nextFlush - Date.now()) / 1000)) + '.' : '';
   const item = q => { const i = S.queue.indexOf(q), n = q.payload.items.reduce((a, x) => a + x.qty, 0), st = q.status === 'review' ? '<span class="tag red">Perlu ditinjau</span>' : q.state === 'sending' ? '<span class="tag busy">Mengirim…</span>' : '<span class="tag">Menunggu</span>', nf = q.status === 'review' ? qinfo(q) : null;
-    return '<div class="li" style="display:block"><div class="kv"><b>' + rp(q.total) + '</b>' + st + '</div><div class="muted">' + esc(fmtDT(q.ts).slice(11)) + ' · ' + esc(q.ch) + ' · ' + n + ' item' + (q.tries ? ' · percobaan ke-' + q.tries : '') + '</div>' +
-      '<div class="qitems">' + qitems(q) + '</div>' + (nf ? '<div class="qwhy"><b>' + esc(nf.t) + '</b><div>' + esc(nf.h) + '</div></div>' : '') + (q.error ? '<div style="color:var(--err);font-size:13px">' + esc(q.error) + '</div>' : '') +
+    return '<div class="u-blk li"><div class="kv"><b>' + rp(q.total) + '</b>' + st + '</div><div class="muted">' + esc(fmtDT(q.ts).slice(11)) + ' · ' + esc(q.ch) + ' · ' + n + ' item' + (q.tries ? ' · percobaan ke-' + q.tries : '') + '</div>' +
+      '<div class="qitems">' + qitems(q) + '</div>' + (nf ? '<div class="qwhy"><b>' + esc(nf.t) + '</b><div>' + esc(nf.h) + '</div></div>' : '') + (q.error ? '<div class="u-err u-fs13">' + esc(q.error) + '</div>' : '') +
       (q.status === 'review' ? '<div class="row2">' + (nf.auth ? '<button class="btn pri sm" data-act="qauth" data-i="' + i + '">Otorisasi Owner</button>' : '') + (nf.accept ? '<button class="btn pri sm" data-act="qaccept" data-i="' + i + '">Terima harga server</button>' : '') + '<button class="btn sec sm" data-act="qretry" data-i="' + i + '">Coba lagi</button><button class="btn dan sm" data-act="qdel" data-i="' + i + '">Hapus</button></div>' : '') + '</div>'; };
   sheet('<div class="grab"></div><h2>Antrean transaksi</h2>' + (rev.length ? '<div class="qwarn" role="alert"><b>' + rev.length + ' transaksi tidak bisa dikirim.</b> Uang pelanggan mungkin sudah diterima, jadi jangan diabaikan. Pilih tindakan di tiap transaksi.</div>' : '') +
     '<div class="qs-top"><span class="tag ' + (off ? '' : 'grn') + '">' + (off ? 'Offline' : 'Online') + '</span><span class="muted">Terakhir sinkron: ' + (S.lastSync ? fmtDT(S.lastSync).slice(11) : '-') + ' · penyimpanan: ' + Store.mode() + '</span></div>' +
-    (mineQ.length ? mineQ.slice(0, lim('q')).map(item).join('') + moreBtn('q', mineQ.length) : '<div class="okmark sm">' + svg('check', 22) + '</div><p class="muted" style="text-align:center">Semua transaksi sudah terkirim ke server.</p>') + (next ? '<p class="muted">' + next + '</p>' : '') +
+    (mineQ.length ? mineQ.slice(0, lim('q')).map(item).join('') + moreBtn('q', mineQ.length) : '<div class="okmark sm">' + svg('check', 22) + '</div><p class="u-tc muted">Semua transaksi sudah terkirim ke server.</p>') + (next ? '<p class="muted">' + next + '</p>' : '') +
     (retryable > 1 ? '<button class="btn sec" data-act="qretryall">Coba lagi semua (' + retryable + ')</button>' : '') +
     (mineQ.some(q => q.status === 'pending') ? '<button class="btn pri" data-act="qnow">Kirim sekarang</button>' : '') + '<button class="btn sec" data-act="close">Tutup</button>');
   S.qopen = true; watchMore();

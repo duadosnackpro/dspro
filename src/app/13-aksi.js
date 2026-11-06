@@ -19,7 +19,7 @@ const ACT = {
   inc1: el => addToCart(el.dataset.v), dec1: el => dropFromCart(el.dataset.v),
   inc: el => { const l = S.cart[el.dataset.i]; if (!l) return; const st = Number(vById(l.v).stok) || 0; if (T(cfg('blokir_stok_minus')) && cartQty(l.v) + 1 > st) return toast('Stok tidak cukup'); l.qty++; saveCart(); cartLines(); addonsRender(); cashBox(); upd(); updCard(l.v); buzz(); },
   dec: el => { const l = S.cart[el.dataset.i]; if (!l) return; const id = l.v; l.qty--; if (l.qty <= 0) S.cart.splice(el.dataset.i, 1); saveCart(); if (!S.cart.length && !isWide()) closeSheet(); cartLines(); addonsRender(); cashBox(); upd(); updCard(id); },
-  metode: el => { S.metode = el.dataset.m; LS.set('metode', S.metode); const c = $('#mchips'); if (c) c.innerHTML = methodChips(); cashBox(); upd(); },
+  metode: el => { S.metode = el.dataset.m; LS.set('metode', S.metode); const keep = !!el.closest('#mchips'), c = $('#mchips'); if (c) c.innerHTML = methodChips(); if (keep) { const b = /** @type {any} */ ($('#mchips [aria-checked="true"]')); if (b) b.focus({preventScroll: true}); } cashBox(); upd(); },
   qk: el => { S.terima = el.dataset.n; cashBox(); upd(); },
   wa: () => waSend(S.rc, ($('#wa') || {}).value), rawbt: () => printBT(S.rc), print: () => printBrowser(), share: () => shareRc(S.rc), copyrc: () => copyText(receiptText(S.rc)),
   addonnew: () => { if (S.dirty) return toast('Simpan perubahan pengaturan dulu.'); addonSheet(); },
@@ -98,6 +98,13 @@ window.addEventListener('beforeunload', e => { if (S.dirty || sheetDirtyNow()) {
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEv = e; if (S.tab === 'menu' && S.data) vMenu(); });
 window.addEventListener('appinstalled', () => { S.installEv = null; if (S.tab === 'menu' && S.data) vMenu(); });
 { let rzT = 0; window.addEventListener('resize', () => { cancelAnimationFrame(rzT); rzT = requestAnimationFrame(initFades); }); }
+document.addEventListener('input', e => {   // pemisah ribuan pada kolom uang [data-rp]; dipasang di fase tangkap agar pendengar lain sudah melihat nilai yang diformat
+  const t = /** @type {any} */ (e.target); if (!t || !t.matches || !t.matches('input[data-rp]') || e.isComposing) return;
+  const old = t.value, pos = t.selectionStart == null ? old.length : t.selectionStart, digitsBefore = old.slice(0, pos).replace(/\D/g, '').length, nv = rpIn(old);
+  if (nv === old) return; t.value = nv;
+  let n = 0, p = 0; while (p < nv.length && n < digitsBefore) { if (/\d/.test(nv[p])) n++; p++; }   // kursor tetap di depan angka yang sama
+  try { t.setSelectionRange(p, p); } catch (x) {}
+}, true);
 document.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.in; if (!k) return; let v = e.target.value;
   if (k === 'q') { S.q = v; clearTimeout(S.qT); S.qT = setTimeout(() => { if ($('#grid')) grid(); }, 90); return; } // v1.9.9: gabungkan ketikan beruntun menjadi satu penggambaran
@@ -112,5 +119,10 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('input', e => { if (/** @type {HTMLElement|null} */ (e.target) && /** @type {HTMLElement} */ (e.target).id === 'a_h') adjHppUpd(); });   // peringatan "menimpa HPP" muncul begitu kolom HPP diisi
 document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.chg === 'day') { S.day = e.target.value; vRiwayat(); } });
+document.addEventListener('keydown', e => {   // radiogroup metode bayar: panah memilih metode berikutnya/sebelumnya (pola radio standar)
+  const t = /** @type {any} */ (e.target); if (!t || !t.matches || !t.matches('#mchips [role="radio"]') || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+  const all = Array.from(t.parentNode.querySelectorAll('[role="radio"]')), i = all.indexOf(t), step = /Right|Down/.test(e.key) ? 1 : -1, nx = all[(i + step + all.length) % all.length];
+  e.preventDefault(); if (nx && nx !== t) nx.click();
+});
 document.addEventListener('keydown', e => { const t = /** @type {HTMLElement} */ (e.target); if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('[role="button"][data-act]:not(button)')) { e.preventDefault(); t.click(); return; } /* kartu produk berperan tombol: sebelumnya hanya bisa diketuk/diklik, tidak bisa lewat keyboard */ if (e.key === 'Tab') trapTab(e); if (e.key === 'Escape' && $('#sheet') && !$('#sheet').hidden && (!S.opin || S.opin.kind === 'alasan') && !S.busyOn) { requestCloseSheet(); return; } if (e.key === 'Enter' && $('#lp') && document.activeElement === $('#lp')) doLogin(); });
 

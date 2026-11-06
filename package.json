@@ -1,6 +1,6 @@
 {
   "name": "duado-pos",
-  "version": "2.6.15",
+  "version": "2.6.16",
   "private": true,
   "description": "Duado Snack POS: klien web statis (GitHub Pages) + backend Supabase",
   "scripts": {

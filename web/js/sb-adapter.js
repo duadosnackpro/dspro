@@ -242,7 +242,11 @@ async function call(action, p, token, tokCb) {
     case 'login': {
       const u = String(p.username || '').trim().toLowerCase();
       const r = await raw('/auth/v1/token?grant_type=password', {method: 'POST', body: JSON.stringify({email: u + EMAIL_DOMAIN, password: p.pin})});
-      if (!r.ok) throw fail(r.status === 429 ? 'Terlalu banyak percobaan. Coba lagi beberapa menit lagi.' : 'Username atau PIN salah.');
+      if (!r.ok) {   // v2.6.18: penanda limit/cred agar UI memilih pesan dan kolom yang tepat; galat 5xx bukan "PIN salah"
+        if (r.status === 429) throw fail('Terlalu banyak percobaan. Coba lagi beberapa menit lagi.', {limit: true});
+        if (r.status >= 500) throw fail('Server sedang bermasalah. Coba lagi sebentar.', {retry: true});
+        throw fail('Username atau PIN salah.', {cred: true});
+      }
       ls.set(LSK.rt, r.body.refresh_token);
       schemaOkAt = 0; try { await checkSchema(r.body.access_token); } catch (e) { ls.set(LSK.rt, null); throw e; }
       let b; try { b = await bootWithOps(r.body.access_token); } catch (e) { throw fail('Akun belum diaktifkan di outlet mana pun. Hubungi Owner.'); }

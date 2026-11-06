@@ -7,7 +7,7 @@ function askReason(title, msg, okLabel) { // v1.9.9: pengganti prompt() bawaan b
   });
 }
 const ACT = {
-  login: doLogin, logout: confirmLogout, close: requestCloseSheet, cart: cartSheet, pay: pay,
+  login: doLogin, pinvis: pinToggle, logout: confirmLogout, close: requestCloseSheet, cart: cartSheet, pay: pay,
   hideout: el => { S.hideOut = !!el.checked; LS.set('hideOut', S.hideOut); grid(); }, showout: () => { S.hideOut = false; LS.set('hideOut', false); vKasir(); },
   rday: el => { const p = el.dataset.p; if (p === 'today') { S.day = today(); S.rcustom = false; } else if (p === 'yday') { S.day = addDays(today(), -1); S.rcustom = false; } else S.rcustom = true; vRiwayat(); },
   scat: el => { S.scat = el.dataset.c; vStok(); },
@@ -124,5 +124,8 @@ document.addEventListener('keydown', e => {   // radiogroup metode bayar: panah 
   const all = Array.from(t.parentNode.querySelectorAll('[role="radio"]')), i = all.indexOf(t), step = /Right|Down/.test(e.key) ? 1 : -1, nx = all[(i + step + all.length) % all.length];
   e.preventDefault(); if (nx && nx !== t) nx.click();
 });
-document.addEventListener('keydown', e => { const t = /** @type {HTMLElement} */ (e.target); if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('[role="button"][data-act]:not(button)')) { e.preventDefault(); t.click(); return; } /* kartu produk berperan tombol: sebelumnya hanya bisa diketuk/diklik, tidak bisa lewat keyboard */ if (e.key === 'Tab') trapTab(e); if (e.key === 'Escape' && $('#sheet') && !$('#sheet').hidden && (!S.opin || S.opin.kind === 'alasan') && !S.busyOn) { requestCloseSheet(); return; } if (e.key === 'Enter' && $('#lp') && document.activeElement === $('#lp')) doLogin(); });
+document.addEventListener('keydown', e => { const t = /** @type {HTMLElement} */ (e.target); if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('[role="button"][data-act]:not(button)')) { e.preventDefault(); t.click(); return; } /* kartu produk berperan tombol: sebelumnya hanya bisa diketuk/diklik, tidak bisa lewat keyboard */ if (e.key === 'Tab') trapTab(e); if (e.key === 'Escape' && $('#sheet') && !$('#sheet').hidden && (!S.opin || S.opin.kind === 'alasan') && !S.busyOn) { requestCloseSheet(); return; } });
+/* v2.6.17: login memakai <form> sungguhan: Enter di kolom mana pun dan tombol Go/Masuk keyboard layar ikut mengirim. preventDefault wajib (CSP form-action 'none'). */
+document.addEventListener('submit', e => { const t = /** @type {HTMLElement} */ (e.target); if (t && t.id === 'lf') { e.preventDefault(); doLogin(); } });
+document.addEventListener('input', e => { const t = /** @type {HTMLElement} */ (e.target); if (t && t.closest && t.closest('#lf') && (t.id === 'lu' || t.id === 'lp')) loginClear(); });
 

@@ -349,6 +349,11 @@ pre.rc{background:var(--rc-paper);border-radius:12px;padding:12px;font:12px/1.35
 .lg-hero p{margin:6px 0 0;letter-spacing:2px;text-transform:uppercase;font-size:12px;color:var(--on-brand-3)}
 .lg-card{margin:6px var(--s4) calc(var(--s5) + env(safe-area-inset-bottom));background:var(--paper);border-radius:var(--r-lg);padding:20px 20px 22px;box-shadow:var(--sh-card);flex:none}
 .lg-card label{text-align:left}
+.pw{position:relative;display:flow-root}.pw .inp{padding-right:56px}
+.pwt{position:absolute;right:4px;bottom:calc(var(--s3) + 4px);width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-2);cursor:pointer;touch-action:manipulation}
+.pwt .pw-on{display:inline-flex}.pwt .pw-off{display:none}.pwt[aria-pressed="true"] .pw-on{display:none}.pwt[aria-pressed="true"] .pw-off{display:inline-flex}
+.pwt:focus-visible{outline:3px solid var(--brand);outline-offset:-2px}
+.lg-help{margin:var(--s3) 0 0;text-align:center}
 
 /* ---------- 10. Interaksi pointer ---------- */
 .btn,.chip,.mi,.li,.plus,.step button,.qty button,.nav button{touch-action:manipulation}

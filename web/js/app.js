@@ -508,7 +508,9 @@ const IC = {
   sync: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
   diag: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
-  chev: '<path d="m9 18 6-6-6-6"/>', trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v5M14 11v5"/>', search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>', check: '<path d="M20 6 9 17l-5-5"/>'
+  chev: '<path d="m9 18 6-6-6-6"/>', trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v5M14 11v5"/>', search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>', check: '<path d="M20 6 9 17l-5-5"/>',
+  eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>'
 };
 const svg = (n, sz) => '<svg class="ic" viewBox="0 0 24 24" width="' + (sz || 22) + '" height="' + (sz || 22) + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>';
 const FLAME = 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z';
@@ -1178,17 +1180,50 @@ function btWake() { // aplikasi terlihat lagi (mis. kembali dari WhatsApp)
 /* ---------- Login ---------- */
 function renderLogin(msg) {
   RF.tab = 'login'; document.title = 'Masuk · Duado Snack';
-  $('#app').innerHTML = '<div class="login"><div class="lg-hero"><img src="icons/icon-192.png" alt="Duado Snack" width="116" height="116"><h1 class="wordmark">DUADO SNACK</h1><p>Jajanan Cemilan Pedas</p></div><div class="lg-card">' +
-    '<label>Username<input id="lu" class="inp" autocomplete="username" autocapitalize="none" value="' + esc(LS.get('lastUser', '')) + '"></label>' +
-    '<label>PIN atau kata sandi<input id="lp" class="inp" type="password" autocomplete="current-password"></label>' +
+  $('#app').innerHTML = '<div class="login"><div class="lg-hero"><img src="icons/icon-192.png" alt="Duado Snack" width="116" height="116"><h1 class="wordmark">DUADO SNACK</h1><p>Jajanan Cemilan Pedas</p></div><form class="lg-card" id="lf" novalidate>' +
+    '<label>Username<input id="lu" class="inp" autocomplete="username" autocapitalize="none" enterkeyhint="next" aria-describedby="lerr" value="' + esc(LS.get('lastUser', '')) + '"></label>' +
+    '<div class="pw"><label>PIN atau kata sandi<input id="lp" class="inp" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="lerr"></label>' +
+    '<button type="button" class="pwt" data-act="pinvis" aria-pressed="false" aria-controls="lp" aria-label="Tampilkan PIN"><span class="pw-on">' + svg('eye') + '</span><span class="pw-off">' + svg('eyeoff') + '</span></button></div>' +
+    '<div class="err" id="lerr" role="alert">' + esc(msg || '') + '</div>' +
     '<label class="sw"><input type="checkbox" id="lsh"' + (LS.get('shared', false) ? ' checked' : '') + '><span class="sw-t" aria-hidden="true"></span><span class="sw-l"><b>Perangkat bersama</b><small>Hapus data lokal saat keluar</small></span></label>' +
-    '<button class="btn pri big" data-act="login">Masuk</button><div class="err" id="lerr" role="alert">' + esc(msg || '') + '</div>' +
-    (S.queue.length ? '<div class="muted">' + S.queue.length + ' transaksi menunggu dikirim setelah masuk.</div>' : '') + '</div></div>';
+    '<button class="btn pri big" type="submit">Masuk</button>' +
+    '<p class="muted lg-help">Lupa PIN? Hubungi Owner outlet.</p>' +
+    (S.queue.length ? '<div class="muted">' + S.queue.length + ' transaksi menunggu dikirim setelah masuk.</div>' : '') + '</form></div>';
   navSync();
+  /* v2.6.18: fokus awal: PIN bila username terakhir sudah terisi, selain itu username. */
+  try { const f = /** @type {HTMLInputElement|null} */ ($(LS.get('lastUser', '') ? '#lp' : '#lu')); if (f) f.focus(); } catch (x) { /* fokus tidak wajib */ }
+}
+/* v2.6.17: galat login tampil di antara kolom PIN dan tombol (tetap terlihat saat keyboard layar terbuka), kolom yang bermasalah diberi aria-invalid
+   dan fokus pindah ke sana. Pesan dan tanda hilang begitu pengguna mengetik lagi (loginClear, dipasang di 13-aksi.js). */
+function loginClear() {
+  const e = $('#lerr'); if (e) e.textContent = '';
+  ['#lu', '#lp'].forEach(q => { const f = $(q); if (f) f.removeAttribute('aria-invalid'); });
+}
+function loginErr(/** @type {string} */ msg, /** @type {string[]} */ bad, /** @type {string} */ focus) {
+  loginClear();
+  const e = $('#lerr'); if (e) e.textContent = msg;
+  bad.forEach(q => { const f = $(q); if (f) f.setAttribute('aria-invalid', 'true'); });
+  const f = /** @type {HTMLInputElement|null} */ ($(focus));
+  try { if (f) { f.focus(); if (f.scrollIntoView) f.scrollIntoView({block: 'center'}); } } catch (x) { /* fokus tidak wajib */ }
+}
+/* v2.6.18: tombol mata. aria-pressed menandai PIN sedang terlihat; label tombol tetap "Tampilkan PIN" (pola tombol toggle standar). */
+function pinToggle(/** @type {HTMLElement} */ btn) {
+  const f = /** @type {HTMLInputElement|null} */ ($('#lp')); if (!f) return;
+  const show = f.type === 'password'; f.type = show ? 'text' : 'password'; btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+}
+/* v2.6.18: galat login dalam bahasa kasir. Detail teknis (e.message, stack) hanya ke log lokal lewat logErr, tidak pernah ke layar.
+   e.limit = pembatasan percobaan, e.cred = username/PIN salah (keduanya dari sb-adapter.js), e.server = pesan bisnis yang sudah ramah. */
+function loginFail(/** @type {any} */ e) {
+  if (e && e.limit) return loginErr('Terlalu banyak percobaan masuk. Tunggu beberapa menit lalu coba lagi. Jika masih terkunci, hubungi Owner.', [], '#lp');
+  if (e && e.server) return loginErr(e.message, e.cred ? ['#lu', '#lp'] : [], '#lp');
+  logErr(e, 'login');
+  const net = (typeof navigator !== 'undefined' && navigator.onLine === false) || /Tidak ada koneksi/.test(String((e && e.message) || ''));
+  return loginErr(net ? 'Tidak ada koneksi. Periksa internet lalu coba lagi.' : 'Terjadi masalah di aplikasi. Coba lagi. Jika berulang, hubungi Owner.', [], '#lp');
 }
 async function doLogin() {
-  const u = $('#lu').value.trim(), p = $('#lp').value; if (!u || !p) return;
-  $('#lerr').textContent = '';
+  const u = $('#lu').value.trim(), p = $('#lp').value;
+  if (!u || !p) { const bad = []; if (!u) bad.push('#lu'); if (!p) bad.push('#lp'); return loginErr('Isi username dan PIN.', bad, bad[0]); }
+  loginClear();
   await busy('Masuk…', async () => { try {
     const r = await api('login', {username: u, pin: p, dev: devId()}); S.token = r.token;
     /* Penguncian ganti user: antrean pengguna lain yang belum terkirim tidak boleh tertinggal atau tercampur. */
@@ -1201,7 +1236,7 @@ async function doLogin() {
     LS.set('token', r.token); LS.set('lastUser', u); LS.set('shared', !!($('#lsh') && $('#lsh').checked));
     await loadData(); await shiftCheck(); S.tab = homeTab(); render(); flush();
     if (r.pin_lemah) setTimeout(() => toast(own() ? 'PIN Anda lemah. Ganti di Menu, Pengguna.' : 'PIN Anda lemah. Minta Owner menggantinya.'), 900);
-  } catch (e) { S.token = null; $('#lerr').textContent = e.server ? e.message : 'Tidak dapat terhubung ke server. ' + e.message; } });
+  } catch (e) { S.token = null; loginFail(e); } });
 }
 
 /* ---------- Kerangka ---------- */
@@ -2096,7 +2131,7 @@ function askReason(title, msg, okLabel) { // v1.9.9: pengganti prompt() bawaan b
   });
 }
 const ACT = {
-  login: doLogin, logout: confirmLogout, close: requestCloseSheet, cart: cartSheet, pay: pay,
+  login: doLogin, pinvis: pinToggle, logout: confirmLogout, close: requestCloseSheet, cart: cartSheet, pay: pay,
   hideout: el => { S.hideOut = !!el.checked; LS.set('hideOut', S.hideOut); grid(); }, showout: () => { S.hideOut = false; LS.set('hideOut', false); vKasir(); },
   rday: el => { const p = el.dataset.p; if (p === 'today') { S.day = today(); S.rcustom = false; } else if (p === 'yday') { S.day = addDays(today(), -1); S.rcustom = false; } else S.rcustom = true; vRiwayat(); },
   scat: el => { S.scat = el.dataset.c; vStok(); },
@@ -2213,7 +2248,10 @@ document.addEventListener('keydown', e => {   // radiogroup metode bayar: panah 
   const all = Array.from(t.parentNode.querySelectorAll('[role="radio"]')), i = all.indexOf(t), step = /Right|Down/.test(e.key) ? 1 : -1, nx = all[(i + step + all.length) % all.length];
   e.preventDefault(); if (nx && nx !== t) nx.click();
 });
-document.addEventListener('keydown', e => { const t = /** @type {HTMLElement} */ (e.target); if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('[role="button"][data-act]:not(button)')) { e.preventDefault(); t.click(); return; } /* kartu produk berperan tombol: sebelumnya hanya bisa diketuk/diklik, tidak bisa lewat keyboard */ if (e.key === 'Tab') trapTab(e); if (e.key === 'Escape' && $('#sheet') && !$('#sheet').hidden && (!S.opin || S.opin.kind === 'alasan') && !S.busyOn) { requestCloseSheet(); return; } if (e.key === 'Enter' && $('#lp') && document.activeElement === $('#lp')) doLogin(); });
+document.addEventListener('keydown', e => { const t = /** @type {HTMLElement} */ (e.target); if ((e.key === 'Enter' || e.key === ' ') && t && t.matches && t.matches('[role="button"][data-act]:not(button)')) { e.preventDefault(); t.click(); return; } /* kartu produk berperan tombol: sebelumnya hanya bisa diketuk/diklik, tidak bisa lewat keyboard */ if (e.key === 'Tab') trapTab(e); if (e.key === 'Escape' && $('#sheet') && !$('#sheet').hidden && (!S.opin || S.opin.kind === 'alasan') && !S.busyOn) { requestCloseSheet(); return; } });
+/* v2.6.17: login memakai <form> sungguhan: Enter di kolom mana pun dan tombol Go/Masuk keyboard layar ikut mengirim. preventDefault wajib (CSP form-action 'none'). */
+document.addEventListener('submit', e => { const t = /** @type {HTMLElement} */ (e.target); if (t && t.id === 'lf') { e.preventDefault(); doLogin(); } });
+document.addEventListener('input', e => { const t = /** @type {HTMLElement} */ (e.target); if (t && t.closest && t.closest('#lf') && (t.id === 'lu' || t.id === 'lp')) loginClear(); });
 
 /* ---------- Multi-outlet (v2.1.0): pilih outlet aktif dan administrasi outlet. Aktif hanya pada backend Supabase (S.data.outlets ada). ---------- */
 const multiOutlet = () => !!(S.data && S.data.outlets);

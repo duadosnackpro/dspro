@@ -51,4 +51,58 @@ ok(/class="tw" role="region" tabindex="0" aria-label="Tabel /.test(mod), 'wilaya
 const men = rd('src/app/10-menu-master-pengaturan.js');
 ok(!/<span class="mi-b"[^>]*aria-label/.test(men) && /<span class="mi-b" aria-hidden="true">' \+ bd \+ '<\/span><span class="sr"> ' \+ bd \+ ' masalah<\/span>/.test(men), 'lencana masalah: angka disembunyikan, teks "N masalah" lewat .sr');
 ok(/data-tf="qty"[^>]*aria-label="Jumlah item yang dikirim"/.test(rd('src/app/136-transfer.js')), 'kolom jumlah Transfer berlabel jelas');
+// ===== v2.6.17: layar masuk =====
+{
+  const lg = rd('src/app/05-login.js'), ak = rd('src/app/13-aksi.js');
+  ok(/<form class="lg-card" id="lf" novalidate>/.test(lg) && /type="submit">Masuk<\/button>/.test(lg) && !/data-act="login"/.test(lg), 'login: <form> sungguhan, tombol submit tanpa data-act (tidak terkirim dua kali)');
+  ok(/id="lu"[^>]*enterkeyhint="next"/.test(lg) && /id="lp"[^>]*enterkeyhint="go"/.test(lg), 'login: enterkeyhint next di username, go di PIN');
+  ok(lg.indexOf('id="lp"') < lg.indexOf('id="lerr"') && lg.indexOf('id="lerr"') < lg.indexOf('type="submit"'), 'login: galat berada di antara kolom PIN dan tombol');
+  ok((lg.match(/aria-describedby="lerr"/g) || []).length === 2, 'login: kedua kolom terhubung ke pesan galat');
+  ok(/addEventListener\('submit'[^\n]*e\.preventDefault\(\); doLogin\(\)/.test(ak), 'login: submit memakai preventDefault (CSP form-action none)');
+  const code = lg.slice(lg.indexOf('function loginClear'), lg.indexOf('async function doLogin'));
+  const run = (lu, lp) => {
+    const els = {'#lerr': {textContent: ''}}, log = [];
+    ['#lu', '#lp'].forEach(id => { const at = {}; els[id] = {attrs: at, focus: () => log.push(id), setAttribute: (k, v) => { at[k] = v; }, removeAttribute: k => { delete at[k]; }}; });
+    const f = new Function('$', code + '\nreturn {loginErr, loginClear};')(q => els[q]);
+    return {f, els, log};
+  };
+  { const t = run(); t.f.loginErr('Isi username dan PIN.', ['#lp'], '#lp');
+    ok(t.els['#lerr'].textContent === 'Isi username dan PIN.' && t.els['#lp'].attrs['aria-invalid'] === 'true' && !t.els['#lu'].attrs['aria-invalid'] && t.log.join() === '#lp', 'loginErr: pesan tampil, hanya kolom bermasalah ber-aria-invalid, fokus ke kolom itu');
+    t.f.loginClear(); ok(t.els['#lerr'].textContent === '' && !t.els['#lp'].attrs['aria-invalid'], 'loginClear: pesan dan aria-invalid dibersihkan'); }
+  ok(/if \(!u \|\| !p\) \{[^}]*loginErr\('Isi username dan PIN\.'/.test(lg), 'doLogin: submit kosong menampilkan pesan, tidak diam');
+  // ===== v2.6.18: temuan 4-7 (pesan galat manusiawi, tombol lihat PIN, fokus awal, jalur bantuan) =====
+  ok(/<button type="button" class="pwt" data-act="pinvis" aria-pressed="false" aria-controls="lp" aria-label="Tampilkan PIN">/.test(lg), 'login: tombol mata type=button, aria-pressed, aria-controls ke PIN, label "Tampilkan PIN"');
+  ok(!/<label>PIN atau kata sandi<input[^>]*><button/.test(lg) && /<\/label>' \+\s*\n\s*'<button type="button" class="pwt"/.test(lg), 'login: tombol mata di luar <label> (nama kolom PIN tidak ikut membaca nama tombol)');
+  ok(/\.pwt\{[^}]*width:44px;height:44px/.test(rd('web/css/app.css')), 'login: target ketuk tombol mata 44x44');
+  ok(/pinvis: pinToggle/.test(ak), 'login: aksi pinvis terdaftar');
+  ok(/Lupa PIN\? Hubungi Owner outlet\./.test(lg), 'login: teks bantuan lupa PIN tampil permanen');
+  ok(/\$\(LS\.get\('lastUser', ''\) \? '#lp' : '#lu'\)/.test(lg), 'login: fokus awal ke PIN bila username terakhir ada, selain itu ke username');
+  ok(!/'Tidak dapat terhubung ke server\. ' \+ e\.message/.test(lg), 'login: e.message teknis tidak lagi ditampilkan ke pengguna');
+  {
+    const code2 = lg.slice(lg.indexOf('function loginClear'), lg.indexOf('async function doLogin'));
+    const mk = online => {
+      const els = {'#lerr': {textContent: ''}}, logged = [];
+      ['#lu', '#lp'].forEach(id => { const at = {}; els[id] = {attrs: at, type: 'password', focus() {}, setAttribute: (k, v) => { at[k] = v; }, removeAttribute: k => { delete at[k]; }}; });
+      const f = new Function('$', 'logErr', 'navigator', code2 + '\nreturn {loginFail, pinToggle};')(q => els[q], (e, c) => logged.push(c + ':' + e.message), {onLine: online});
+      return {f, els, logged};
+    };
+    { const t = mk(true); t.f.loginFail(Object.assign(new Error('Terlalu banyak percobaan. Coba lagi beberapa menit lagi.'), {server: true, limit: true}));
+      ok(/^Terlalu banyak percobaan masuk\./.test(t.els['#lerr'].textContent) && /Owner/.test(t.els['#lerr'].textContent) && !t.els['#lu'].attrs['aria-invalid'] && !t.els['#lp'].attrs['aria-invalid'], 'loginFail: pembatasan percobaan punya pesan khusus dan tidak menandai kolom salah'); }
+    { const t = mk(true); t.f.loginFail(Object.assign(new Error('Username atau PIN salah.'), {server: true, cred: true}));
+      ok(t.els['#lerr'].textContent === 'Username atau PIN salah.' && t.els['#lu'].attrs['aria-invalid'] === 'true' && t.els['#lp'].attrs['aria-invalid'] === 'true', 'loginFail: kredensial salah menandai kedua kolom'); }
+    { const t = mk(true); t.f.loginFail(Object.assign(new Error('Akun belum diaktifkan di outlet mana pun. Hubungi Owner.'), {server: true}));
+      ok(t.els['#lerr'].textContent.startsWith('Akun belum') && !t.els['#lu'].attrs['aria-invalid'], 'loginFail: galat bisnis lain tampil apa adanya tanpa menandai kolom'); }
+    { const t = mk(true); t.f.loginFail(new Error('Tidak ada koneksi ke server'));
+      ok(t.els['#lerr'].textContent === 'Tidak ada koneksi. Periksa internet lalu coba lagi.' && t.logged.length === 1, 'loginFail: galat jaringan: pesan manusiawi, detail ke log'); }
+    { const t = mk(false); t.f.loginFail(new TypeError('Failed to fetch'));
+      ok(t.els['#lerr'].textContent === 'Tidak ada koneksi. Periksa internet lalu coba lagi.' && !/Failed to fetch/.test(t.els['#lerr'].textContent), 'loginFail: perangkat offline: "Failed to fetch" tidak bocor ke layar'); }
+    { const t = mk(true); t.f.loginFail(new TypeError("Cannot read properties of undefined (reading 'x')"));
+      ok(/^Terjadi masalah di aplikasi\./.test(t.els['#lerr'].textContent) && !/Cannot read/.test(t.els['#lerr'].textContent) && /Cannot read/.test(t.logged[0]), 'loginFail: galat tak terduga: pesan umum, detail teknis hanya di log'); }
+    { const t = mk(true), btn = {a: {}, setAttribute(k, v) { this.a[k] = v; }};
+      t.f.pinToggle(btn); ok(t.els['#lp'].type === 'text' && btn.a['aria-pressed'] === 'true', 'pinToggle: PIN terlihat, aria-pressed=true');
+      t.f.pinToggle(btn); ok(t.els['#lp'].type === 'password' && btn.a['aria-pressed'] === 'false', 'pinToggle: klik lagi menyembunyikan PIN'); }
+  }
+  const ad = rd('web/js/sb-adapter.js');
+  ok(/status === 429\) throw fail\([^)]*\{limit: true\}\)/.test(ad) && /\{cred: true\}/.test(ad) && /r\.status >= 500\) throw fail\('Server sedang bermasalah/.test(ad), 'adapter login: 429 bertanda limit, salah PIN bertanda cred, 5xx tidak lagi disebut "PIN salah"');
+}
 console.log('Semua lulus (' + n + ' pemeriksaan)');

@@ -12,7 +12,7 @@ function outletSheet() {
 }
 async function outletPick(id) {
   if (S.data.outlet && id === S.data.outlet.id) return closeSheet();
-  if (S.cart.length && !confirm('Keranjang berisi ' + S.cart.length + ' item dan akan dikosongkan karena pindah outlet. Lanjutkan?')) return;
+  if (S.cart.length && !await confirmBox({title: 'Pindah outlet?', msg: 'Keranjang berisi ' + S.cart.length + ' item dan akan dikosongkan karena pindah outlet.', stay: 'Tetap di sini', leave: 'Pindah outlet'})) return;
   await busy('Memuat outlet…', async () => {
     try {
       await api('outlet.use', {id: id}); S.cart = []; LS.set('cart', []); S.rhist = null; VC = {}; S.users = null; S.expLoaded = false;

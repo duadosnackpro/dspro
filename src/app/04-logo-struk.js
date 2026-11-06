@@ -135,9 +135,9 @@ function logoSave() {
   const e = LGE; if (!e || !e.out) return; const first = !logoGet();
   return busy('Menyimpan logo…', async () => { try { await api('setting.logo', {data: logoEncode(e.out), aktif: first}); await loadData(); closeSheet(); render(); toast('Logo disimpan'); } catch (er) { toast(er.message); } });
 }
-function logoDel() {
+async function logoDel() {
   if (S.dirty) return toast('Simpan perubahan pengaturan dulu.');
-  if (!confirm('Hapus logo struk?')) return;
+  if (!await confirmBox({title: 'Hapus logo struk?', msg: 'Struk berikutnya dicetak tanpa logo.', stay: 'Batal', leave: 'Hapus logo'})) return;
   return busy('Menghapus logo…', async () => { try { await api('setting.logo', {data: ''}); await loadData(); render(); toast('Logo dihapus'); } catch (er) { toast(er.message); } });
 }
 function logoCard() { // isi kartu "Logo struk" di Pengaturan (di luar tombol-tombol sakelar)

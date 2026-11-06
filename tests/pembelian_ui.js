@@ -10,7 +10,7 @@ const shared = pick(/function dnum\(s\) \{[\s\S]*?\n\}/) + '\n' + pick(/const CA
 
 function boot(role, o) {
   o = o || {};
-  const els = {}, calls = [], toasts = [], store = {}, confirms = [];
+  const els = {}, calls = [], toasts = [], store = {}, confirms = [], ferrs = [];
   const $ = sel => els[sel] || (els[sel] = {innerHTML: '', value: '', textContent: '', placeholder: '', disabled: false, hidden: false, dataset: {}, focus() {}});
   const S = {data: {user: {role: role}, settings: {}, suppliers: [], variants: [{id: 'v1', stok: 5, hpp_rata2: 1000}],
       materials: [{id: 'm1', nama: 'Tepung', satuan: 'kg', stok: 10, tipe: 'bahan'}, {id: 'm2', nama: 'Gula', satuan: 'kg', stok: 0, tipe: 'bahan'}]},
@@ -20,13 +20,13 @@ function boot(role, o) {
   const ctx = {S: S, $: $, document: {querySelectorAll: () => []}, esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'),
     rp: x => 'Rp ' + Math.round(Number(x) || 0), num: x => String(x), qf: x => String(Math.round(Number(x) * 1000) / 1000).replace('.', ','), r6: x => Math.round(Number(x) * 1e6) / 1e6,
     svg: () => '', cfg: () => '', pById: () => null, vById: id => S.data.variants.find(v => v.id === id), vName: () => 'Basreng', vSub: () => '100g', lvText: () => '', wrapChips: h => '<div class="chips">' + h + '</div>', emptyState: () => '',
-    skel: () => '', sheet: h => { ctx.__sheet = h; }, closeSheet: () => { ctx.__closed = true; }, render: () => {}, toast: m => toasts.push(m), busy: (l, fn) => fn(),
+    skel: () => '', sheet: h => { ctx.__sheet = h; }, closeSheet: () => { ctx.__closed = true; }, render: () => {}, toast: m => toasts.push(m), fieldErr: (t, m) => { ferrs.push(t); toasts.push(m); }, busy: (l, fn) => fn(),
     LS: {get: (k, d) => k in store ? store[k] : d, set: (k, v) => { store[k] = JSON.parse(JSON.stringify(v)); }},
     api: async (op, body) => { calls.push({op: op, body: JSON.parse(JSON.stringify(body || {}))}); const r = ctx.__reply[op]; return typeof r === 'function' ? r(body) : r; },
     loadData: async () => { calls.push({op: 'loadData'}); }, newReqId: (() => { let i = 0; return () => 'rid-test-' + (++i); })(),
     confirmBox: async o2 => { confirms.push(o2); return ctx.__confirmAnswer; }, __reply: {}, __confirmAnswer: true};
   const fn = new Function('ctx', 'with (ctx) {\n' + shared + '\n' + stok + '\nreturn {pbAdd, pbSave, pbSheet, pbTouch, pbRead, pbSetMode, pbRefUpd, pbLastLoad, adjSheet, adjSave, adjHppUpd, pbBase, pbRef, PB_WARN, pbPackOf, stPack, stokList};\n}');
-  return Object.assign({S: S, els: els, $: $, calls: calls, toasts: toasts, store: store, confirms: confirms, ctx: ctx}, fn(ctx));
+  return Object.assign({S: S, els: els, $: $, calls: calls, toasts: toasts, ferrs: ferrs, store: store, confirms: confirms, ctx: ctx}, fn(ctx));
 }
 const setSat = (m, id, q, h) => { m.$('#pb_m').value = id; m.$('#pb_q').value = q; m.$('#pb_h').value = h; };
 const setKem = (m, id, nk, nm, isi, hk) => { m.S.pb.mode = 'kem'; m.$('#pb_m').value = id; m.$('#pk_n').value = nk; m.$('#pk_nm').value = nm; m.$('#pk_i').value = isi; m.$('#pk_h').value = hk; };
@@ -54,7 +54,7 @@ const setKem = (m, id, nk, nm, isi, hk) => { m.S.pb.mode = 'kem'; m.$('#pb_m').v
   ok(m.calls.some(c => c.op === 'loadData') && /sudah tercatat/.test(m.toasts[m.toasts.length - 1]), 'jawaban duplikat: data disegarkan dan pengguna diberi tahu');
   ok(m.calls.filter(c => c.op === 'purchase.create')[0].body.request_id.indexOf('rid-test-') === 0, 'request_id dibuat bila belum ada');
 
-  m = boot('owner'); m.S.pb.items = []; await m.pbSave(); ok(!m.calls.length && /kosong/.test(m.toasts[0]), 'daftar kosong tidak dikirim');
+  m = boot('owner'); m.S.pb.items = []; await m.pbSave(); ok(!m.calls.length && /kosong/.test(m.toasts[0]) && m.ferrs[0] === '[data-act="pbadd"]', 'daftar kosong tidak dikirim, galat tampil di dekat tombol Tambah');
 
   const built = rd('web/js/app.js');
   ok(/pbdel: el => \{[^}]*pbTouch\(\)/.test(built), 'menghapus baris pembelian mengganti request_id');
@@ -86,7 +86,8 @@ const setKem = (m, id, nk, nm, isi, hk) => { m.S.pb.mode = 'kem'; m.$('#pb_m').v
   ok(m.confirms.length === 1 && /harga beli terakhir/.test(m.confirms[0].msg), 'peran tanpa akses biaya: pembanding = harga beli terakhir');
   m = boot('stok'); setSat(m, 'm1', '1', '160000'); await m.pbAdd(); ok(!m.confirms.length && m.S.pb.items.length === 1, 'tanpa pembanding sama sekali: tidak ada peringatan');
   m = boot('owner', {hpp: 15800, last: {m1: {harga: 16000, waktu: ''}}}); ok(m.pbBase(m.pbRef('m1')).nm === 'HPP rata-rata', 'bila HPP terlihat, HPP rata-rata jadi pembanding utama peringatan');
-  m = boot('owner', {hpp: 16000}); setSat(m, 'm1', '', ''); await m.pbAdd(); ok(/Isi jumlah dan harga/.test(m.toasts[0]) && !m.S.pb.items.length, 'isian kosong ditolak');
+  m = boot('owner', {hpp: 16000}); setSat(m, 'm1', '', ''); await m.pbAdd(); ok(/jumlah lebih dari 0/.test(m.toasts[0]) && m.ferrs[0] === '#pb_q' && !m.S.pb.items.length, 'isian kosong ditolak, galat menunjuk kolom jumlah');
+  setSat(m, 'm1', '2', ''); m.ferrs.length = 0; m.toasts.length = 0; await m.pbAdd(); ok(/harga satuan/.test(m.toasts[0]) && m.ferrs[0] === '#pb_h', 'jumlah sudah benar tetapi harga kosong: galat menunjuk kolom harga');
   m = boot('owner', {hpp: 16000}); m.S.pb.rid = 'rid-lama-1234'; setSat(m, 'm1', '1', '16000'); await m.pbAdd(); ok(m.S.pb.rid === '', 'menambah baris mengganti request_id');
 
   // ===== 4. input per kemasan =====
@@ -97,7 +98,7 @@ const setKem = (m, id, nk, nm, isi, hk) => { m.S.pb.mode = 'kem'; m.$('#pb_m').v
   ok(JSON.stringify(m.store.pbpack) === '{"m1":{"nm":"karung","isi":25}}', 'nama dan isi kemasan diingat per bahan');
   setKem(m, 'm1', '1', 'karung', '3', '400000'); ok(m.pbRead().h === 133333.3333, 'harga per satuan dibulatkan 4 desimal (sesuai kolom server)');
   setKem(m, 'm1', '1', 'karung', '25', '4000000'); m.ctx.__confirmAnswer = false; m.confirms.length = 0; await m.pbAdd(); ok(m.confirms.length === 1 && /900%/.test(m.confirms[0].msg), 'salah nol pada harga kemasan juga tertangkap peringatan');
-  setKem(m, 'm1', '1', 'karung', '', '400000'); m.toasts.length = 0; await m.pbAdd(); ok(/isi per kemasan/.test(m.toasts[0]), 'isi per kemasan kosong ditolak dengan pesan yang jelas');
+  setKem(m, 'm1', '1', 'karung', '', '400000'); m.toasts.length = 0; await m.pbAdd(); ok(/isi per kemasan/i.test(m.toasts[0]) && m.ferrs[m.ferrs.length - 1] === '#pk_i', 'isi per kemasan kosong ditolak dengan pesan yang jelas, di kolomnya');
   setKem(m, 'm1', '1', '', '25', '400000'); ok(m.pbRead().label === '1 kemasan × 25 kg', 'nama kemasan kosong memakai kata "kemasan"');
   m.pbSheet(); ok(/id="pb_kem">/.test(m.ctx.__sheet) && /id="pb_sat" hidden>/.test(m.ctx.__sheet), 'mode kemasan: bagian kemasan tampil, bagian per satuan tersembunyi');
   ok(/placeholder="karung"/.test(m.ctx.__sheet) && /value="karung"/.test(m.ctx.__sheet) && /value="25"/.test(m.ctx.__sheet), 'form kemasan terisi nama dan isi yang diingat');
@@ -128,7 +129,7 @@ const setKem = (m, id, nk, nm, isi, hk) => { m.S.pb.mode = 'kem'; m.$('#pb_m').v
   m = boot('stok'); m.S.pbLast = {}; m.adjSheet('bahan', 'm2'); ok(!m.$('#a_h').disabled && /hanya untuk HPP awal/.test(m.$('#a_hw').innerHTML), 'peran stok + bahan tanpa riwayat: kolom tetap terbuka untuk HPP awal, dengan catatan');
   m = boot('stok'); m.S.pbLast = {m1: {harga: 1, waktu: ''}}; m.adjSheet('bahan', 'm1'); m.ctx.__reply['stock.adjust'] = {stok: 9, hpp_rata2: 1}; m.$('#a_s').value = '9'; m.$('#a_r').value = 'opname'; await m.adjSave('bahan', 'm1');
   ok(m.calls.find(c => c.op === 'stock.adjust').body.hpp === '' && !m.confirms.length, 'peran stok yang terkunci tetap bisa koreksi stok (HPP tidak dikirim)');
-  m = boot('owner', {hpp: 16000}); m.adjSheet('bahan', 'm1'); m.$('#a_h').value = 'abc'; await m.adjSave('bahan', 'm1'); ok(/tidak valid/.test(m.toasts[0]) && !m.calls.some(c => c.op === 'stock.adjust'), 'HPP bukan angka ditolak sebelum dikirim');
+  m = boot('owner', {hpp: 16000}); m.adjSheet('bahan', 'm1'); m.$('#a_h').value = 'abc'; await m.adjSave('bahan', 'm1'); ok(/tidak valid/.test(m.toasts[0]) && m.ferrs[0] === '#a_h' && !m.calls.some(c => c.op === 'stock.adjust'), 'HPP bukan angka ditolak sebelum dikirim');
 
   // ===== 5. kemasan beli di Data Master (0037): isi otomatis dan tampilan "≈ N pack" =====
   m = boot('owner'); Object.assign(m.S.data.materials[0], {nama: 'Plastik', satuan: 'pcs', stok: 72, pack_nama: 'pack', pack_isi: 24});

@@ -1,7 +1,7 @@
 /* ---------- Menu, data master, pengguna, pengaturan ---------- */
 const standalone = () => !!((window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true);
-function confirmLogout() {
-  const p = S.queue.length; if (!confirm(p ? 'Masih ada ' + p + ' transaksi yang belum terkirim ke server. Transaksi itu tetap tersimpan di perangkat dan dikirim saat Anda masuk lagi. Tetap keluar?' : 'Keluar dari akun ini?')) return;
+async function confirmLogout() {
+  const p = S.queue.length; if (!await confirmBox({title: p ? 'Masih ada transaksi belum terkirim' : 'Keluar dari akun ini?', msg: p ? 'Ada ' + p + ' transaksi yang belum terkirim ke server. Transaksi itu tetap tersimpan di perangkat dan dikirim saat Anda masuk lagi.' : 'Anda perlu masuk lagi untuk memakai aplikasi.', stay: 'Tetap masuk', leave: p ? 'Tetap keluar' : 'Keluar'})) return;
   S.dirty = false; logout();
 }
 function vMenu() {
@@ -93,8 +93,10 @@ async function mSave(id) {
   ['harga_jual', 'fee_persen', 'fee_tetap', 'stok_minimum', 'nominal', 'faktor_kecil'].forEach(k => { if (k in data) data[k] = dnum(data[k]) || 0; });
   if (S.mt === 'materials') {   // 0037: nama dan isi kemasan beli harus lengkap berdua, atau kosong keduanya
     const dd = /** @type {any} */ (data), nm = String(dd.pack_nama || '').trim(), isi = dd.pack_isi === '' || dd.pack_isi == null ? 0 : dnum(dd.pack_isi);
-    if ((nm && !(isi > 0)) || (!nm && isi > 0)) { toast('Isi nama kemasan dan isi per kemasan berdua, atau kosongkan keduanya'); return; }
-    if (isi >= 1000000 || nm.length > 30) { toast('Isi kemasan terlalu besar atau nama kemasan terlalu panjang (maks. 30 huruf)'); return; }
+    if (nm && !(isi > 0)) { fieldErr('#sheet [data-f="pack_isi"]', 'Isi per kemasan wajib diisi bila nama kemasan diisi (atau kosongkan keduanya)'); return; }
+    if (!nm && isi > 0) { fieldErr('#sheet [data-f="pack_nama"]', 'Nama kemasan wajib diisi bila isi per kemasan diisi (atau kosongkan keduanya)'); return; }
+    if (isi >= 1000000) { fieldErr('#sheet [data-f="pack_isi"]', 'Isi kemasan terlalu besar'); return; }
+    if (nm.length > 30) { fieldErr('#sheet [data-f="pack_nama"]', 'Nama kemasan terlalu panjang (maks. 30 huruf)'); return; }
     dd.pack_nama = nm || ''; dd.pack_isi = isi > 0 ? Math.round(isi * 10000) / 10000 : '';
   }
   try { const rec = await api('master.save', {table: S.mt, data: data}); S.expLoaded = false; if (!patchMaster(S.mt, rec)) await loadData();
@@ -118,8 +120,8 @@ function patchRecipe(r) {
   S.data.recipe_items = (S.data.recipe_items || []).filter(x => x.recipe_id !== rec.id).concat(r.items); LS.set('data', S.data); return true;
 }
 async function mDel(id) {
+  if (!await confirmBox({title: 'Hapus data ini?', msg: 'Data ini akan dihapus dari daftar.', stay: 'Batal', leave: 'Hapus'})) return;
   return busy('Menghapus…', async () => {
-  if (!confirm('Hapus data ini?')) return;
   try { await api('master.remove', {table: S.mt, id: id}); S.expLoaded = false; await loadData(); closeSheet(); render(); toast('Dihapus'); } catch (e) { toast(e.message); }
   });
 }
@@ -150,8 +152,8 @@ function ueditSheet(id) {
 async function uSave(id) {
   return busy('Menyimpan pengguna…', async () => {
   const d = readForm(); if (id) { d.id = id; const cur = (S.users.find(x => x.id === id) || {}).role; if (!d.role || d.role === cur) delete d.role; }   // P0-1: kirim peran hanya bila benar-benar diubah
-  if (!id && !d.role) { toast('Pilih peran.'); return; }
-  { const role = d.role || (S.users.find(x => x.id === id) || {}).role, cp = d.pin ? credProblem(String(d.pin), role) : null; if (cp) { toast(cp); return; } }   // server tetap memeriksa ulang
+  if (!id && !d.role) { fieldErr('#sheet [data-f="role"]', 'Pilih peran.'); return; }
+  { const role = d.role || (S.users.find(x => x.id === id) || {}).role, cp = d.pin ? credProblem(String(d.pin), role) : null; if (cp) { fieldErr('#sheet [data-f="pin"]', cp); return; } }   // server tetap memeriksa ulang
   try { await api('user.save', d); closeSheet(); vUsers(); toast('Tersimpan'); } catch (e) { toast(e.message); }
   });
 }

@@ -23,7 +23,7 @@ async function tutupList() { await vload('shift.list', {}, L => { let el = $('#t
     (x._ro ? '<button class="chip" data-act="shreopen" data-id="' + esc(x.id) + '">Salah input? Buka kembali</button> ' : '') + (x.disetujui ? '<div><span class="tag">Ditinjau</span> ' + esc(x.disetujui_oleh || '') + (x.catatan_tinjau ? ' · ' + esc(x.catatan_tinjau) : '') + '</div>' : (Number(x.selisih_tunai) !== 0 && can('approve') && x.kasir_id !== S.data.user.uid ? '<button class="chip" data-act="shapp" data-id="' + esc(x.id) + '" data-d="' + esc(x.selisih_tunai) + '">Tandai ditinjau</button>' : '')) + '</div></div>').join('') : '<p class="muted">Belum ada.</p>'); el.innerHTML = h; }); }
 async function tutupSimpan() {
   const v = dnum(($('#tf') || {}).value);
-  if (isNaN(v) || v < 0 || ($('#tf') || {}).value === '') return toast('Isi jumlah uang tunai di laci');
+  if (isNaN(v) || v < 0 || ($('#tf') || {}).value === '') return fieldErr('#tf', 'Isi jumlah uang tunai di laci (0 atau lebih)');
   if (mineAll().length) return toast('Masih ada transaksi belum terkirim');
   return busy('Menutup kasir…', async () => { try { S.shiftOpen = false; const r = await api('shift.close', {uang_fisik: v, catatan: ($('#tn') || {}).value || ''}); const d = r.selisih_tunai, kv = (a, b) => '<div class="kv"><span>' + a + '</span><span>' + b + '</span></div>';
     $('#tbody').innerHTML = '<div class="okmark">' + svg('check', 30) + '</div><h2 class="c">Kasir ditutup</h2><div class="li" style="display:block">' + kv('Jumlah transaksi', num(r.jumlah_trx)) + kv('Tunai (setelah retur)', rp(r.tunai)) + kv('Transfer', rp(r.transfer)) + kv('QRIS', rp(r.qris)) + (r.lain ? kv('Lainnya', rp(r.lain)) : '') + (r.retur ? kv('Retur di shift ini', rp(r.retur)) : '') + kv('<b>Total</b>', '<b>' + rp(r.total) + '</b>') + '</div>' +
@@ -33,12 +33,12 @@ async function tutupSimpan() {
 
 
 async function kasOpen() {
-  const m = dnum(($('#tm') || {}).value || '0'); if (isNaN(m) || m < 0) return toast('Modal awal harus berupa angka 0 atau lebih');
+  const m = dnum(($('#tm') || {}).value || '0'); if (isNaN(m) || m < 0) return fieldErr('#tm', 'Modal awal harus berupa angka 0 atau lebih');
   return busy('Membuka kasir…', async () => { try { await api('shift.open', {modal_awal: m}); S.shiftOpen = true; toast('Kasir dibuka'); vTutup(); } catch (e) { toast(e.message); } });
 }
 async function kasMove() {
-  const n = dnum(($('#mn') || {}).value), a = (($('#ma') || {}).value || '').trim(); if (!(n > 0)) return toast('Isi nominal lebih dari 0'); if (a.length < 3) return toast('Alasan wajib diisi');
-  const j = ($('#mj') || {}).value, k = ($('#mk') || {}).value || ''; if (j === 'out' && !k) return toast('Pilih kategori biaya untuk kas keluar');
+  const n = dnum(($('#mn') || {}).value), a = (($('#ma') || {}).value || '').trim(); if (!(n > 0)) return fieldErr('#mn', 'Isi nominal lebih dari 0'); if (a.length < 3) return fieldErr('#ma', 'Alasan wajib diisi (minimal 3 huruf)');
+  const j = ($('#mj') || {}).value, k = ($('#mk') || {}).value || ''; if (j === 'out' && !k) return fieldErr('#mk', 'Pilih kategori biaya untuk kas keluar');
   S.kmRid = S.kmRid || ((window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2)); // kirim ulang setelah timeout memakai id yang sama (tidak menggandakan)
   return busy('Mencatat…', async () => { try { await api('cash.move', {jenis: j, nominal: n, alasan: a, kategori: j === 'out' ? k : undefined, request_id: S.kmRid}); S.kmRid = null; toast('Tercatat'); vTutup(); } catch (e) { if (e.server && !e.retry) S.kmRid = null; toast(e.message); } });
 }
@@ -47,13 +47,12 @@ const shiftNeeded = () => can('sell') && S.wajibBuka && S.shiftOpen === false;
 
 /* F-17: supervisor/owner menandai selisih kas sudah ditinjau (catatan wajib bila ada selisih). */
 async function shiftApprove(id, diff) {
-  let note = ''; if (Number(diff) !== 0) { note = prompt('Catatan hasil tinjauan selisih Rp' + num(diff) + ' (min. 3 huruf):'); if (note === null) return; if (note.trim().length < 3) return toast('Catatan wajib diisi'); }
+  let note = ''; if (Number(diff) !== 0) { note = await promptBox({title: 'Tandai sudah ditinjau?', msg: 'Selisih kas Rp' + num(diff) + '. Tulis hasil tinjauan Anda, mis. selisih sudah dijelaskan.', label: 'Catatan tinjauan (min. 3 huruf)', err: 'Catatan wajib diisi (minimal 3 huruf).', stay: 'Batal', leave: 'Tandai ditinjau', tone: 'pri'}); if (note === null) return; }
   return busy('Menyimpan…', async () => { try { await api('shift.approve', {id: id, catatan: note.trim()}); toast('Ditandai ditinjau'); tutupList(); } catch (e) { toast(e.message); } });
 }
 
 /* 0031: buka kembali penutupan yang salah input (owner/admin; supervisor untuk kasir lain). Sesi kembali terbuka, lalu kasir menutup ulang dengan angka yang benar. */
 async function shiftReopen(id) {
-  const why = prompt('Buka kembali penutupan ini agar bisa diinput ulang?\nTulis alasannya (min. 3 huruf), mis. "salah ketik uang laci":'); if (why === null) return;
-  if (why.trim().length < 3) return toast('Alasan wajib diisi');
-  return busy('Membuka kembali…', async () => { try { await api('shift.reopen', {id: id, alasan: why.trim()}); S.shiftOpen = true; toast('Penutupan dibuka kembali. Silakan input ulang uang laci.'); vTutup(); } catch (e) { toast(e.message); } });
+  const why = await promptBox({title: 'Buka kembali penutupan ini?', msg: 'Sesi kasir terbuka lagi agar uang laci bisa diinput ulang. Tulis alasannya, mis. "salah ketik uang laci".', label: 'Alasan (min. 3 huruf)', err: 'Alasan wajib diisi (minimal 3 huruf).', stay: 'Batal', leave: 'Buka kembali'}); if (why === null) return;
+  return busy('Membuka kembali…', async () => { try { await api('shift.reopen', {id: id, alasan: why}); S.shiftOpen = true; toast('Penutupan dibuka kembali. Silakan input ulang uang laci.'); vTutup(); } catch (e) { toast(e.message); } });
 }

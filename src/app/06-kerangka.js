@@ -3,6 +3,7 @@ const MENU_TABS = ['menu', 'master', 'users', 'settings', 'resep', 'laporan', 's
 function render() {
   if (!S.token || !S.data) return renderLogin();
   if (!tabAllowed(S.tab)) S.tab = homeTab();
+  navTrack();
   const d = S.data; if (!S.ch || !d.channels.some(c => c.id === S.ch)) S.ch = d.channels[0] && d.channels[0].id;
   const o = own(), tabs = [['dash', 'Beranda'], ['kasir', 'Kasir'], ['riwayat', 'Riwayat'], ['stok', 'Stok'], ['produksi', 'Produksi'], ['menu', 'Menu']].filter(t => tabAllowed(t[0]) && !(o && t[0] === 'riwayat')),
     inMenu = MENU_TABS.concat(o ? ['riwayat'] : []).indexOf(S.tab) >= 0;
@@ -10,7 +11,7 @@ function render() {
     '<nav class="nav" aria-label="Menu utama">' + tabs.map(t => { const on = S.tab === t[0] || (t[0] === 'menu' && inMenu); return '<button data-act="tab" data-t="' + t[0] + '"' + (on ? ' aria-current="page"' : '') + ' class="' + (on ? 'on' : '') + '"><span class="ni">' + svg(t[0], 22) + '</span><span>' + t[1] + '</span></button>'; }).join('') + '</nav>';
   badge();
   (APP.views[S.tab] || vKasir)();
-  cartbar(); btTick();
+  cartbar(); btTick(); navSync();
 }
 function badge() {
   const b = $('#badge');

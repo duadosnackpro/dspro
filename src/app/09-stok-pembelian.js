@@ -57,7 +57,7 @@ function adjHppUpd() {
 async function adjSave(t, id) {
   const hv = String($('#a_h').value).trim(), st = adjHppState();
   if (hv !== '' && st && can('approve') && (st.known || st.maybe)) {   // menimpa HPP yang sudah berjalan: minta konfirmasi sebelum mengirim
-    const nv = dnum(hv); if (!(nv >= 0)) return toast('HPP tidak valid');
+    const nv = dnum(hv); if (!(nv >= 0)) return fieldErr('#a_h', 'HPP tidak valid. Isi angka 0 atau lebih, atau kosongkan kolomnya.');
     if (!(Math.abs(nv - st.cur) < 0.0001)) {
       const ok = await confirmBox({title: 'Timpa HPP rata-rata?', msg: 'HPP rata-rata ' + (st.bahan ? 'bahan' : 'produk') + ' ini hasil ' + st.src + (st.cur > 0 ? ' (' + pbRp(st.cur) + ')' : '') + ' akan diganti menjadi ' + pbRp(nv) + '. Laba semua penjualan berikutnya ikut berubah.', stay: 'Batal', leave: 'Ya, timpa HPP'});
       if (!ok) return;
@@ -131,8 +131,17 @@ function pbSetMode(m) {
   document.querySelectorAll('#sheet [data-act="pbmode"]').forEach(c => { const on = /** @type {any} */ (c).dataset.m === S.pb.mode; c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on)); });
   if (S.pb.mode === 'kem') pbPackDefault(pbVal('pb_m')); pbCalc();
 }
+/* Galat isian tambah baris pembelian: tunjuk kolom pertama yang belum benar (v2.6.13), bukan satu pesan umum. */
+function pbAddErr(x) {
+  const nv = id => dnum(pbVal(id));
+  if (!x) return fieldErr('#pb_m', 'Pilih bahan dulu');
+  if (S.pb.mode !== 'kem') return !(nv('pb_q') > 0) ? fieldErr('#pb_q', 'Isi jumlah lebih dari 0') : fieldErr('#pb_h', 'Isi harga satuan (Rp), 0 atau lebih');
+  if (!(nv('pk_n') > 0)) return fieldErr('#pk_n', 'Isi jumlah kemasan lebih dari 0');
+  if (!(nv('pk_i') > 0)) return fieldErr('#pk_i', 'Isi per kemasan harus lebih dari 0');
+  return fieldErr('#pk_h', 'Isi harga per kemasan (Rp), 0 atau lebih');
+}
 async function pbAdd() {
-  const x = pbRead(); if (!x || !x.ok) return toast(S.pb.mode === 'kem' ? 'Isi jumlah kemasan, isi per kemasan, dan harga kemasan' : 'Isi jumlah dan harga');
+  const x = pbRead(); if (!x || !x.ok) return pbAddErr(x);
   const b = pbBase(pbRef(x.id));
   if (b && Math.abs(x.h - b.v) / b.v > PB_WARN) {   // selisih besar terhadap pembanding: kemungkinan salah ketik nol atau salah satuan
     const up = x.h > b.v, pct = Math.round(Math.abs(x.h - b.v) / b.v * 100);
@@ -168,12 +177,12 @@ async function pbHist() {
   } catch (e) { $('#pbh').innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }
 }
 async function pbCancel(id) {
-  const why = prompt('Alasan membatalkan pembelian ini (min. 3 huruf):'); if (why === null) return; if (why.trim().length < 3) return toast('Alasan wajib diisi');
-  return busy('Membatalkan…', async () => { try { await api('purchase.cancel', {id: id, alasan: why.trim()}); await loadData(); toast('Pembelian dibatalkan, stok bahan dikembalikan'); pbHist(); } catch (e) { toast(e.message); } });
+  const why = await promptBox({title: 'Batalkan pembelian ini?', msg: 'Stok bahan dikembalikan seperti sebelum pembelian. Alasan dicatat di server.', label: 'Alasan (min. 3 huruf)', err: 'Alasan wajib diisi (minimal 3 huruf).', stay: 'Kembali', leave: 'Batalkan pembelian'}); if (why === null) return;
+  return busy('Membatalkan…', async () => { try { await api('purchase.cancel', {id: id, alasan: why}); await loadData(); toast('Pembelian dibatalkan, stok bahan dikembalikan'); pbHist(); } catch (e) { toast(e.message); } });
 }
 async function pbSave() {
   return busy('Menyimpan pembelian…', async () => {
-  const pb = S.pb, back = pb.back; if (!pb.items.length) return toast('Daftar masih kosong');
+  const pb = S.pb, back = pb.back; if (!pb.items.length) return fieldErr('[data-act="pbadd"]', 'Daftar masih kosong. Isi bahan, jumlah, dan harga, lalu ketuk Tambah.');
   if (!pb.rid) pb.rid = newReqId();   // dipakai ulang bila kirim ulang (ketuk dua kali, jaringan putus): server mengenali permintaan yang sama dan tidak menambah stok lagi
   try {
     const r = await api('purchase.create', {request_id: pb.rid, supplier_id: pb.sup, ongkir: Number(pb.ongkir) || 0, items: pb.items.map(i => ({material_id: i.id, qty: i.qty, harga_satuan: i.harga}))}), dup = !!(r && r.duplicate);

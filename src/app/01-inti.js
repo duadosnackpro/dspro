@@ -116,12 +116,36 @@ function watchMore() {
   moreIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting && e.target.isConnected) { moreIO.unobserve(e.target); /** @type {HTMLElement} */ (e.target).click(); } }), {rootMargin: '300px'});
   els.forEach(e => moreIO.observe(e));
 }
-function toast(m) { const t = $('#toast'); t.textContent = m; t.className = 'show'; clearTimeout(toast.t); toast.t = setTimeout(() => t.className = '', 2600); }
+/* v2.6.13: lama toast mengikuti panjang pesan (dulu tetap 2,6 dtk sehingga pesan panjang hilang sebelum selesai dibaca): dasar 1,8 dtk + 55 ms per huruf, 2,6 sampai 10 dtk. */
+const toastMs = s => Math.min(10000, Math.max(2600, 1800 + String(s).length * 55));
+function toast(m) { const t = $('#toast'), s = String(m == null ? '' : m); t.textContent = s; t.className = 'show'; clearTimeout(toast.t); toast.t = setTimeout(() => t.className = '', toastMs(s)); }
+/* v2.6.13: galat validasi tampil DI BAWAH kolomnya (role=alert, tidak hilang sendiri), kolom diberi aria-invalid + aria-describedby dan langsung difokuskan.
+   Hilang begitu kolom diubah. Target tidak ketemu (mis. layar sudah berganti) = jatuh ke toast, jadi pesan tidak pernah hilang tanpa terbaca. Selalu mengembalikan undefined supaya `return fieldErr(...)` tetap sama seperti `return toast(...)`. */
+let ferrN = 0;
+function fieldClear(/** @type {any} */ el) {
+  if (!el || !el.getAttribute) return; el.removeAttribute('aria-invalid');
+  const id = el.getAttribute('data-ferr'); if (!id) return; el.removeAttribute('data-ferr');
+  const box = document.getElementById(id); if (box) box.remove();
+  const rest = String(el.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && x !== id).join(' ');
+  if (rest) el.setAttribute('aria-describedby', rest); else el.removeAttribute('aria-describedby');
+}
+function fieldErr(/** @type {any} */ target, /** @type {string} */ msg) {
+  const el = typeof target === 'string' ? document.querySelector(target) : target;
+  if (!el || !el.isConnected || !el.insertAdjacentElement) { toast(msg); return; }
+  fieldClear(el);
+  const id = 'ferr' + (++ferrN), box = document.createElement('div');
+  box.id = id; box.className = 'ferr'; box.setAttribute('role', 'alert'); box.textContent = msg;
+  (el.closest && el.closest('label') || el).insertAdjacentElement('afterend', box);
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) el.setAttribute('aria-invalid', 'true');
+  el.setAttribute('data-ferr', id); el.setAttribute('aria-describedby', (String(el.getAttribute('aria-describedby') || '') + ' ' + id).trim());
+  try { el.focus(); if (el.scrollIntoView) el.scrollIntoView({block: 'center'}); } catch (e) { /* fokus tidak wajib */ }
+}
+['input', 'change'].forEach(ev => document.addEventListener(ev, e => { const t = /** @type {any} */ (e.target); if (t && t.getAttribute && t.getAttribute('data-ferr')) fieldClear(t); }, true));
 /* A: selama sheet terbuka, halaman di belakangnya tidak boleh terbaca pembaca layar maupun terjangkau Tab/ketuk (inert + aria-hidden). */
 function bgInert(on) { ['app', 'upd'].forEach(id => { const e = document.getElementById(id); if (!e) return; if (on) { e.setAttribute('inert', ''); e.setAttribute('aria-hidden', 'true'); } else { e.removeAttribute('inert'); e.removeAttribute('aria-hidden'); } }); }
 function sheet(html) {
   const b = $('#sheet'), opening = b.hidden; if (opening) { S.sheetFrom = document.activeElement; bgInert(true); }
-  b.innerHTML = '<div class="sheet-bg" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" tabindex="-1">' + html + '</div>'; b.hidden = false;
+  b.innerHTML = '<div class="sheet-bg" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" tabindex="-1">' + html + '</div>'; b.hidden = false; navSync();
   const d = /** @type {HTMLElement|null} */ (b.querySelector('.sheet')), h = d && d.querySelector('h2');
   if (!d) return;
   { const ttl = h ? h.textContent || '' : ''; if (opening || ttl !== S.sheetTtl) S.sheetDirty = false; S.sheetTtl = ttl; } // re-render dialog yang sama (mis. tambah bahan di resep) tidak menghapus tanda "belum disimpan"
@@ -140,7 +164,7 @@ function trapTab(/** @type {KeyboardEvent} */ e) {
   else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
   else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
 }
-function closeSheet() { S.sheetDirty = false; S.sheetTtl = ''; if (S.opin) { const r = S.opin.res; S.opin = null; r(null); } const b = $('#sheet'); S.qopen = false; b.hidden = true; b.innerHTML = ''; bgInert(false); try { const f = S.sheetFrom; S.sheetFrom = null; if (f && f.isConnected && f.focus) f.focus({preventScroll: true}); } catch (e) {} if (S.deferRender) { S.deferRender = false; render(); } if (S.conflictPending) setTimeout(notifyConflicts, 250); }
+function closeSheet() { S.sheetDirty = false; S.sheetTtl = ''; if (S.opin) { const r = S.opin.res; S.opin = null; r(null); } const b = $('#sheet'); S.qopen = false; b.hidden = true; b.innerHTML = ''; bgInert(false); navSync(); try { const f = S.sheetFrom; S.sheetFrom = null; if (f && f.isConnected && f.focus) f.focus({preventScroll: true}); } catch (e) {} if (S.deferRender) { S.deferRender = false; render(); } if (S.conflictPending) setTimeout(notifyConflicts, 250); }
 
 /* Pengaman form di dalam sheet: ketukan di luar kotak, tombol Esc, dan tombol Batal/Tutup tidak boleh membuang isian yang belum disimpan tanpa konfirmasi.
    Sheet dianggap "berisi isian" bila punya kolom input/select/textarea (kecuali kolom cari) dan sudah disentuh (diketik, diganti, atau ada tombol aksi diketuk di dalamnya).
@@ -155,28 +179,44 @@ function markSheetDirty(/** @type {Event} */ e) {
   S.sheetDirty = true;
 }
 ['input', 'change', 'click'].forEach(ev => document.addEventListener(ev, markSheetDirty, true)); // fase tangkap: tertandai sebelum aksi tombol (mis. simpan) berjalan
-/* Dialog konfirmasi di dalam aplikasi (pengganti confirm() bawaan browser, yang di PWA/ponsel sering tidak tampil atau tampak seperti galat).
-   Resolve true = pilih "leave" (tindakan yang membuang), false = tetap. Ketuk latar atau Esc = false, jadi tidak pernah membuang data tanpa disengaja. */
-function confirmBox(/** @type {{title:string,msg:string,stay:string,leave:string}} */ o) {
+/* Dialog di dalam aplikasi (pengganti confirm()/prompt() bawaan browser, yang di PWA/ponsel sering tidak tampil atau tampak seperti galat).
+   confirmBox: resolve true = pilih "leave" (tindakan yang dilakukan), false = tetap. Ketuk latar atau Esc = false, jadi tidak pernah membuang data tanpa disengaja.
+   promptBox (v2.6.13): sama, tetapi dengan kolom teks; resolve teks yang sudah dipangkas (minimal `min` huruf, salahnya tampil di bawah kolom dan dialog tetap terbuka) atau null bila dibatalkan.
+   Dialog ini ditumpuk DI ATAS sheet yang sedang terbuka (tidak menggantikannya) dan juga muncul di atas overlay "memuat" bila dipanggil dari dalam busy().
+   tone 'pri': tombol aksi berwarna utama (untuk tindakan yang tidak merusak); bawaan 'dan' (merah) dan tombol aman (stay) yang berwarna utama. */
+function confirmBox(/** @type {{title:string,msg:string,stay:string,leave:string,tone?:string}} */ o) { return dlgBox(o, null); }
+function promptBox(/** @type {{title:string,msg:string,stay:string,leave:string,label:string,min?:number,err?:string,tone?:string}} */ o) { return dlgBox(o, o); }
+function dlgBox(/** @type {any} */ o, /** @type {any} */ fld) {
   return new Promise(res => {
-    if (S.cfmOpen) return res(false);
-    S.cfmOpen = true; const prev = document.activeElement, sh = $('#sheet'), box = document.createElement('div');
+    const none = fld ? null : false;
+    if (S.cfmOpen) return res(none);
+    S.cfmOpen = true; const prev = document.activeElement, sh = $('#sheet'), bz = $('#busy'), hideBusy = !!(bz && !bz.hidden), box = document.createElement('div'), pri = o.tone === 'pri', min = fld ? (fld.min == null ? 3 : fld.min) : 0;
     box.id = 'cfm'; box.className = 'cfm';
-    box.innerHTML = '<div class="cfm-bg"></div><div class="cfm-box" role="alertdialog" aria-modal="true" aria-labelledby="cfm-h" aria-describedby="cfm-p"><div class="cfm-ic" aria-hidden="true">!</div><h3 id="cfm-h">' + esc(o.title) + '</h3><p id="cfm-p">' + esc(o.msg) + '</p>' +
-      '<button class="btn pri" data-cf="stay">' + esc(o.stay) + '</button><button class="btn dan" data-cf="leave">' + esc(o.leave) + '</button></div>';
-    document.body.appendChild(box); if (sh) sh.setAttribute('inert', '');
-    const btns = /** @type {HTMLElement[]} */ (Array.from(box.querySelectorAll('button')));
-    const done = (/** @type {boolean} */ v) => {
-      document.removeEventListener('keydown', onKey, true); box.remove(); S.cfmOpen = false; if (sh) sh.removeAttribute('inert');
-      try { if (prev && /** @type {any} */ (prev).isConnected && /** @type {any} */ (prev).focus) /** @type {any} */ (prev).focus({preventScroll: true}); } catch (e) {} res(v);
+    box.innerHTML = '<div class="cfm-bg"></div><div class="cfm-box" role="' + (fld ? 'dialog' : 'alertdialog') + '" aria-modal="true" aria-labelledby="cfm-h" aria-describedby="cfm-p"><div class="cfm-ic" aria-hidden="true">!</div><h3 id="cfm-h">' + esc(o.title) + '</h3><p id="cfm-p">' + esc(o.msg) + '</p>' +
+      (fld ? '<label class="cfm-f">' + esc(fld.label) + '<textarea class="inp ta" id="cfm-t" rows="3" maxlength="300" autocomplete="off"></textarea></label>' : '') +
+      '<button class="btn ' + (pri ? 'sec' : 'pri') + '" data-cf="stay">' + esc(o.stay) + '</button><button class="btn ' + (pri ? 'pri' : 'dan') + '" data-cf="leave">' + esc(o.leave) + '</button></div>';
+    document.body.appendChild(box); if (sh) sh.setAttribute('inert', ''); if (hideBusy && bz) bz.hidden = true;
+    const ta = /** @type {any} */ (box.querySelector('textarea')), btns = /** @type {HTMLElement[]} */ (Array.from(box.querySelectorAll('textarea,button')));
+    const done = (/** @type {any} */ v) => {
+      document.removeEventListener('keydown', onKey, true); box.remove(); S.cfmOpen = false; S.cfmCancel = null; if (sh) sh.removeAttribute('inert'); if (hideBusy && bz && S.busyOn) bz.hidden = false;
+      try { if (prev && /** @type {any} */ (prev).isConnected && /** @type {any} */ (prev).focus) /** @type {any} */ (prev).focus({preventScroll: true}); } catch (e) {}
+      navSync(); res(v);
     };
+    S.cfmCancel = () => done(none);
     const onKey = (/** @type {KeyboardEvent} */ e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); return; }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(none); return; }
       if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); const i = btns.indexOf(/** @type {HTMLElement} */ (document.activeElement)); btns[(i + (e.shiftKey ? btns.length - 1 : 1)) % btns.length].focus(); }
     };
     document.addEventListener('keydown', onKey, true);
-    box.addEventListener('click', e => { const t = /** @type {HTMLElement} */ (e.target), b = t.closest && /** @type {HTMLElement|null} */ (t.closest('[data-cf]')); e.stopPropagation(); if (b) done(b.dataset.cf === 'leave'); else if (t.classList.contains('cfm-bg')) done(false); });
-    btns[0].focus();
+    box.addEventListener('click', e => {
+      const t = /** @type {HTMLElement} */ (e.target), b = t.closest && /** @type {HTMLElement|null} */ (t.closest('[data-cf]')); e.stopPropagation();
+      if (!b) { if (t.classList.contains('cfm-bg')) done(none); return; }
+      if (b.dataset.cf !== 'leave') return done(none);
+      if (!fld) return done(true);
+      const v = String(ta.value || '').trim(); if (v.length < min) return fieldErr(ta, fld.err || 'Wajib diisi (minimal ' + min + ' huruf).');
+      done(v);
+    });
+    navSync(); (ta || btns[0]).focus();
   });
 }
 /* Tutup atas permintaan pengguna (ketuk latar, Esc, Batal/Tutup). Bila ada isian belum tersimpan: tampilkan peringatan dulu. */

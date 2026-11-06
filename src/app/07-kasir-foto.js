@@ -78,7 +78,7 @@ async function fotoLoad(file) {
   });
 }
 async function fotoDel() {
-  const pid = S.fotoFor; if (!pid || !confirm('Hapus foto produk ini?')) return;
+  const pid = S.fotoFor; if (!pid || !await confirmBox({title: 'Hapus foto produk ini?', msg: 'Kartu produk di Kasir kembali tanpa foto.', stay: 'Batal', leave: 'Hapus foto'})) return;
   return busy('Menghapus foto…', async () => { try { await api('produk.foto', {product_id: pid, data: ''}); fotoApply(pid, ''); toast('Foto dihapus'); } catch (e) { toast(e.message); } });
 }
 document.addEventListener('error', ev => { const t = ev.target; if (t && t.tagName === 'IMG' && t.hasAttribute('data-foto')) fotoErr(t); }, true); // error gambar tidak menggelembung: ditangkap di fase capture (CSP v1.9.7 melarang onerror inline; sebelumnya fotoErr juga tidak terjangkau dari atribut)
@@ -205,8 +205,8 @@ async function pay() {
   if (S.cart.some(l => !vById(l.v))) { S.cart = S.cart.filter(l => vById(l.v)); saveCart(); toast('Ada produk yang sudah tidak tersedia; keranjang diperbarui'); if (S.cart.length) { if (!isWide()) cartSheet(); } else closeSheet(); cartbar(); return; }
   { const bi = S.cart.findIndex(l => reqMissing(l) || optStale(l)); if (bi >= 0) { toast('Pilih ulang opsi untuk ' + vName(vById(S.cart[bi].v))); optOpen(S.cart[bi].v, bi); return; } }   // opsi wajib kosong atau sudah nonaktif
   const c = calc(), tunai = S.metode === 'tunai', terima = tunai ? (S.terima === '' ? c.total : Number(S.terima) || 0) : c.total;
-  if (tunai && terima < c.total) return toast('Uang diterima kurang');
-  { const mn = Number(cfg('bayar_referensi_min')); if (!tunai && mn > 0 && c.total >= mn && !String(S.ref || '').trim()) return toast('Isi nomor referensi ' + S.metode.toUpperCase() + ' (transaksi Rp' + num(mn) + ' ke atas)'); }
+  if (tunai && terima < c.total) return fieldErr('[data-in="terima"]', 'Uang diterima kurang ' + rp(c.total - terima));
+  { const mn = Number(cfg('bayar_referensi_min')); if (!tunai && mn > 0 && c.total >= mn && !String(S.ref || '').trim()) return fieldErr('[data-in="ref"]', 'Isi nomor referensi ' + S.metode.toUpperCase() + ' (transaksi Rp' + num(mn) + ' ke atas)'); }
   if (payMethods().indexOf(S.metode) < 0) { S.metode = payMethods()[0] || 'tunai'; LS.set('metode', S.metode); const mc = $('#mchips'); if (mc) mc.innerHTML = methodChips(); cashBox(); upd(); return toast('Metode bayar tidak tersedia, dipilih ' + S.metode.toUpperCase()); }
   S.paying = true; let rc;
   const rid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2), ts = Date.now(), override = {};

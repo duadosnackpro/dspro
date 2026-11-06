@@ -133,12 +133,12 @@ function pustakaEdit(id) {
     '<button type="button" class="btn pri" data-act="pgsave">Simpan</button><button type="button" class="btn sec" data-act="pustaka">Kembali</button>');
 }
 async function pustakaSave() {
-  const nama = (/** @type {any} */ ($('#pg_n')) || {}).value.trim(); if (!nama) return toast('Isi nama grup');
+  const nama = (/** @type {any} */ ($('#pg_n')) || {}).value.trim(); if (!nama) return fieldErr('#pg_n', 'Isi nama grup');
   const items = []; document.querySelectorAll('#sheet [data-pr]').forEach((e, n) => {
     const nm = (/** @type {any} */ (e.querySelector('[data-pn]'))).value.trim(), d = dnum((/** @type {any} */ (e.querySelector('[data-pd]'))).value) || 0, a = !!(/** @type {any} */ (e.querySelector('[data-pa]'))).checked, id = dsOf(e).pr;
     if (!nm && !id) return; items.push({id: id || undefined, nama: nm || undefined, selisih_harga: d, urutan: n + 1, aktif: a});
   });
-  if (items.some(x => x.selisih_harga < 0)) return toast('Tambahan harga tidak boleh negatif');
+  if (items.some(x => x.selisih_harga < 0)) return fieldErr(Array.from(document.querySelectorAll('#sheet [data-pd]')).find(e => dnum(/** @type {any} */ (e).value) < 0) || '#pg_items', 'Tambahan harga tidak boleh negatif');
   const body = {id: S.pgid || undefined, nama: nama, aktif: !!(/** @type {any} */ ($('#pg_a'))).checked, items: items};
   return busy('Menyimpan…', async () => {
     try { await api('opsi.grup_save', body); await loadData(); optReset(); S.pus = await api('opsi.pustaka', {}); pustakaList(); toast('Pustaka opsi tersimpan'); }

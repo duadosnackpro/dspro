@@ -54,22 +54,22 @@ function vLama() {
 }
 function bdAdd() {
   const v = vOf('bd_v'), q = Math.round(dnum(vOf('bd_q')) * 10000) / 10000, hs = vOf('bd_h').trim(), h = hs === '' ? null : dnum(hs);
-  if (!v) return toast('Pilih produk'); if (!(q > 0)) return toast('Isi jumlah lebih dari 0');
-  if (h != null && !(h >= 0)) return toast('Harga tidak valid');
-  if (h == null && priceOf(v, BD.ch) == null) return toast('Harga channel belum diatur untuk produk ini. Isi harga satuan.');
+  if (!v) return fieldErr('#bd_v', 'Pilih produk'); if (!(q > 0)) return fieldErr('#bd_q', 'Isi jumlah lebih dari 0');
+  if (h != null && !(h >= 0)) return fieldErr('#bd_h', 'Harga tidak valid. Isi angka 0 atau lebih.');
+  if (h == null && priceOf(v, BD.ch) == null) return fieldErr('#bd_h', 'Harga channel belum diatur untuk produk ini. Isi harga satuan.');
   const vr = vById(v), o = vr && hasOpt(vr) ? bdSelIds() : [];
-  if (vr && reqMissing({v: v, o: o})) return toast('Pilih opsi wajib: ' + optGroupsOf(vr.product_id).filter(x => x.wajib && !x.items.some(i => o.indexOf(i.id) >= 0)).map(x => x.g.nama).join(', '));
+  if (vr && reqMissing({v: v, o: o})) return fieldErr(Array.from(document.querySelectorAll('#bd_opt [data-bdo]')).find(e => !/** @type {any} */ (e).value) || '#bd_opt', 'Pilih opsi wajib: ' + optGroupsOf(vr.product_id).filter(x => x.wajib && !x.items.some(i => o.indexOf(i.id) >= 0)).map(x => x.g.nama).join(', '));
   const sel = /** @type {any} */ (document.getElementById('bd_v')), t = sel && sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : v;
   BD.items.push({v: v, t: String(t), qty: q, harga: h, o: o, ol: o.length ? optLabel(o) : ''}); BD.rid = '';   // opsi tetap terpilih untuk baris berikutnya (mis. beberapa porsi dengan level sama)
   const qe = /** @type {any} */ (document.getElementById('bd_q')), he = /** @type {any} */ (document.getElementById('bd_h')); if (qe) qe.value = ''; if (he) he.value = '';
   bdItems(); bdPh(); if (qe && qe.focus) qe.focus();
 }
 async function bdSave() {
-  if (!BD.items.length) return toast('Tambahkan minimal satu item');
-  if (!BD.ch) return toast('Pilih channel');
+  if (!BD.items.length) return fieldErr('#bd_v', 'Tambahkan minimal satu item: pilih produk dan jumlah, lalu ketuk Tambah ke transaksi.');
+  if (!BD.ch) return fieldErr('[data-bd="ch"]', 'Pilih channel');
   const when = new Date(BD.tgl + 'T' + (BD.jam || '12:00'));
-  if (!BD.tgl || isNaN(+when)) return toast('Isi tanggal dan jam');
-  if (+when >= Date.now()) return toast('Tanggal harus di masa lalu. Transaksi hari ini lewat Kasir.');
+  if (!BD.tgl || isNaN(+when)) return fieldErr('[data-bd="tgl"]', 'Isi tanggal dan jam');
+  if (+when >= Date.now()) return fieldErr('[data-bd="tgl"]', 'Tanggal harus di masa lalu. Transaksi hari ini lewat Kasir.');
   if (!navigator.onLine) return toast('Perlu koneksi internet');
   BD.rid = BD.rid || newReqId();
   const body = {request_id: BD.rid, tanggal: BD.tgl + ' ' + (BD.jam || '12:00') + ':00', channel_id: BD.ch, metode_bayar: BD.metode, potong_stok: !!BD.stok, catatan: BD.cat.trim(),

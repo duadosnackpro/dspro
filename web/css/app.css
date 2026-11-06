@@ -395,6 +395,11 @@ img,svg,canvas,video{max-width:100%}
 .cfm-ic{width:48px;height:48px;border-radius:50%;margin:0 auto var(--s3);display:flex;align-items:center;justify-content:center;background:var(--err-bg);color:var(--err);font:800 26px var(--head)}
 .cfm-box h3{margin:0 0 var(--s2);font:800 20px var(--head);color:var(--brand)}
 .cfm-box p{margin:0 0 var(--s3);color:var(--mut);font-size:15px}
+.cfm-f{display:block;text-align:left;margin:0 0 var(--s3)}
+/* Galat validasi inline (v2.6.13): tampil di bawah kolomnya, tidak hilang sendiri; warna dan teks (bukan warna saja) menandai galat */
+.ferr{margin:calc(var(--s2) * -1) 0 var(--s3);padding:var(--s2) var(--s3);border-radius:var(--r-sm);background:var(--err-bg);color:var(--err-ink);font-size:14px;font-weight:700;line-height:1.35;text-align:left}
+.ferr::before{content:"! ";content:"! " / "";font-weight:800}
+.inp[aria-invalid="true"]{border-color:var(--err);box-shadow:0 0 0 1px var(--err)}
 .ri-add{padding:var(--s3)}.ri-add .inp{min-height:46px;margin-bottom:var(--s2)}.ri-add .chips{margin:0 0 var(--s1)}.ri-add .btn{min-height:48px;margin-top:var(--s1)}
 /* Peringatan di lembar Stok/Pembelian: HPP yang diisi manual menimpa HPP hasil pembelian/produksi */
 .pbwarn{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn);border-radius:var(--r-sm);padding:var(--s3);margin:var(--s2) 0;font-size:14px}

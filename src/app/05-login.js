@@ -6,6 +6,7 @@ function renderLogin(msg) {
     '<label class="sw"><input type="checkbox" id="lsh"' + (LS.get('shared', false) ? ' checked' : '') + '><span class="sw-t" aria-hidden="true"></span><span class="sw-l"><b>Perangkat bersama</b><small>Hapus data lokal saat keluar</small></span></label>' +
     '<button class="btn pri big" data-act="login">Masuk</button><div class="err" id="lerr" role="alert">' + esc(msg || '') + '</div>' +
     (S.queue.length ? '<div class="muted">' + S.queue.length + ' transaksi menunggu dikirim setelah masuk.</div>' : '') + '</div></div>';
+  navSync();
 }
 async function doLogin() {
   const u = $('#lu').value.trim(), p = $('#lp').value; if (!u || !p) return;
@@ -15,7 +16,7 @@ async function doLogin() {
     /* Penguncian ganti user: antrean pengguna lain yang belum terkirim tidak boleh tertinggal atau tercampur. */
     const other = S.queue.filter(q => q.uid !== r.uid);
     if (other.length) {
-      if (can('takeover', r.role) && confirm('Ada ' + other.length + ' transaksi pengguna lain yang belum terkirim di perangkat ini.\n\nKirim atas nama mereka sekarang (diambil alih Owner)? Pilih Batal untuk membatalkan login.')) other.forEach(q => { q.by = r.uid; });
+      if (can('takeover', r.role) && await confirmBox({title: 'Ada antrean pengguna lain', msg: 'Ada ' + other.length + ' transaksi pengguna lain yang belum terkirim di perangkat ini. Kirim atas nama mereka sekarang (diambil alih Owner)? Pilih "Batalkan login" untuk membatalkan masuk.', stay: 'Batalkan login', leave: 'Ambil alih dan kirim'})) other.forEach(q => { q.by = r.uid; });
       else { try { await api('logout', {}, {silent: true}); } catch (e) {} S.token = null; throw Object.assign(new Error(can('takeover', r.role) ? 'Login dibatalkan. Antrean pengguna lain belum terkirim.' : 'Masih ada ' + other.length + ' transaksi pengguna lain yang belum terkirim di perangkat ini. Masuk sebagai pengguna tersebut dulu agar antrean terkirim, atau hubungi Owner.'), {server: true}); }
       LS.set('queue', S.queue);
     }

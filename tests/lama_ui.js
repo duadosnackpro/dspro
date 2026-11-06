@@ -8,20 +8,20 @@ const shared = pick(/function dnum\(s\) \{[\s\S]*?\n\}/) + '\n' + pick(/const T 
 
 function boot(o) {
   o = o || {};
-  const els = {}, calls = [], toasts = [], $ = sel => els[sel] || (els[sel] = {innerHTML: '', value: '', textContent: '', placeholder: '', focus() {}});
+  const els = {}, calls = [], toasts = [], ferrs = [], $ = sel => els[sel] || (els[sel] = {innerHTML: '', value: '', textContent: '', placeholder: '', focus() {}});
   const S = {tab: 'lama', data: {settings: o.settings || {}, channels: [{id: 'c1', nama: 'Shopee'}, {id: 'c2', nama: 'Offline'}], variants: [{id: 'v1', sku: 'BSR-70', nm: 'Basreng 70'}, {id: 'v2', sku: 'MKR-100', nm: 'Makaroni 100'}, {id: 'v3', sku: 'PGS-650', nm: 'Pangsit 650', product_id: 'p3'}],
     option_groups: [{id: 'g1', nama: 'Level', urutan: 1}, {id: 'g2', nama: 'Cara masak', urutan: 2}],
     option_items: [{id: 'i1', group_id: 'g1', nama: 'Level 1', selisih_harga: 0}, {id: 'i3', group_id: 'g1', nama: 'Level 3', selisih_harga: 1000}, {id: 'i4', group_id: 'g2', nama: 'Goreng', selisih_harga: 0}, {id: 'i5', group_id: 'g2', nama: 'Rebus', selisih_harga: 0}],
     product_options: [{product_id: 'p3', group_id: 'g1', wajib: true, default_item_id: null, urutan: 1}, {product_id: 'p3', group_id: 'g2', wajib: true, default_item_id: 'i4', urutan: 2}]}, rhist: 'x', expLoaded: true};
   const prices = {'v1|c2': 12000, 'v2|c2': 15000, 'v1|c1': 11000, 'v3|c2': 20000};
   const field = {};   // elemen berdasarkan id, untuk vOf (document.getElementById)
-  const document = {getElementById: id => id === 'bd_v' ? {value: field.bd_v || '', selectedOptions: [{textContent: 'Label ' + (field.bd_v || '')}]} : id in field ? {value: field[id], focus() {}} : null, addEventListener: (t, f) => { document.__h[t] = f; }, __h: {}};
+  const document = {getElementById: id => id === 'bd_v' ? {value: field.bd_v || '', selectedOptions: [{textContent: 'Label ' + (field.bd_v || '')}]} : id in field ? {value: field[id], focus() {}} : null, addEventListener: (t, f) => { document.__h[t] = f; }, querySelectorAll: () => [], __h: {}};
   const ctx = {S: S, $: $, document: document, esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), rp: x => 'Rp ' + Math.round(Number(x) || 0), num: x => String(x), qf: x => String(x),
-    idDate: d => String(d).slice(0, 10), vName: v => v.nm, vSub: () => '', pById: id => id === 'p3' ? {id: 'p3', pakai_opsi: true} : null, vById: id => S.data.variants.find(v => v.id === id) || null, cfg: k => S.data.settings[k], priceOf: (v, c) => (v + '|' + c) in prices ? prices[v + '|' + c] : null, toast: m => toasts.push(m), busy: (l, fn) => fn(),
+    idDate: d => String(d).slice(0, 10), vName: v => v.nm, vSub: () => '', pById: id => id === 'p3' ? {id: 'p3', pakai_opsi: true} : null, vById: id => S.data.variants.find(v => v.id === id) || null, cfg: k => S.data.settings[k], priceOf: (v, c) => (v + '|' + c) in prices ? prices[v + '|' + c] : null, toast: m => toasts.push(m), fieldErr: (t, m) => { ferrs.push(t); toasts.push(m); }, busy: (l, fn) => fn(),
     loadData: async () => { calls.push({op: 'loadData'}); }, render: () => {}, VC: {}, OWN_TABS: [], MENU_TABS: [], APP: {views: {}}, ACT: {}, navigator: {onLine: true}, window: {}, Date: Date, Math: Math,
     api: async (op, body) => { calls.push({op: op, body: JSON.parse(JSON.stringify(body))}); if (ctx.__fail) throw new Error(ctx.__fail); return {sale: {id: 's', nomor: 'T1-261031-00' + calls.length, tanggal: body.tanggal, total: 24000, metode: body.metode_bayar}}; }, __fail: null};
   const fn = new Function('ctx', 'with (ctx) {\n' + shared + '\n' + opsi + '\n' + src + '\nreturn {BD, vLama, bdAdd, bdSave, ACT, APP, OWN_TABS, MENU_TABS};\n}');
-  return Object.assign({S: S, els: els, field: field, calls: calls, toasts: toasts, ctx: ctx, document: document}, fn(ctx));
+  return Object.assign({S: S, els: els, field: field, calls: calls, toasts: toasts, ferrs: ferrs, ctx: ctx, document: document}, fn(ctx));
 }
 const add = (m, v, q, h) => { m.field.bd_v = v; m.field.bd_q = q; m.field.bd_h = h || ''; m.bdAdd(); };
 
@@ -34,9 +34,9 @@ const add = (m, v, q, h) => { m.field.bd_v = v; m.field.bd_q = q; m.field.bd_h =
   m = boot({settings: {bayar_qris: 'false'}}); m.vLama(); ok(!/QRIS/.test(m.els['#main'].innerHTML), 'metode yang dimatikan di Pengaturan tidak ditawarkan');
 
   m = boot(); m.vLama();
-  await m.bdSave(); ok(/minimal satu item/.test(m.toasts.pop()) && !m.calls.length, 'tanpa item ditolak di klien');
-  add(m, 'v1', '0', ''); ok(/lebih dari 0/.test(m.toasts.pop()), 'jumlah 0 ditolak');
-  add(m, 'v1', '2', '-5'); ok(/Harga tidak valid/.test(m.toasts.pop()) && !m.BD.items.length, 'harga negatif ditolak');
+  await m.bdSave(); ok(/minimal satu item/.test(m.toasts.pop()) && m.ferrs.pop() === '#bd_v' && !m.calls.length, 'tanpa item ditolak di klien, galat di kolom produk');
+  add(m, 'v1', '0', ''); ok(/lebih dari 0/.test(m.toasts.pop()) && m.ferrs.pop() === '#bd_q', 'jumlah 0 ditolak di kolom jumlah');
+  add(m, 'v1', '2', '-5'); ok(/Harga tidak valid/.test(m.toasts.pop()) && m.ferrs.pop() === '#bd_h' && !m.BD.items.length, 'harga negatif ditolak di kolom harga');
   m.BD.ch = 'c1'; add(m, 'v2', '1', ''); ok(/belum diatur/.test(m.toasts.pop()) && !m.BD.items.length, 'produk tanpa harga channel dan tanpa harga manual ditolak');
   m.BD.ch = 'c2'; add(m, 'v1', '2', ''); add(m, 'v2', '1,5', '14.000');
   ok(m.BD.items.length === 2 && m.BD.items[1].qty === 1.5 && m.BD.items[1].harga === 14000 && m.BD.items[0].harga === null, 'item masuk: jumlah desimal koma dan harga manual terbaca; harga kosong = harga channel');

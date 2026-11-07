@@ -473,3 +473,12 @@ img,svg,canvas,video{max-width:100%}
 .set-grp .set-card{margin:0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}
 .hg-h{margin:var(--s3) 0 var(--s1);font:800 15px var(--head);color:var(--brand)}
 .hg-cells{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s2)}.hg-c{flex:1 1 130px;min-width:0}.hg-c label{display:block}
+
+/* Riwayat: baris nota yang bisa diketuk + hasil pencarian (v2.7.0) */
+#crr[hidden],#crday[hidden]{display:none}
+.li.rli{display:block;padding:0}
+.rli-main{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);width:100%;min-height:56px;padding:var(--s3) var(--s4);background:none;border:0;border-radius:var(--r-md);font:inherit;color:inherit;text-align:left;cursor:pointer}
+.rli-main:active{background:var(--sunk)}
+.rli-t{display:block;min-width:0;flex:1;overflow-wrap:anywhere}.rli-s{display:block}.rli-n{flex:none;font-variant-numeric:tabular-nums}
+.rli-a{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--s2);padding:0 var(--s4) var(--s3)}
+@media (hover:hover){.rli-main:hover{background:var(--sunk)}}

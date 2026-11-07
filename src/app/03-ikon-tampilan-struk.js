@@ -114,10 +114,11 @@ function receiptDoc(rc, o) { // o: {w: lebar, rich: ukuran ganda + QR bawaan pri
   const add = (s, x) => D.push(Object.assign({s: s}, x)), hr = () => add('-'.repeat(w));
   if (!o.logo) { const nm = String(cfg('nama_usaha') || 'Duado Snack').toUpperCase(), z = rich && nm.length * 2 <= w; wrapWords(nm, z ? w >> 1 : w).forEach(x => add(x, {a: 'c', b: true, z: z ? 2 : 1})); }
   if (cfgOn('header_aktif', true)) noteLines(cfg('header_struk'), w).forEach(x => D.push(x));
-  hr();
-  const nomor = S.nomor[rc.rid] || '(menunggu sinkron)', kasir = String(rc.kasir || ''), kv = (k, v, lw, n) => ljust(k, lw) + ': ' + String(v).slice(0, n);
+  hr(); if (rc.retur) add('*** RETUR ***', {a: 'c', b: true}); if (rc.salinan) add('SALINAN STRUK', {a: 'c'}); // cetak ulang dari Riwayat (2.7.0)
+  const nomor = rc.nomor || S.nomor[rc.rid] || '(menunggu sinkron)', kasir = String(rc.kasir || ''), kv = (k, v, lw, n) => ljust(k, lw) + ': ' + String(v).slice(0, n);
   if (wide) { add(ljust(kv('No', nomor, 8, 18), 28) + kv('Waktu', hms(rc.time), 6, 12)); add(ljust(kv('Tanggal', dmy(rc.time), 8, 18), 28) + kv('Kasir', kasir, 6, 12)); add(kv('Via', rc.ch, 8, 38)); }
   else { add(kv('No', nomor, 6, 24)); add(kv('Waktu', dmy(rc.time) + ' ' + hms(rc.time), 6, 24)); if (kasir) add(kv('Kasir', kasir, 6, 24)); add(kv('Via', rc.ch, 6, 24)); }
+  if (rc.ref) add(kv('Asal', rc.ref, wide ? 8 : 6, 38));
   hr();
   if (wide) { // tabel: ITEM | QTY | HARGA | TOTAL (satu baris per item; nama panjang turun ke baris berikutnya)
     const Q = 4, H = 10, TT = 11, N = w - Q - H - TT - 3;
@@ -125,9 +126,10 @@ function receiptDoc(rc, o) { // o: {w: lebar, rich: ukuran ganda + QR bawaan pri
     rc.lines.forEach(l => wrapWords(l.n, N).forEach((x, i) => add(i ? x : ljust(x, N) + ' ' + rjust(String(l.q), Q) + ' ' + rjust(num(l.h), H) + ' ' + rjust(num(l.q * l.h), TT))));
   } else rc.lines.forEach(l => { wrapWords(l.n, w).forEach(x => add(x)); add(lr('  ' + l.q + ' x ' + num(l.h), num(l.q * l.h), w)); });
   const ind = wide ? 20 : 0, pad = ' '.repeat(ind), S2 = (a, b) => add(pad + lr(a, b, w - ind));
-  hr(); S2('Subtotal', num(rc.sub)); if (rc.dis) S2('Diskon', '-' + num(rc.dis)); if (rc.ppn) S2(T(cfg('ppn_inklusif')) ? 'PPN (incl.)' : 'PPN', num(rc.ppn));
+  hr(); S2('Subtotal', num(rc.sub)); if (rc.dis) S2('Diskon', rc.dis < 0 ? num(-rc.dis) : '-' + num(rc.dis)); if (rc.ppn) S2(T(cfg('ppn_inklusif')) ? 'PPN (incl.)' : 'PPN', num(rc.ppn));
   hr(); const tz = rich && 'TOTAL'.length + 1 + num(rc.total).length <= w >> 1; add(lr('TOTAL', num(rc.total), tz ? w >> 1 : w), {b: true, z: tz ? 2 : 1});
-  hr(); S2(pay === 'qris' ? 'QRIS' : pay.charAt(0).toUpperCase() + pay.slice(1), num(rc.terima)); if (pay === 'tunai') S2('Kembalian', num(rc.kembali));
+  hr(); const pl = pay === 'qris' ? 'QRIS' : pay.charAt(0).toUpperCase() + pay.slice(1);
+  if (rc.retur) S2('Refund ' + pl, num(-rc.total)); else { S2(pl, num(rc.terima)); if (pay === 'tunai') S2('Kembalian', num(rc.kembali)); }
   const ft = cfgOn('footer_aktif', true) ? noteLines(cfg('footer_struk'), w) : [], qr = String(cfg('qr_struk') || '').trim();
   if (ft.length || qr) hr();
   ft.forEach(x => D.push(x));

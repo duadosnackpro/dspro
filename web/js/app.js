@@ -606,10 +606,11 @@ function receiptDoc(rc, o) { // o: {w: lebar, rich: ukuran ganda + QR bawaan pri
   const add = (s, x) => D.push(Object.assign({s: s}, x)), hr = () => add('-'.repeat(w));
   if (!o.logo) { const nm = String(cfg('nama_usaha') || 'Duado Snack').toUpperCase(), z = rich && nm.length * 2 <= w; wrapWords(nm, z ? w >> 1 : w).forEach(x => add(x, {a: 'c', b: true, z: z ? 2 : 1})); }
   if (cfgOn('header_aktif', true)) noteLines(cfg('header_struk'), w).forEach(x => D.push(x));
-  hr();
-  const nomor = S.nomor[rc.rid] || '(menunggu sinkron)', kasir = String(rc.kasir || ''), kv = (k, v, lw, n) => ljust(k, lw) + ': ' + String(v).slice(0, n);
+  hr(); if (rc.retur) add('*** RETUR ***', {a: 'c', b: true}); if (rc.salinan) add('SALINAN STRUK', {a: 'c'}); // cetak ulang dari Riwayat (2.7.0)
+  const nomor = rc.nomor || S.nomor[rc.rid] || '(menunggu sinkron)', kasir = String(rc.kasir || ''), kv = (k, v, lw, n) => ljust(k, lw) + ': ' + String(v).slice(0, n);
   if (wide) { add(ljust(kv('No', nomor, 8, 18), 28) + kv('Waktu', hms(rc.time), 6, 12)); add(ljust(kv('Tanggal', dmy(rc.time), 8, 18), 28) + kv('Kasir', kasir, 6, 12)); add(kv('Via', rc.ch, 8, 38)); }
   else { add(kv('No', nomor, 6, 24)); add(kv('Waktu', dmy(rc.time) + ' ' + hms(rc.time), 6, 24)); if (kasir) add(kv('Kasir', kasir, 6, 24)); add(kv('Via', rc.ch, 6, 24)); }
+  if (rc.ref) add(kv('Asal', rc.ref, wide ? 8 : 6, 38));
   hr();
   if (wide) { // tabel: ITEM | QTY | HARGA | TOTAL (satu baris per item; nama panjang turun ke baris berikutnya)
     const Q = 4, H = 10, TT = 11, N = w - Q - H - TT - 3;
@@ -617,9 +618,10 @@ function receiptDoc(rc, o) { // o: {w: lebar, rich: ukuran ganda + QR bawaan pri
     rc.lines.forEach(l => wrapWords(l.n, N).forEach((x, i) => add(i ? x : ljust(x, N) + ' ' + rjust(String(l.q), Q) + ' ' + rjust(num(l.h), H) + ' ' + rjust(num(l.q * l.h), TT))));
   } else rc.lines.forEach(l => { wrapWords(l.n, w).forEach(x => add(x)); add(lr('  ' + l.q + ' x ' + num(l.h), num(l.q * l.h), w)); });
   const ind = wide ? 20 : 0, pad = ' '.repeat(ind), S2 = (a, b) => add(pad + lr(a, b, w - ind));
-  hr(); S2('Subtotal', num(rc.sub)); if (rc.dis) S2('Diskon', '-' + num(rc.dis)); if (rc.ppn) S2(T(cfg('ppn_inklusif')) ? 'PPN (incl.)' : 'PPN', num(rc.ppn));
+  hr(); S2('Subtotal', num(rc.sub)); if (rc.dis) S2('Diskon', rc.dis < 0 ? num(-rc.dis) : '-' + num(rc.dis)); if (rc.ppn) S2(T(cfg('ppn_inklusif')) ? 'PPN (incl.)' : 'PPN', num(rc.ppn));
   hr(); const tz = rich && 'TOTAL'.length + 1 + num(rc.total).length <= w >> 1; add(lr('TOTAL', num(rc.total), tz ? w >> 1 : w), {b: true, z: tz ? 2 : 1});
-  hr(); S2(pay === 'qris' ? 'QRIS' : pay.charAt(0).toUpperCase() + pay.slice(1), num(rc.terima)); if (pay === 'tunai') S2('Kembalian', num(rc.kembali));
+  hr(); const pl = pay === 'qris' ? 'QRIS' : pay.charAt(0).toUpperCase() + pay.slice(1);
+  if (rc.retur) S2('Refund ' + pl, num(-rc.total)); else { S2(pl, num(rc.terima)); if (pay === 'tunai') S2('Kembalian', num(rc.kembali)); }
   const ft = cfgOn('footer_aktif', true) ? noteLines(cfg('footer_struk'), w) : [], qr = String(cfg('qr_struk') || '').trim();
   if (ft.length || qr) hr();
   ft.forEach(x => D.push(x));
@@ -1587,14 +1589,16 @@ function refreshRc() { // pratinjau + cetak browser: logo (bila aktif) di atas t
 
 /* ---------- Riwayat ---------- */
 async function vRiwayat() {
-  const t0 = today(), day = S.day || t0; if (S.rlimDay !== day) { S.rlimDay = day; delete LIM.hist; } // hari berganti: mulai dari halaman pertama
+  const CRS = crState(), t0 = today(), day = S.day || t0; if (S.rlimDay !== day) { S.rlimDay = day; delete LIM.hist; } // hari berganti: mulai dari halaman pertama
   const yd = addDays(t0, -1), pre = S.rcustom ? 'custom' : day === t0 ? 'today' : day === yd ? 'yday' : 'custom';
   $('#main').innerHTML = wrapChips('<button class="chip ' + (pre === 'today' ? 'on' : '') + '" data-act="rday" data-p="today">Hari ini</button><button class="chip ' + (pre === 'yday' ? 'on' : '') + '" data-act="rday" data-p="yday">Kemarin</button><button class="chip ' + (pre === 'custom' ? 'on' : '') + '" data-act="rday" data-p="custom">Pilih tanggal</button>') +
-    '<p class="muted rcap">' + esc(idDate(day)) + '</p>' + (pre === 'custom' ? '<label>Tanggal<input type="date" class="inp" data-chg="day" value="' + day + '"></label>' : '') + '<div id="rq"></div><div id="rsum"></div><div id="rlist">' + skel(3) + '</div>';
+    '<p class="muted rcap">' + esc(idDate(day)) + '</p>' + (pre === 'custom' ? '<label>Tanggal<input type="date" class="inp" data-chg="day" value="' + day + '"></label>' : '') + '<label class="search u-mt8">' + svg('search', 18) + '<input id="crin" type="search" class="inp" data-in="cr" placeholder="Cari nomor nota, total, atau produk" value="' + esc(CRS.q) + '" aria-label="Cari transaksi" autocomplete="off" enterkeyhint="search"></label>' +
+    '<div id="crr" hidden></div><div id="crday"><div id="rq"></div><div id="rsum"></div><div id="rlist">' + skel(3) + '</div></div>';
   const qs = S.queue.map((q, i) => q.uid !== S.data.user.uid && q.by !== S.data.user.uid ? '' : '<div class="li"><div><b>' + rp(q.total) + '</b> <span class="muted">' + esc(q.ch) + ' · ' + fmtDT(q.ts).slice(11) + '</span>' + (q.ringkas ? '<div class="muted">' + esc(q.ringkas) + '</div>' : '') +
     (q.status === 'review' ? '<div class="u-err muted">' + esc(q.error) + '</div>' : '') + '</div><div class="r"><span class="tag ' + (q.status === 'review' ? 'red' : '') + '">' + (q.status === 'review' ? 'Perlu ditinjau' : 'Menunggu kirim') + '</span>' +
     (q.status === 'review' ? '<div>' + (qinfo(q).accept ? '<button class="chip" data-act="qaccept" data-i="' + i + '">Terima harga server</button> ' : '') + '<button class="chip" data-act="qretry" data-i="' + i + '">Coba lagi</button> <button class="chip" data-act="qdel" data-i="' + i + '">Hapus</button></div>' : '') + '</div></div>').join('');
   $('#rq').innerHTML = qs;
+  crMode(true); // ada kata kunci tersimpan: tampilkan hasil pencarian, bukan daftar harian
   const uid = S.data.user.uid, hist = S.rhist && S.rhist.uid === uid ? S.rhist : (S.rhist = {uid: uid, d: {}}), ent = hist.d[day];
   const paint = e => {
     if (S.tab !== 'riwayat' || !$('#rlist') || !$('#rsum')) return; const rows = e.rows; S.rcur = e;
@@ -1605,7 +1609,7 @@ async function vRiwayat() {
   };
   const paintList = e => { // v1.9.8: daftar bertahap; "Tampilkan lagi" hanya menggambar ulang daftar (KPI tidak dihitung ulang)
     if (S.tab !== 'riwayat' || !$('#rlist')) return; const rows = e.rows;
-    const rest = e.srv ? e.total - rows.length : 0; $('#rlist').innerHTML = (e.srv ? rows : rows.slice(0, lim('hist'))).map(r => '<div class="li"><div><b>' + esc(r.nomor) + '</b>' + (r.ref_sale_id ? ' <span class="tag red">Retur</span>' : '') + (r.review ? ' <span class="tag red">Perlu ditinjau</span>' : '') + '<div class="muted">' + esc(String(r.tanggal).slice(11, 16)) + ' · ' + esc(chName(r.channel_id)) + ' · ' + esc(r.metode_bayar) + '</div>' + (r.review && r.review_note ? '<div class="u-err muted">' + esc(r.review_note) + '</div>' : '') + '</div><div class="r"><b>' + rp(r.total) + '</b>' + (r.review && can('approve') ? '<div><button class="chip" data-act="sreview" data-id="' + esc(r.id) + '">Tandai ditinjau</button></div>' : '') + (r.status === 'selesai' && !r.ref_sale_id ? '<div><button class="chip" data-act="retur" data-id="' + esc(r.id) + '">Retur</button></div>' : '') + '</div></div>').join('') + (e.srv ? (rest > 0 ? '<button class="btn sec lmore" data-act="more" data-k="hist">Tampilkan ' + Math.min(rest, PGN.hist) + ' lagi (sisa ' + rest + ')</button>' : '') : moreBtn('hist', rows.length)) ||
+    const rest = e.srv ? e.total - rows.length : 0; $('#rlist').innerHTML = (e.srv ? rows : rows.slice(0, lim('hist'))).map(r => riwayatRow(r)).join('') + (e.srv ? (rest > 0 ? '<button class="btn sec lmore" data-act="more" data-k="hist">Tampilkan ' + Math.min(rest, PGN.hist) + ' lagi (sisa ' + rest + ')</button>' : '') : moreBtn('hist', rows.length)) ||
       emptyState('riwayat', 'Belum ada transaksi', 'Tidak ada transaksi pada ' + esc(idDate(day)) + '.', '<button class="btn pri" data-act="tab" data-t="kasir">Mulai transaksi</button>');
     watchMore();
   };
@@ -1625,6 +1629,91 @@ async function vRiwayat() {
   } catch (e) { if ($('#rlist') && !ent) $('#rlist').innerHTML = '<p class="muted">Tidak bisa memuat riwayat dari server (' + esc(e.message) + ').</p>'; }
 }
 
+/* ---------- Pencarian Riwayat dan detail nota (v2.7.0, migrasi 0042) ----------
+   Pencarian berjalan di server (sales.search): nomor nota, total, dan nama produk/SKU/label opsi, lintas hari (hari terpilih, 7, 30, atau 90 hari ke belakang),
+   dipaginasi 50 per halaman. Angka saja = nomor urut nota atau total. Mengetuk baris membuka struk lengkap dari server (sale.receipt): dapat dibagikan, dicetak ulang
+   (diberi tanda SALINAN STRUK), atau diretur. Tidak berjalan offline: nota yang belum terkirim tetap terlihat di antrean. */
+const CR_SPAN = [[1, 'Hari terpilih'], [7, '7 hari'], [30, '30 hari'], [90, '90 hari']];
+function crState() { // keadaan pencarian per pengguna (perangkat bersama: hasil pengguna lain tidak ikut terbawa)
+  const uid = S.data && S.data.user ? S.data.user.uid : '';
+  if (!S.cr || S.cr.uid !== uid) S.cr = {uid: uid, q: '', span: 1, seq: 0, res: null, k: '', err: '', loading: false, t: 0};
+  return S.cr;
+}
+function riwayatRow(r, o) { // satu nota: area utama diketuk untuk membuka struk; tombol Retur/Tinjau terpisah (tidak ikut membuka struk)
+  o = o || {}; const tg = {nomor: 'Nomor', total: 'Total', produk: 'Produk'}, cc = Array.isArray(r.cocok) ? r.cocok : [], it = Array.isArray(r.items) ? r.items : [];
+  const acts = (r.review && can('approve') ? '<button class="chip" data-act="sreview" data-id="' + esc(r.id) + '">Tandai ditinjau</button>' : '') +
+    (r.status === 'selesai' && !r.ref_sale_id ? '<button class="chip" data-act="retur" data-id="' + esc(r.id) + '">Retur</button>' : '');
+  return '<div class="li rli"><button type="button" class="rli-main" data-act="rcpt" data-id="' + esc(r.id) + '" aria-label="Lihat struk ' + esc(r.nomor) + '"><span class="rli-t"><b>' + esc(r.nomor) + '</b>' +
+    (r.ref_sale_id ? ' <span class="tag red">Retur</span>' : '') + (r.review ? ' <span class="tag red">Perlu ditinjau</span>' : '') + (o.tags ? cc.map(c => ' <span class="tag">' + esc(tg[c] || c) + '</span>').join('') : '') +
+    '<span class="muted rli-s">' + (o.date ? esc(idDate(r.tanggal)) + ' · ' : '') + esc(String(r.tanggal).slice(11, 16)) + ' · ' + esc(chName(r.channel_id)) + ' · ' + esc(r.metode_bayar) + '</span>' +
+    (o.items && it.length ? '<span class="muted rli-s">' + it.map(x => esc(x.n) + ' ×' + qf(Math.abs(Number(x.q)))).join(', ') + (r.item_n > it.length ? ' +' + (r.item_n - it.length) + ' lagi' : '') + '</span>' : '') +
+    (r.review && r.review_note ? '<span class="u-err muted rli-s">' + esc(r.review_note) + '</span>' : '') + '</span><b class="rli-n">' + rp(r.total) + '</b></button>' + (acts ? '<div class="rli-a">' + acts + '</div>' : '') + '</div>';
+}
+function crMode(go) { // tampilkan hasil pencarian bila ada kata kunci, selain itu daftar harian
+  const R = crState(), on = !!R.q.trim(), d = $('#crday'), r = $('#crr'); if (!d || !r) return;
+  d.hidden = on; r.hidden = !on; if (on) { crPaint(); if (go) crGo(false); }
+}
+function crType(v) { // ketikan: gabungkan ketukan beruntun (350 md) menjadi satu permintaan
+  const R = crState(); R.q = String(v || '').slice(0, 60); clearTimeout(R.t);
+  if (!R.q.trim()) { R.seq++; R.res = null; R.k = ''; R.err = ''; R.loading = false; return crMode(false); }
+  crMode(false); R.t = setTimeout(() => crGo(false), 350);
+}
+async function crGo(more) {
+  const R = crState(), q = R.q.trim(); if (!q || S.tab !== 'riwayat' || !$('#crr')) return;
+  const to = S.day || today(), from = addDays(to, 1 - R.span), key = [q, from, to, dverKey()].join('|');
+  if (!more && R.res && R.k === key) return crPaint(); // hasil masih sesuai versi data perangkat ini
+  if (more && (R.loading || !R.res || R.res.rows.length >= R.res.total)) return;
+  if (navigator.onLine === false) { if (more) return toast('Pencarian butuh koneksi internet'); R.res = null; R.err = 'Pencarian butuh koneksi internet. Transaksi yang belum terkirim ada di bagian Menunggu kirim pada daftar harian.'; return crPaint(); }
+  const my = ++R.seq; R.loading = true; R.err = ''; if (!more) R.res = null; crPaint();
+  try {
+    const r = await api('sales.search', {q: q, from: from, to: to, limit: PGN.hist, offset: more ? R.res.rows.length : 0}, {silent: true});
+    if (my !== R.seq) return; // pencarian lebih baru sudah berjalan
+    if (more) { const seen = new Set(R.res.rows.map(x => x.id)); r.rows.forEach(x => { if (!seen.has(x.id)) R.res.rows.push(x); }); R.res.total = r.total; R.res.omzet = r.omzet; }
+    else { R.res = {rows: r.rows, total: r.total, omzet: Number(r.omzet) || 0}; R.k = key; }
+  } catch (e) {
+    if (my !== R.seq) return; if (e.auth) { softLogout(); return; }
+    if (more) toast('Gagal memuat hasil berikutnya: ' + e.message); else R.err = e.server ? e.message : 'Pencarian gagal (periksa koneksi): ' + e.message;
+  } finally { if (my === R.seq) { R.loading = false; crPaint(); } }
+}
+function crPaint() {
+  const R = crState(), el = $('#crr'); if (!el || S.tab !== 'riwayat' || !R.q.trim()) return;
+  const to = S.day || today(), from = addDays(to, 1 - R.span), res = R.res;
+  let body;
+  if (R.err) body = '<p class="u-err">' + esc(R.err) + '</p>';
+  else if (!res) body = skel(3);
+  else if (!res.rows.length) body = emptyState('search', 'Tidak ada nota yang cocok', 'Coba kata lain atau lebarkan rentang tanggal. Angka dicari sebagai nomor urut nota atau total.');
+  else {
+    const rest = res.total - res.rows.length;
+    body = '<div class="kgrid"><div class="kpi"><div class="muted">Nota cocok</div><b>' + res.total + '</b></div><div class="kpi"><div class="muted">Nilai nota (neto)</div><b>' + rp(res.omzet) + '</b></div></div>' +
+      res.rows.map(r => riwayatRow(r, {date: R.span > 1, items: true, tags: true})).join('') +
+      (rest > 0 ? '<button class="btn sec lmore" data-act="crmore"' + (R.loading ? ' disabled' : '') + '>Tampilkan ' + Math.min(rest, PGN.hist) + ' lagi (sisa ' + rest + ')</button>' : '');
+  }
+  el.innerHTML = wrapChips(CR_SPAN.map(x => '<button class="chip ' + (R.span === x[0] ? 'on' : '') + '" data-act="crspan" data-n="' + x[0] + '">' + x[1] + '</button>').join('')) +
+    '<p class="muted rcap">' + (R.span > 1 ? esc(idDate(from)) + ' – ' : '') + esc(idDate(to)) + '</p>' + body;
+}
+async function rcptOpen(id) { // struk lengkap satu nota dari server
+  if (!id) return; if (navigator.onLine === false) return toast('Detail nota butuh koneksi internet');
+  let d; try { d = await api('sale.receipt', {id: id}); } catch (e) { if (e.auth) return softLogout(); return toast(e.server ? e.message : 'Tidak bisa memuat nota (periksa koneksi)'); }
+  const s = d.sale, ret = s.jenis === 'return', num0 = x => Number(x) || 0, rets = d.returns || [], batal = s.status !== 'selesai';
+  const rc = {rid: s.id, nomor: s.nomor, salinan: true, retur: ret, ref: String(s.ref_nomor || ''), time: num0(s.waktu_ms), kasir: String(s.kasir || ''), ch: String(s.channel || ''), metode: String(s.metode_bayar || ''),
+    terima: num0(s.terima), kembali: num0(s.kembali), sub: num0(s.subtotal), dis: num0(s.diskon), ppn: num0(s.ppn_nominal), total: num0(s.total),
+    lines: (d.items || []).map(l => ({n: String(l.nama || '') + (l.label ? ' (' + l.label + ')' : ''), q: num0(l.qty), h: num0(l.harga)}))};
+  S.rc = rc; const tunai = rc.metode === 'tunai';
+  sheet('<div class="grab"></div><h2>' + esc(s.nomor) + '</h2><p class="muted">' + esc(idDate(s.tanggal)) + ' ' + esc(String(s.tanggal).slice(11, 16)) + (rc.kasir ? ' · ' + esc(rc.kasir) : '') +
+    (ret ? ' <span class="tag red">Retur</span>' : '') + (batal ? ' <span class="tag red">Batal</span>' : '') + (s.review ? ' <span class="tag red">Perlu ditinjau</span>' : '') + '</p>' +
+    '<div class="rc-sum"><div><small>' + (ret ? 'Dikembalikan' : 'Total') + '</small><b>' + rp(ret ? -rc.total : rc.total) + '</b></div><div><small>' + (tunai && !ret ? 'Kembalian' : 'Metode') + '</small><b>' + (tunai && !ret ? rp(Math.max(rc.kembali, 0)) : esc(rc.metode.toUpperCase())) + '</b></div></div>' +
+    (s.review && s.review_note ? '<p class="u-err muted">' + esc(s.review_note) + '</p>' : '') + (ret && s.alasan ? '<p class="muted">Alasan retur: ' + esc(s.alasan) + '</p>' : '') + (s.catatan ? '<p class="muted">Catatan: ' + esc(s.catatan) + '</p>' : '') +
+    '<pre class="rc" id="rtxt"></pre>' +
+    (ret && s.ref_sale_id ? '<button class="btn sec" data-act="rcpt" data-id="' + esc(s.ref_sale_id) + '">Lihat nota asal ' + esc(rc.ref) + '</button>' : '') +
+    (rets.length ? '<h3 class="ri-h">Retur terkait</h3>' + rets.map(x => '<button type="button" class="li" data-act="rcpt" data-id="' + esc(x.id) + '"><div><b>' + esc(x.nomor) + '</b><div class="muted">' + esc(idDate(x.tanggal)) + ' ' + esc(String(x.tanggal).slice(11, 16)) + '</div></div><div class="r"><b>' + rp(x.total) + '</b></div></button>').join('') : '') +
+    '<label>No. WhatsApp pelanggan (opsional)<input class="inp" id="wa" inputmode="tel" placeholder="08xxxxxxxxxx"></label>' +
+    '<div class="row2"><button class="btn wa" data-act="wa">Kirim WhatsApp</button><button class="btn dark" data-act="rawbt">Cetak Bluetooth</button></div>' + btBox('rc') +
+    '<div class="row3"><button class="btn sec sm" data-act="share">Bagikan…</button><button class="btn sec sm" data-act="copyrc">Salin</button><button class="btn sec sm" data-act="print">Cetak</button></div>' +
+    (!ret && !batal ? '<button class="btn sec" data-act="retur" data-id="' + esc(s.id) + '">Retur</button>' : '') +
+    (s.review && can('approve') ? '<button class="btn sec" data-act="rcpt_rev" data-id="' + esc(s.id) + '">Tandai ditinjau</button>' : '') +
+    '<button class="btn pri big" data-act="close">Tutup</button>');
+  refreshRc();
+}
 /* ---------- Stok dan pembelian ---------- */
 const stState = (st, min, thr) => st <= 0 ? 'out' : (min > 0 ? st <= min : st < thr) ? 'low' : 'ok';
 const stBadge = x => x === 'out' ? '<span class="bdg out">Habis</span>' : x === 'low' ? '<span class="bdg low">Menipis</span>' : '';
@@ -2200,6 +2289,8 @@ const ACT = {
     const k = S.queue.indexOf(q); if (k < 0) return back(); S.queue.splice(k, 1); q.payload.items.forEach(it => { const v = vById(it.variant_id); if (v) v.stok = r6((Number(v.stok) || 0) + it.qty); }); LS.set('queue', S.queue); LS.set('data', S.data); badge(); if (fromQ) queueSheet(); else qrefresh(); toast('Dihapus dan dicatat di server');
   },
   retur: el => returOpen(el.dataset.id), retur_ok: () => returGo(),
+  rcpt: el => rcptOpen(el.dataset.id), rcpt_rev: async el => { await ACT.sreview(el); if (S.tab === 'riwayat') rcptOpen(el.dataset.id); },   // v2.7.0: struk per nota dari Riwayat
+  crspan: el => { const R = crState(); R.span = Number(el.dataset.n) || 1; crGo(false); }, crmore: () => crGo(true),
   retur_all: () => { document.querySelectorAll('#sheet [data-rv]').forEach(e => { e.value = e.max; }); },
   ohsaran: async () => { const el = $('#oh-saran'); try { const r = await api('overhead.saran', {}); if (r.saran_per_unit == null) { if (el) el.textContent = r.pesan || 'Belum bisa dihitung.'; return; } if (el) el.textContent = 'Bulan ' + r.bulan + ': biaya ' + rp(r.biaya) + ' dibagi ' + num(r.unit) + ' unit = ' + rp(r.saran_per_unit) + ' per bungkus. Diisikan ke kolom di atas; tekan Simpan pengaturan.'; const f = document.querySelector('#sf [data-f="overhead_per_unit"]'), m = document.querySelector('#sf [data-f="metode_overhead"]'); if (m && m.value !== 'per_unit') { m.value = 'per_unit'; m.dispatchEvent(new Event('change', {bubbles: true})); } if (f) { f.value = r.saran_per_unit; f.dispatchEvent(new Event('input', {bubbles: true})); } } catch (e) { toast(e.message); } },
   stab: el => { S.stab = el.dataset.s; S.scat = 'Semua'; S.sq = ''; vStok(); },
@@ -2243,6 +2334,7 @@ document.addEventListener('input', e => {   // pemisah ribuan pada kolom uang [d
 }, true);
 document.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.in; if (!k) return; let v = e.target.value;
+  if (k === 'cr') return crType(v);
   if (k === 'q') { S.q = v; clearTimeout(S.qT); S.qT = setTimeout(() => { if ($('#grid')) grid(); }, 90); return; } // v1.9.9: gabungkan ketikan beruntun menjadi satu penggambaran
   if (k === 'sq') { S.sq = v; return stokList(); }
   if (k === 'pbsup') { S.pb.sup = v; pbTouch(); return; }

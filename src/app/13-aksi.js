@@ -64,6 +64,8 @@ const ACT = {
     const k = S.queue.indexOf(q); if (k < 0) return back(); S.queue.splice(k, 1); q.payload.items.forEach(it => { const v = vById(it.variant_id); if (v) v.stok = r6((Number(v.stok) || 0) + it.qty); }); LS.set('queue', S.queue); LS.set('data', S.data); badge(); if (fromQ) queueSheet(); else qrefresh(); toast('Dihapus dan dicatat di server');
   },
   retur: el => returOpen(el.dataset.id), retur_ok: () => returGo(),
+  rcpt: el => rcptOpen(el.dataset.id), rcpt_rev: async el => { await ACT.sreview(el); if (S.tab === 'riwayat') rcptOpen(el.dataset.id); },   // v2.7.0: struk per nota dari Riwayat
+  crspan: el => { const R = crState(); R.span = Number(el.dataset.n) || 1; crGo(false); }, crmore: () => crGo(true),
   retur_all: () => { document.querySelectorAll('#sheet [data-rv]').forEach(e => { e.value = e.max; }); },
   ohsaran: async () => { const el = $('#oh-saran'); try { const r = await api('overhead.saran', {}); if (r.saran_per_unit == null) { if (el) el.textContent = r.pesan || 'Belum bisa dihitung.'; return; } if (el) el.textContent = 'Bulan ' + r.bulan + ': biaya ' + rp(r.biaya) + ' dibagi ' + num(r.unit) + ' unit = ' + rp(r.saran_per_unit) + ' per bungkus. Diisikan ke kolom di atas; tekan Simpan pengaturan.'; const f = document.querySelector('#sf [data-f="overhead_per_unit"]'), m = document.querySelector('#sf [data-f="metode_overhead"]'); if (m && m.value !== 'per_unit') { m.value = 'per_unit'; m.dispatchEvent(new Event('change', {bubbles: true})); } if (f) { f.value = r.saran_per_unit; f.dispatchEvent(new Event('input', {bubbles: true})); } } catch (e) { toast(e.message); } },
   stab: el => { S.stab = el.dataset.s; S.scat = 'Semua'; S.sq = ''; vStok(); },
@@ -107,6 +109,7 @@ document.addEventListener('input', e => {   // pemisah ribuan pada kolom uang [d
 }, true);
 document.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.in; if (!k) return; let v = e.target.value;
+  if (k === 'cr') return crType(v);
   if (k === 'q') { S.q = v; clearTimeout(S.qT); S.qT = setTimeout(() => { if ($('#grid')) grid(); }, 90); return; } // v1.9.9: gabungkan ketikan beruntun menjadi satu penggambaran
   if (k === 'sq') { S.sq = v; return stokList(); }
   if (k === 'pbsup') { S.pb.sup = v; pbTouch(); return; }

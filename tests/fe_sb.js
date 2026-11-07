@@ -76,6 +76,8 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
   const rt = {}, hh = (url, opt, body) => {
     const m = url.match(/rpc_([a-z_]+)/); if (m) { rt[m[1]] = body.p; }
     if (/rpc_dashboard/.test(url)) return {status: 200, body: {period: 'hari', cur: {omzet: 0}}};
+    if (/rpc_sales_search/.test(url)) return {status: 200, body: {rows: [], total: 0, omzet: 0}};
+    if (/rpc_sale_receipt/.test(url)) return {status: 200, body: {sale: {id: body.p.id}, items: [], returns: []}};
     if (/rpc_report_ops/.test(url)) return {status: 200, body: {type: body.p.type, title: 'O', columns: [], fmt: [], rows: [], summary: []}};
     if (/rpc_report_legacy/.test(url)) return {status: 200, body: {type: body.p.type, title: 'T', columns: [], fmt: [], rows: [], summary: []}};
     if (/rpc_production_list/.test(url)) return {status: 200, body: []};
@@ -95,6 +97,10 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
   const q = load(hh); q.S.setOutlet('o1');
   await q.S.call('dashboard.get', {period: 'bulan'}, good);
   ok(rt.dashboard.period === 'bulan' && rt.dashboard.outlet_id === 'o1', 'dashboard.get => rpc_dashboard + outlet aktif');
+  await q.S.call('sales.search', {q: 'basreng', from: '2026-11-01', to: '2026-11-07', limit: 50, offset: 0}, good);
+  ok(rt.sales_search.q === 'basreng' && rt.sales_search.from === '2026-11-01' && rt.sales_search.offset === 0 && rt.sales_search.outlet_id === 'o1', 'sales.search => rpc_sales_search + outlet aktif');
+  await q.S.call('sale.receipt', {id: 's-9'}, good);
+  ok(rt.sale_receipt.id === 's-9', 'sale.receipt => rpc_sale_receipt');
   await q.S.call('report.get', {type: 'penjualan', from: '2026-10-01', to: '2026-10-28'}, good);
   ok(rt.report_legacy.type === 'penjualan' && rt.report_legacy.from === '2026-10-01' && rt.report_legacy.outlet_id === 'o1', 'report.get => rpc_report_legacy dengan jenis, rentang, outlet');
   for (const ty of ['stok_minimum', 'lead_transfer', 'durasi_shift']) {
@@ -235,7 +241,7 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
 
   // ---- P0-3: penjaga versi skema ----
   const sg = (reply, cfg) => { const x = load((url, opt, body) => /grant_type=password/.test(url) ? {status: 200, body: {access_token: good, refresh_token: 'r1'}} : /rpc_bootstrap/.test(url) ? {status: 200, body: boot('kasir')} : {status: 404, body: {message: 'x'}}, cfg); x.schema.reply = reply; return x; };
-  let sgx = sg(() => ({status: 200, body: {version: '20261105000040', min_client: '2.3.0'}}), {VERSION: '2.3.1'});
+  let sgx = sg(() => ({status: 200, body: {version: '20261107000042', min_client: '2.3.0'}}), {VERSION: '2.3.1'});
   ok((await sgx.S.call('login', {username: 'tia', pin: '123789'})).uid === 'u1', 'skema sama dengan MIN_SCHEMA => login lolos');
   const nSch = () => sgx.calls.filter(c => /rpc_schema_version/.test(c.url)).length, n1 = nSch();
   await sgx.S.call('bootstrap', {}, good); ok(nSch() === n1, 'hasil pemeriksaan skema disimpan sementara (bootstrap tidak memanggil ulang)');
@@ -244,7 +250,7 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
   ok(sgx.store.sb_rt === undefined || sgx.store.sb_rt === null, 'login yang diblokir skema tidak meninggalkan refresh token');
   sgx = sg(() => ({status: 200, body: {version: '20261027000015', min_client: '2.3.0'}}), {VERSION: '2.3.1'});
   try { await sgx.S.call('login', {username: 'tia', pin: '123789'}); ok(false, 'DB lebih lama harus memblokir'); } catch (e) { ok(e.schema && /20261027000015/.test(e.message), 'DB lebih lama dari MIN_SCHEMA => diblokir'); }
-  sgx = sg(() => ({status: 200, body: {version: '20261105000040', min_client: '9.0.0'}}), {VERSION: '2.3.1'});
+  sgx = sg(() => ({status: 200, body: {version: '20261107000042', min_client: '9.0.0'}}), {VERSION: '2.3.1'});
   try { await sgx.S.call('login', {username: 'tia', pin: '123789'}); ok(false, 'klien terlalu lama harus memblokir'); } catch (e) { ok(e.schema && /terlalu lama/.test(e.message), 'klien lebih lama dari min_client => minta perbarui'); }
   sgx = sg(() => ({status: 200, body: {version: 'unknown', min_client: '2.3.0'}}), {VERSION: '2.3.1'});
   ok((await sgx.S.call('login', {username: 'tia', pin: '123789'})).uid === 'u1', "versi 'unknown' (migrasi tanpa CLI) tidak memblokir klien");

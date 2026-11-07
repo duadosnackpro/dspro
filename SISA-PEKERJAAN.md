@@ -55,3 +55,6 @@ Urut dari yang paling mendesak.
 3. Modul promo terpusat, kloning pengaturan antar-outlet, status pembayaran `pending/confirmed` (dicatat belum selesai di README F-10).
 4. Instrumentasi adopsi (login, transaksi per kasir, waktu per transaksi) dan survei SUS per outlet.
 5. Baseline biaya kertas, selisih kas, dan waktu rekonsiliasi untuk menghitung ROI/payback.
+
+## G. ISS-01 pencarian Riwayat (v2.7.0, selesai)
+Opsi B dikerjakan: migrasi 0042 (`sales_search`, `sale_receipt`), layar cari + detail nota, `MIN_SCHEMA` = 0042. Lihat `docs/RIWAYAT.md`. Belum ada: pencarian offline, pencarian lintas outlet, ekspor hasil.

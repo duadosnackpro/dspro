@@ -35,6 +35,8 @@ jobs:
         run: npm run test:ops
       - name: Uji tampilan Beranda
         run: npm run test:dashui
+      - name: Uji pencarian Riwayat dan detail nota
+        run: npm run test:riw
       - name: Uji printer Bluetooth
         run: npm run test:bt
       - name: Uji logika kewenangan Edge Function

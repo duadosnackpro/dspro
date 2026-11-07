@@ -12,7 +12,7 @@ ok(keys.length === new Set(keys).size, 'jenis laporan tidak ada yang kembar: ' +
 
 // 2. checks() dan vCek()
 const a = src.indexOf('const priceOf'), b = src.indexOf('async function stockAudit');
-const cardA = src.indexOf('A.setupCard = '), cardB = src.indexOf('A.issueCount = ');
+const cardA = src.indexOf('A.setupWarn = '), cardB = src.indexOf('A.issueCount = ');
 const dom = {main: {innerHTML: ''}}; const S = {data: null}; let own = true;
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const A = {vName: v => v.nama || v, vSub: v => v.sub || '', own: () => own};
@@ -45,15 +45,20 @@ ok(!titles().some(x => /stok awal/i.test(x)), 'stok 0 dengan HPP terisi (habis t
 S.data = full(); S.data.settings = {}; t = m.checks().find(x => /^Overhead belum diisi/.test(x.title)); ok(t && t.lv === 'info' && t.go === 'settings', 'overhead 0: catatan Info mengarah ke Pengaturan');
 S.data = mk({settings: {}}); ok(!titles().some(x => /^Overhead/.test(x)), 'katalog kosong: tidak menambah catatan overhead');
 
-// 5. kartu Beranda
-const card = new Function('A', 'S', 'esc', 'checks', src.slice(cardA, cardB) + '\nreturn A.setupCard;');
-const A2 = {own: () => true}; const sc = card(A2, S, esc, () => [{lv: 'err', title: 'A'}, {lv: 'err', title: 'B'}, {lv: 'err', title: 'C'}, {lv: 'err', title: 'D'}, {lv: 'info', title: 'Catatan biasa'}, {lv: 'info', title: 'Overhead belum diisi'}]);
-let h = sc(); ok(/Perlu dilengkapi/.test(h) && /<li>A<\/li>/.test(h) && !/<li>D<\/li>/.test(h) && /dan 2 lainnya/.test(h), 'kartu: 3 judul tampil, sisanya diringkas (info biasa tidak dihitung)');
-ok(/data-act="go_cek"/.test(h), 'kartu punya tombol ke Pemeriksaan data');
-A2.own = () => false; ok(sc() === '', 'bukan Owner: tidak ada kartu');
-A2.own = () => true; ok(card(A2, S, esc, () => [])() === '', 'tidak ada yang perlu dilengkapi: tidak ada kartu');
-ok(card(A2, S, esc, () => { throw new Error('x'); })() === '', 'galat di pemeriksaan tidak merusak Beranda');
-ok(/A\.setupCard \? A\.setupCard\(\) : ''/.test(src), 'drawDash memanggil kartu lewat guard (tes Beranda lama tetap jalan)');
+// 5. isi lonceng Beranda (dulu kartu \"Perlu dilengkapi\" yang memakan layar)
+const card = new Function('A', 'S', 'esc', 'checks', src.slice(cardA, cardB) + '\nreturn A.setupWarn;');
+const A2 = {own: () => true};
+const ck = [{lv: 'err', title: 'A', items: ['a1', 'a2', 'a3', 'a4'], go: 'stok'}, {lv: 'err', title: 'B', items: ['b1'], go: 'resep'}, {lv: 'info', title: 'Catatan biasa', items: ['x'], go: 'x'},
+  {lv: 'info', title: 'Item belum punya stok awal', items: ['i1'], go: 'stokawal'}, {lv: 'info', title: 'Overhead belum diisi', items: ['o'], go: 'settings'}];
+let w = card(A2, S, esc, () => ck)();
+ok(w.length === 4 && w.map(x => x.judul).join('|') === 'A|B|Item belum punya stok awal|Overhead belum diisi', 'galat, stok awal, dan overhead masuk lonceng; info biasa tidak');
+ok(w[0].teks === 'a1, a2, a3 dan 1 lainnya' && w[1].teks === 'b1', 'isi ringkas: tiga nama pertama, sisanya diringkas');
+ok(w.every(x => x.act === 'cekgo' && x.tombol === 'Lengkapi') && w.map(x => x.t).join() === 'stok,resep,stokawal,settings', 'tombol membuka tujuan temuan lewat aksi cekgo');
+A2.own = () => false; ok(card(A2, S, esc, () => ck)().length === 0, 'bukan Owner: lonceng tidak memuat temuan');
+A2.own = () => true; ok(card(A2, S, esc, () => [])().length === 0, 'tidak ada yang perlu dilengkapi: kosong');
+ok(card(A2, S, esc, () => { throw new Error('x'); })().length === 0, 'galat di pemeriksaan tidak merusak Beranda');
+ok(/dashWarnings\(d\)\.concat\(A\.setupWarn \? A\.setupWarn\(\) : \[\]\)/.test(src), 'drawDash menggabungkan temuan ke S.dwarn lewat guard (tes Beranda lama tetap jalan)');
+ok(!/setup-card/.test(src) && !/A\.setupCard/.test(src), 'kartu besar di Beranda sudah dihapus');
 
 // 6. menu dan aksi Biaya operasional
 ok(/\(o \? mi\('go_biaya', 'laporan', 'Biaya operasional'/.test(menuSrc), 'menu Operasional memuat Biaya operasional hanya untuk Owner');

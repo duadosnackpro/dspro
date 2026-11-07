@@ -145,14 +145,14 @@ function drawDash(d) {
     : '<div class="lsum">' + (nh ? '<span class="bdg out">' + num(nh) + ' habis</span> ' : '') + (nt ? '<span class="bdg low">' + num(nt) + ' menipis</span>' : '') + '</div>' + list.slice(0, 3).map(lrow).join('') +
       (list.length > 3 ? '<details class="more"><summary>Lihat ' + (list.length - 3) + ' lainnya</summary>' + list.slice(3).map(lrow).join('') + '</details>' : '') + lowNote + '<button class="u-mt8 btn sec" data-act="tab" data-t="stok">Buka Stok</button>';
   const notes = []; if (Number(c.diskon) > 0) notes.push('Diskon ' + rp(c.diskon)); if (Number(c.retur_n) > 0) notes.push('Retur ' + num(c.retur_n) + ' trx (' + rp(c.retur_rp) + ', sudah mengurangi omzet)');
-  $('#dbody').innerHTML = '<div class="rcaprow"><p class="muted rcap">' + esc(idRange(d.from, d.to)) + ' · omzet tanpa PPN · pembanding: ' + esc(idRange(pfrom, pto)) + '</p><span id="wbell"></span></div>' + (A.setupCard ? A.setupCard() : '') + heroHtml(d, lab) +
+  $('#dbody').innerHTML = '<div class="rcaprow"><p class="muted rcap">' + esc(idRange(d.from, d.to)) + ' · omzet tanpa PPN · pembanding: ' + esc(idRange(pfrom, pto)) + '</p><span id="wbell"></span></div>' + heroHtml(d, lab) +
     '<div class="kgrid ' + (t2 ? 'k3' : 'k2') + '">' + kpi('Transaksi', num(c.trx), sub(chg(c.trx, p && p.trx))) + (t2 ? kpi('Produk terjual', num(c.pcs) + ' pcs', sub(chg(c.pcs, p && p.pcs))) : '') + kpi('Rata-rata / transaksi', rp(avg), sub(chg(avg, pavg))) + '</div>' +
     (notes.length ? '<p class="muted dnote">' + notes.join(' · ') + '</p>' : '') +
     '<div class="dgrid"><div class="u-blk li" id="chcard">' + chInner(d) + '</div>' +
     '<div class="u-blk li" id="topcard">' + topInner(d) + '</div>' + jamHtml(d) +
     '<div class="u-blk li span2"><b>Stok bahan perlu perhatian</b>' + lowBody + '</div></div>';
   S.dashRange = {from: d.from, to: d.to};
-  S.dwarn = dashWarnings(d); drawBell();
+  S.dwarn = dashWarnings(d).concat(A.setupWarn ? A.setupWarn() : []); drawBell();
   if (c.trx && !(d.peringatan || []).some(w => w && w.aksi === 'hpp')) hppCheck(d.from, d.to).then(v => { if (!v.n || !$('#wbell')) return; S.dwarn.push({judul: 'Laba belum akurat', teks: v.n + ' produk belum punya resep/HPP: ' + v.names.slice(0, 3).join(', ') + (v.names.length > 3 ? ' dan ' + (v.names.length - 3) + ' lainnya' : ''), tombol: 'Lengkapi di Resep', act: 'go_resep'}); drawBell(); const mg = $('#mgn'); if (mg && c.omzet && c.laba / c.omzet >= .995) mg.innerHTML = qMark + ' belum akurat'; }).catch(() => {});
 }
 
@@ -718,11 +718,11 @@ document.addEventListener('change', e => {
   else if (t.dataset && t.dataset.chg === 'rtsel') { S.rt = t.value; vLaporan(); }
   else if (t.dataset && t.dataset.chg === 'ropt') { S.ropt = t.value; runReport(); }
 });
-A.setupCard = () => { // kartu Beranda untuk Owner: hal yang masih harus dilengkapi (hasil Pemeriksaan data), maksimal 3 judul
+A.setupWarn = () => { // Owner: hal yang masih harus dilengkapi (hasil Pemeriksaan data) sebagai isi lonceng Beranda, bukan kartu yang memakan layar
   try {
-    if (!A.own()) return ''; const c = checks().filter(x => x.lv === 'err' || x.title === 'Item belum punya stok awal' || x.title.indexOf('Overhead') === 0); if (!c.length) return '';
-    return '<div class="u-blk li setup-card"><div class="kv"><b>Perlu dilengkapi</b><span class="tag red">' + c.length + '</span></div><ul class="muted">' + c.slice(0, 3).map(x => '<li>' + esc(x.title) + '</li>').join('') + '</ul>' + (c.length > 3 ? '<div class="muted">dan ' + (c.length - 3) + ' lainnya</div>' : '') + '<button class="u-mt6 btn sec" data-act="go_cek">Lihat dan perbaiki</button></div>';
-  } catch (e) { return ''; }
+    if (!A.own()) return [];
+    return checks().filter(x => x.lv === 'err' || x.title === 'Item belum punya stok awal' || x.title.indexOf('Overhead') === 0).map(x => ({judul: x.title, teks: x.items.slice(0, 3).join(', ') + (x.items.length > 3 ? ' dan ' + (x.items.length - 3) + ' lainnya' : ''), tombol: 'Lengkapi', act: 'cekgo', t: x.go}));
+  } catch (e) { return []; }
 };
 A.issueCount = () => { try { return checks().filter(x => x.lv === 'err').length; } catch (e) { return 0; } };
 Object.assign(A.views, {dash: vDash, produksi: vProduksi, resep: vResep, laporan: vLaporan, shopee: vShopee, cek: vCek});

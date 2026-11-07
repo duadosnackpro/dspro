@@ -462,3 +462,14 @@ img,svg,canvas,video{max-width:100%}
 /* nada foto produk */
 .tn0{--t1:var(--tn0-a);--t2:var(--tn0-b)}.tn1{--t1:var(--tn1-a);--t2:var(--tn1-b)}.tn2{--t1:var(--tn2-a);--t2:var(--tn2-b)}
 .tn3{--t1:var(--tn3-a);--t2:var(--tn3-b)}.tn4{--t1:var(--tn4-a);--t2:var(--tn4-b)}.tn5{--t1:var(--tn5-a);--t2:var(--tn5-b)}
+.sa-row .row2{margin-top:var(--s2)}.sa-row .row2 label{flex:1;min-width:0}
+/* Pengaturan dilipat per kelompok; tabel harga jual */
+.set-grp{margin-bottom:var(--s3);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.set-grp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:var(--s3);min-height:56px;padding:var(--s3) var(--s4)}
+.set-grp>summary::-webkit-details-marker{display:none}
+.set-grp>summary::after{content:'▾';flex:none;color:var(--brand);font-size:18px}.set-grp[open]>summary::after{content:'▴'}
+.set-grp>summary:focus-visible{outline:none;box-shadow:inset 0 0 0 3px var(--ring)}
+.sg-t{display:flex;flex-direction:column;min-width:0}.sg-t b{font:800 17px var(--head);color:var(--brand)}.sg-t small{margin-top:2px;color:var(--mut);font-size:13px}
+.set-grp .set-card{margin:0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}
+.hg-h{margin:var(--s3) 0 var(--s1);font:800 15px var(--head);color:var(--brand)}
+.hg-cells{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s2)}.hg-c{flex:1 1 130px;min-width:0}.hg-c label{display:block}

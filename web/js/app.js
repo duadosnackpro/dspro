@@ -1253,7 +1253,7 @@ function render() {
   const o = own(), tabs = [['dash', 'Beranda'], ['kasir', 'Kasir'], ['riwayat', 'Riwayat'], ['stok', 'Stok'], ['produksi', 'Produksi'], ['menu', 'Menu']].filter(t => tabAllowed(t[0]) && !(o && t[0] === 'riwayat')),
     inMenu = MENU_TABS.concat(o ? ['riwayat'] : []).indexOf(S.tab) >= 0;
   $('#app').innerHTML = '<header class="top"><img class="logo" src="icons/icon-192.png" alt="" width="38" height="38"><div class="brand"><b class="wordmark">' + esc(String(d.settings.nama_usaha || 'Duado Snack').toUpperCase()) + '</b>' + outletLabel() + '</div><button class="badge" id="badge" data-act="queue" aria-label="Status sinkronisasi"></button></header><div class="accent"></div><h1 class="sr" id="stitle" tabindex="-1"></h1><main id="main"></main><div id="cartbar"></div>' +
-    '<nav class="nav" aria-label="Menu utama">' + tabs.map(t => { const on = S.tab === t[0] || (t[0] === 'menu' && inMenu); return '<button data-act="tab" data-t="' + t[0] + '"' + (on ? ' aria-current="page"' : '') + ' class="' + (on ? 'on' : '') + '"><span class="ni">' + svg(t[0], 22) + '</span><span>' + t[1] + '</span></button>'; }).join('') + '</nav>';
+    '<nav class="nav" aria-label="Menu utama">' + tabs.map(t => { const on = S.tab === t[0] || (t[0] === 'menu' && inMenu) || (t[0] === 'stok' && S.tab === 'stokawal'); return '<button data-act="tab" data-t="' + t[0] + '"' + (on ? ' aria-current="page"' : '') + ' class="' + (on ? 'on' : '') + '"><span class="ni">' + svg(t[0], 22) + '</span><span>' + t[1] + '</span></button>'; }).join('') + '</nav>';
   badge();
   (APP.views[S.tab] || vKasir)();
   cartbar(); btTick(); navSync();
@@ -1633,7 +1633,8 @@ function vStok() {
   const tabs = o ? wrapChips('<button class="chip ' + (S.stab === 'varian' ? 'on' : '') + '" data-act="stab" data-s="varian">Produk jadi</button><button class="chip ' + (S.stab === 'bahan' ? 'on' : '') + '" data-act="stab" data-s="bahan">Bahan dan kemasan</button>') : '';
   const cats = bahan ? ['Semua', 'bahan', 'kemasan', 'barang jadi beli'] : ['Semua'].concat(Array.from(new Set(S.data.variants.map(v => String((pById(v.product_id) || {}).kategori || '')).filter(Boolean))));
   if (cats.indexOf(S.scat) < 0) S.scat = 'Semua';
-  $('#main').innerHTML = tabs + (bahan && can('stockedit') ? '<button class="u-mt0 btn pri" data-act="pbopen">+ Pembelian bahan</button>' : '') +
+  const nSa = can('stockedit') && can('cost') ? saAll().length : 0;   // peran tanpa akses HPP tidak menerima hpp_rata2, jadi hitungannya tidak bisa dipercaya
+  $('#main').innerHTML = tabs + (nSa ? '<button class="u-mt0 btn sec" data-act="go_sawal">Isi stok awal (' + num(nSa) + ' item belum diisi)</button>' : '') + (bahan && can('stockedit') ? '<button class="u-mt0 btn pri" data-act="pbopen">+ Pembelian bahan</button>' : '') +
     '<label class="u-mt8 search">' + svg('search', 18) + '<input id="sq" class="inp" data-in="sq" placeholder="' + (bahan ? 'Cari bahan' : 'Cari produk atau SKU') + '" value="' + esc(S.sq) + '" aria-label="Cari stok"></label>' +
     wrapChips(cats.map(c => '<button class="chip ' + (c === S.scat ? 'on' : '') + '" data-act="scat" data-c="' + esc(c) + '">' + esc(c === 'Semua' || !bahan ? c : c.charAt(0).toUpperCase() + c.slice(1)) + '</button>').join('')) + '<div id="ssum" class="ssum"></div><div id="slist"></div>';
   stokList();
@@ -1833,7 +1834,7 @@ function vMenu() {
     (isIOS() && !standalone() ? '<div class="u-blk li"><b>Pasang di layar utama</b><div class="muted">Di Safari, ketuk Bagikan, lalu pilih "Tambah ke Layar Utama".</div></div>' : '');
   $('#main').innerHTML = '<div class="profile"><div class="av">' + esc(String(u.nama || '?').charAt(0).toUpperCase()) + '</div><div class="pi"><b>' + esc(u.nama) + '</b><div class="muted">' + esc(roleName(u.role)) + ' · versi ' + esc(C.VERSION || '') + '</div></div><span class="badge ' + (navigator.onLine ? 'ok' : 'off') + '">' + (navigator.onLine ? 'Online' : 'Offline') + '</span></div>' +
     '<p class="muted note">' + (S.lastSync ? 'Data diperbarui terakhir pukul ' + fmtDT(S.lastSync).slice(11) + '.' : 'Data masih dari penyimpanan perangkat.') + '</p>' + inst +
-    ((o || can('report') || can('transfer') || can('sell') || can('history')) ? '<div class="grp"><h3>Operasional</h3>' + (o || (can('history') && !can('sell')) ? mi('go_riwayat', 'riwayat', 'Riwayat penjualan', 'Daftar transaksi per tanggal') : '') + (can('report') ? mi('go_laporan', 'laporan', 'Laporan', can('cost') ? 'Laba rugi, penjualan, HPP, stok' : 'Penjualan, stok, produksi, pembelian') : '') + (can('transfer') ? mi('go_transfer', 'master', 'Transfer stok', 'Kirim dan terima stok antar outlet') : '') + (can('sell') ? mi('go_tutup', 'riwayat', 'Buka dan tutup kasir', 'Modal awal, kas masuk dan keluar, hitung uang di laci') : '') + (o ? mi('go_cek', 'cek', 'Pemeriksaan data', nIssue ? nIssue + ' hal perlu dibereskan' : 'Tidak ada yang perlu dibereskan', '', nIssue) : '') + '</div>' : '') + (o ?
+    ((o || can('report') || can('transfer') || can('sell') || can('history')) ? '<div class="grp"><h3>Operasional</h3>' + (o || (can('history') && !can('sell')) ? mi('go_riwayat', 'riwayat', 'Riwayat penjualan', 'Daftar transaksi per tanggal') : '') + (can('report') ? mi('go_laporan', 'laporan', 'Laporan', can('cost') ? 'Laba rugi, penjualan, HPP, stok' : 'Penjualan, stok, produksi, pembelian') : '') + (o ? mi('go_biaya', 'laporan', 'Biaya operasional', 'Catat gas, listrik, sewa, gaji. Mengurangi laba bersih') : '') + (can('transfer') ? mi('go_transfer', 'master', 'Transfer stok', 'Kirim dan terima stok antar outlet') : '') + (can('sell') ? mi('go_tutup', 'riwayat', 'Buka dan tutup kasir', 'Modal awal, kas masuk dan keluar, hitung uang di laci') : '') + (o ? mi('go_cek', 'cek', 'Pemeriksaan data', nIssue ? nIssue + ' hal perlu dibereskan' : 'Tidak ada yang perlu dibereskan', '', nIssue) : '') + '</div>' : '') + (o ?
       '<div class="grp"><h3>Data</h3>' + mi('go_master', 'master', 'Data Master', 'Produk, varian, harga, bahan, resep, biaya') + mi('go_shopee', 'shopee', 'Impor pesanan Shopee', 'Unggah file CSV dari Shopee') + mi('go_lama', 'riwayat', 'Input transaksi lama', 'Penjualan sebelum aplikasi dipakai, dengan tanggal asli') + mi('go_users', 'users', 'Pengguna', 'Akun dan hak akses') + (S.data.outlets ? mi('go_outlets', 'master', 'Outlet', 'Tambah outlet dan atur statusnya') : '') + mi('go_settings', 'settings', 'Pengaturan', 'Usaha, PPN, stok, printer, HPP') + '</div>' : '') +
     '<div class="grp"><h3>Sistem</h3>' + mi('sync', 'sync', 'Perbarui data', own() ? 'Ambil data terbaru dan kirim transaksi yang menunggu' : 'Cek data baru dan kirim transaksi yang menunggu') + mi('go_diag', 'diag', 'Diagnostik dan tes cetak', 'Tes koneksi, printer, dan WhatsApp') + '</div>' +
     (can('takeover') ? '<div class="grp"><h3>Hati-hati</h3>' + mi('go_reset', 'trash', 'Reset data transaksi', 'Hapus penjualan, kas, dan riwayat stok outlet ' + esc(S.data.outlet ? S.data.outlet.code : 'ini'), 'danger') + '</div>' : '') +
@@ -1893,8 +1894,10 @@ function field(f, val) {
 function readForm() { const o = {}; document.querySelectorAll('#sheet [data-f]').forEach(e => o[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value); return o; }
 function vMaster(noLoad) {
   const cfg = MT[S.mt], rows = S.mt === 'expenses' ? (S.exp || []) : (S.data[cfg.k] || []);
-  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-mt8 chips">' + Object.keys(MT).map(k => '<button class="chip ' + (k === S.mt ? 'on' : '') + '" data-act="mt" data-k="' + k + '">' + MT[k].l + '</button>').join('') + '<button class="chip" data-act="go_resep">Resep</button></div>' +
-    '<button class="btn pri" data-act="medit" data-id="">+ Tambah ' + cfg.l.toLowerCase() + '</button><div class="u-h8"></div>' +
+  const head = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-mt8 chips">' + Object.keys(MT).map(k => '<button class="chip ' + (k === S.mt ? 'on' : '') + '" data-act="mt" data-k="' + k + '">' + MT[k].l + '</button>').join('') + '<button class="chip" data-act="go_resep">Resep</button></div>';
+  if (S.mt === 'channel_prices') { $('#main').innerHTML = head + hargaBody(); hgCount(); return; }   // 1396-harga.js: tabel varian x channel, bukan daftar satu baris per harga
+  $('#main').innerHTML = head +
+    '<button class="btn pri" data-act="medit" data-id="">+ Tambah ' + cfg.l.toLowerCase() + '</button>' + (S.mt === 'expenses' ? '<p class="muted note">Biaya masuk ke laporan sesuai tanggal yang dipilih dan mengurangi laba bersih. Salah catat? Buka rinciannya, lalu batalkan dan catat ulang.</p>' : '') + '<div class="u-h8"></div>' +
     rows.map(r => '<button class="li-flat li" data-act="medit" data-id="' + esc(r.id) + '"><span' + (r.dibatalkan || r.pembalik ? ' class="' + (r.dibatalkan ? 'is-void' : 'is-rev') + '"' : '') + '>' + esc(cfg.t(r)) + (r.dibatalkan ? ' (dibatalkan)' : r.pembalik ? ' (pembatalan)' : '') + '</span><span class="muted">' + (S.mt === 'expenses' ? 'Rincian' : 'Ubah') + '</span></button>').join('') + (S.mt === 'expenses' && !S.expLoaded ? skel(3) : '');
   if (S.mt === 'expenses' && !noLoad) loadExp();
 }
@@ -1987,6 +1990,8 @@ function sDepUpd() { // field yang bergantung: tarif PPN hanya saat PPN aktif; o
   set('ppn-x', on('ppn_aktif')); set('hdr-x', on('header_aktif')); set('ftr-x', on('footer_aktif')); set('oh-unit', m === 'per_unit'); set('oh-batch', m === 'per_batch');
   const h = $('#oh-hint'); if (h) h.textContent = m === 'per_batch' ? 'Biaya overhead (gas, listrik, dll.) dihitung tetap setiap sekali produksi, berapa pun hasilnya.' : 'Biaya overhead (gas, listrik, dll.) dihitung per bungkus yang dihasilkan. Contoh: Rp300 × 118 bungkus.';
 }
+/* Kelompok Pengaturan yang dibuka/ditutup diingat selama aplikasi terbuka, jadi simpan atau render ulang tidak menutupnya lagi. 'toggle' tidak menggelembung, maka fase tangkap. */
+document.addEventListener('toggle', e => { const t = /** @type {any} */ (e.target); if (t && t.classList && t.classList.contains('set-grp') && t.dataset.g) { S.sOpen = S.sOpen || {}; S.sOpen[t.dataset.g] = t.open; } }, true);
 function sDirty() { S.dirty = setSnap() !== S.sSnap; const b = $('#ssavebtn'); if (b) b.disabled = !S.dirty; sDepUpd(); }
 function addonSheet() {
   sheet('<div class="grab"></div><h2>Buat produk tambahan</h2><p class="muted">Contoh: kantong kresek. Muncul di menu pembayaran kasir sebagai "Tambahan". Harga berlaku untuk semua channel; stok berkurang otomatis setiap terjual.</p>' +
@@ -1997,30 +2002,37 @@ function vSettings() {
   const s = S.data.settings, g = (k, d) => (s[k] == null || s[k] === '' ? d : s[k]), card = (t, h) => '<section class="set-card"><h3>' + t + '</h3>' + h + '</section>';
   const sw = (k, l, sub, def) => '<label class="sw"><input type="checkbox" data-f="' + k + '"' + (T(s[k] == null || s[k] === '' ? def : s[k]) ? ' checked' : '') + '><span class="sw-t" aria-hidden="true"></span><span class="sw-l"><b>' + l + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></label>';
   const m = $('#main'); m.className = 'col';
-  m.innerHTML = '<button class="u-as-start chip" data-act="tab" data-t="menu">← Menu</button><div id="sf" class="u-mt8">' +
-    card('Usaha & Struk', field(['nama_usaha', 'Nama usaha'], s.nama_usaha) + '<p class="m-up4 muted">Dicetak sebagai judul struk hanya bila logo tidak dipakai.</p>' + selF('lebar_struk', 'Lebar kertas struk', [['32', '58 mm (area cetak 48 mm)'], ['48', '80 mm (area cetak 72 mm)']], g('lebar_struk', '32'))) +
-    (own() ? card('Pustaka opsi', '<p class="muted">Grup pilihan seperti Level dan Cara masak. Dipasang per produk di Data Master; tidak mengubah stok maupun HPP.</p><button type="button" class="btn sec sm" data-act="pustaka">Kelola pustaka opsi</button>') : '') +
-    card('Logo struk', logoCard() + sw('logo_aktif', 'Cetak logo di struk', 'Untuk printer thermal. Nama usaha tidak dicetak lagi bila logo aktif. Struk WhatsApp tetap berupa teks.') +
-      (logoGet() ? '<button class="btn sec sm" data-act="logotest">Uji cetak logo</button>' : '') + '<p class="muted">Ukuran kertas diganti (58 atau 80 mm)? Pilih ulang logo agar ukurannya pas.</p>') +
-    card('Header & footer struk', sw('header_aktif', 'Header: catatan di bawah logo', 'Mis. slogan, alamat, nomor telepon, Instagram. Matikan bila tidak perlu.', true) +
+  const cd = {};
+  cd.usaha = card('Nama usaha & kertas', field(['nama_usaha', 'Nama usaha'], s.nama_usaha) + '<p class="m-up4 muted">Dicetak sebagai judul struk hanya bila logo tidak dipakai.</p>' + selF('lebar_struk', 'Lebar kertas struk', [['32', '58 mm (area cetak 48 mm)'], ['48', '80 mm (area cetak 72 mm)']], g('lebar_struk', '32')));
+  cd.pustaka = (own() ? card('Pustaka opsi', '<p class="muted">Grup pilihan seperti Level dan Cara masak. Dipasang per produk di Data Master; tidak mengubah stok maupun HPP.</p><button type="button" class="btn sec sm" data-act="pustaka">Kelola pustaka opsi</button>') : '');
+  cd.logo = card('Logo struk', logoCard() + sw('logo_aktif', 'Cetak logo di struk', 'Untuk printer thermal. Nama usaha tidak dicetak lagi bila logo aktif. Struk WhatsApp tetap berupa teks.') +
+      (logoGet() ? '<button class="btn sec sm" data-act="logotest">Uji cetak logo</button>' : '') + '<p class="muted">Ukuran kertas diganti (58 atau 80 mm)? Pilih ulang logo agar ukurannya pas.</p>');
+  cd.hf = card('Header & footer struk', sw('header_aktif', 'Header: catatan di bawah logo', 'Mis. slogan, alamat, nomor telepon, Instagram. Matikan bila tidak perlu.', true) +
       '<div id="hdr-x">' + field(['header_struk', 'Isi header', 'area:300'], s.header_struk) + '</div>' +
       sw('footer_aktif', 'Footer: catatan di bawah struk', 'Mis. ucapan terima kasih. Matikan bila tidak perlu.', true) +
       '<div id="ftr-x">' + field(['footer_struk', 'Isi footer', 'area:300'], s.footer_struk) + '</div>' +
       '<p class="muted">Satu baris di sini = satu baris di struk (teks panjang turun baris otomatis). Bungkus baris dengan *bintang* agar tercetak tebal, mis. *TERIMA KASIH*.</p>' +
       field(['qr_struk', 'Isi QR di bawah struk (opsional)', 'text'], s.qr_struk) + '<p class="muted">Mis. tautan Instagram atau WhatsApp toko. Kosongkan bila tanpa QR. Maks. 120 karakter. QR dicetak sebagai gambar, sama seperti logo.</p>' +
-      '<button class="btn sec sm" data-act="rcpreview">Pratinjau &amp; uji cetak struk</button><p class="muted">Pratinjau memakai pengaturan yang sudah disimpan.</p>') +
-    card('Pajak (PPN)', sw('ppn_aktif', 'Aktifkan PPN', 'Hitung PPN pada setiap transaksi') + '<div id="ppn-x">' + field(['ppn_persen', 'Tarif PPN (%)', 'number'], s.ppn_persen) + sw('ppn_inklusif', 'Harga jual sudah termasuk PPN') + '</div>') +
-    card('Stok', sw('blokir_stok_minus', 'Blokir penjualan jika stok kurang', 'Kasir tidak bisa menjual produk yang stoknya habis') + field(['stok_menipis', 'Batas "Menipis" produk jadi (jumlah)', 'number'], g('stok_menipis', '5'))) +
-    card('Kantong & Tambahan', '<p class="muted">Produk berkategori "Tambahan" (mis. kantong kresek) muncul di menu pembayaran kasir sebagai pilihan tambahan, bukan di daftar produk.</p>' +
+      '<button class="btn sec sm" data-act="rcpreview">Pratinjau &amp; uji cetak struk</button><p class="muted">Pratinjau memakai pengaturan yang sudah disimpan.</p>');
+  cd.ppn = card('Pajak (PPN)', sw('ppn_aktif', 'Aktifkan PPN', 'Hitung PPN pada setiap transaksi') + '<div id="ppn-x">' + field(['ppn_persen', 'Tarif PPN (%)', 'number'], s.ppn_persen) + sw('ppn_inklusif', 'Harga jual sudah termasuk PPN') + '</div>');
+  cd.stok = card('Stok', sw('blokir_stok_minus', 'Blokir penjualan jika stok kurang', 'Kasir tidak bisa menjual produk yang stoknya habis') + field(['stok_menipis', 'Batas "Menipis" produk jadi (jumlah)', 'number'], g('stok_menipis', '5')));
+  cd.kantong = card('Kantong & Tambahan', '<p class="muted">Produk berkategori "Tambahan" (mis. kantong kresek) muncul di menu pembayaran kasir sebagai pilihan tambahan, bukan di daftar produk.</p>' +
       (S.data.variants.filter(isAddon).map(v => '<div class="kv"><span>' + esc(vName(v)) + '</span><span>' + rp(priceOf(v.id, S.ch) || 0) + ' · stok ' + num(v.stok) + '</span></div>').join('') || '<p class="muted">Belum ada produk tambahan.</p>') +
-      '<button class="btn sec sm" data-act="addonnew">+ Buat produk tambahan (kresek)</button>') +
-    card('Kontrol kasir', field(['diskon_maks_persen', 'Batas diskon kasir (% dari subtotal)', 'number'], g('diskon_maks_persen', '10')) + '<p class="muted">Di atas batas ini, kasir butuh PIN Owner. Owner tidak dibatasi.</p>' + sw('bayar_tunai', 'Metode: Tunai') + sw('bayar_transfer', 'Metode: Transfer') + sw('bayar_qris', 'Metode: QRIS') + sw('tolak_selisih_total', 'Tolak transaksi bila total struk berbeda dari server', 'Disarankan aktif. Owner dapat menyetujui kasus tertentu dengan PIN.')) +
-    card('Kontrol data', field(['opname_ambang_nilai', 'Ambang nilai opname untuk peran Stok (Rp; kosongkan = tanpa batas)', 'number'], s.opname_ambang_nilai == null ? '500000' : s.opname_ambang_nilai) + '<p class="muted">Penyesuaian stok di atas nilai ini perlu supervisor/owner. Mengubah HPP yang sudah ada selalu perlu supervisor/owner.</p>' +
+      '<button class="btn sec sm" data-act="addonnew">+ Buat produk tambahan (kresek)</button>');
+  cd.kasir = card('Kontrol kasir', field(['diskon_maks_persen', 'Batas diskon kasir (% dari subtotal)', 'number'], g('diskon_maks_persen', '10')) + '<p class="muted">Di atas batas ini, kasir butuh PIN Owner. Owner tidak dibatasi.</p>' + sw('bayar_tunai', 'Metode: Tunai') + sw('bayar_transfer', 'Metode: Transfer') + sw('bayar_qris', 'Metode: QRIS') + sw('tolak_selisih_total', 'Tolak transaksi bila total struk berbeda dari server', 'Disarankan aktif. Owner dapat menyetujui kasus tertentu dengan PIN.'));
+  cd.kdata = card('Kontrol data', field(['opname_ambang_nilai', 'Ambang nilai opname untuk peran Stok (Rp; kosongkan = tanpa batas)', 'number'], s.opname_ambang_nilai == null ? '500000' : s.opname_ambang_nilai) + '<p class="muted">Penyesuaian stok di atas nilai ini perlu supervisor/owner. Mengubah HPP yang sudah ada selalu perlu supervisor/owner.</p>' +
       field(['transfer_ambang_nilai', 'Transfer di atas nilai ini tidak boleh disetujui pemohonnya sendiri (Rp; kosong = nonaktif)', 'number'], s.transfer_ambang_nilai) +
-      field(['bayar_referensi_min', 'Nomor referensi wajib untuk Transfer/QRIS mulai Rp (kosong = opsional)', 'number'], s.bayar_referensi_min) + '<p class="muted">Referensi dipakai mencocokkan penjualan dengan mutasi QRIS/bank (Laporan → Pembayaran per metode).</p>') +
-    (can('takeover') ? card('Kunci periode (Owner)', '<p class="muted">Tanggal sampai ' + esc(s.kunci_periode_sampai || '(belum dikunci)') + '. Biaya dan impor bertanggal pada/sebelum tanggal kunci ditolak; transaksi kasir tertunda dicatat dengan waktu server.</p><label>Kunci sampai tanggal (kosong = buka semua)<input class="inp" type="date" id="pl_d" value="' + esc(s.kunci_periode_sampai || '') + '"></label><label>Alasan<input class="inp" id="pl_r" placeholder="Mis. tutup buku Oktober"></label><button class="btn sec sm" data-act="plock">Terapkan kunci</button>') : '') +
-    card('Printer', sw('auto_cetak', 'Langsung cetak setelah bayar', 'Lewat jalur utama di bawah (RawBT atau BLE langsung)') + '<p class="u-mb4 muted"><b>Jalur cetak utama (perangkat ini)</b></p>' + btBox('sw') + '<button class="btn sec sm" data-act="go_diag">Atur dan uji printer</button>') +
-    card('HPP & Overhead', selF('metode_overhead', 'Cara menghitung overhead', [['per_unit', 'Per bungkus'], ['per_batch', 'Per sekali produksi']], g('metode_overhead', 'per_unit')) + '<p class="muted" id="oh-hint"></p><div id="oh-unit">' + field(['overhead_per_unit', 'Overhead per bungkus (Rp)', 'number'], s.overhead_per_unit) + '</div><div id="oh-batch">' + field(['overhead_per_batch', 'Overhead per sekali produksi (Rp)', 'number'], s.overhead_per_batch) + '</div>' + field(['target_margin', 'Target margin minimum (%)', 'number'], g('target_margin', 30)) + field(['kelipatan_harga', 'Pembulatan harga rekomendasi ke atas (Rp)', 'number'], g('kelipatan_harga', '500')) + field(['kategori_masuk_hpp', 'Kategori biaya yang SUDAH masuk HPP (pisahkan koma, mis. Listrik, Gas)'], s.kategori_masuk_hpp) + '<p class="muted">Biaya pada kategori ini tidak dipotong lagi dari laba bersih, supaya tidak terhitung dua kali.</p><button class="btn sec sm" data-act="ohsaran">Hitung saran overhead dari biaya bulan lalu</button><p class="muted" id="oh-saran"></p>') +
+      field(['bayar_referensi_min', 'Nomor referensi wajib untuk Transfer/QRIS mulai Rp (kosong = opsional)', 'number'], s.bayar_referensi_min) + '<p class="muted">Referensi dipakai mencocokkan penjualan dengan mutasi QRIS/bank (Laporan → Pembayaran per metode).</p>');
+  cd.kunci = (can('takeover') ? card('Kunci periode (Owner)', '<p class="muted">Tanggal sampai ' + esc(s.kunci_periode_sampai || '(belum dikunci)') + '. Biaya dan impor bertanggal pada/sebelum tanggal kunci ditolak; transaksi kasir tertunda dicatat dengan waktu server.</p><label>Kunci sampai tanggal (kosong = buka semua)<input class="inp" type="date" id="pl_d" value="' + esc(s.kunci_periode_sampai || '') + '"></label><label>Alasan<input class="inp" id="pl_r" placeholder="Mis. tutup buku Oktober"></label><button class="btn sec sm" data-act="plock">Terapkan kunci</button>') : '');
+  cd.printer = card('Printer', sw('auto_cetak', 'Langsung cetak setelah bayar', 'Lewat jalur utama di bawah (RawBT atau BLE langsung)') + '<p class="u-mb4 muted"><b>Jalur cetak utama (perangkat ini)</b></p>' + btBox('sw') + '<button class="btn sec sm" data-act="go_diag">Atur dan uji printer</button>');
+  cd.hpp = card('HPP & Overhead', selF('metode_overhead', 'Cara menghitung overhead', [['per_unit', 'Per bungkus'], ['per_batch', 'Per sekali produksi']], g('metode_overhead', 'per_unit')) + '<p class="muted" id="oh-hint"></p><div id="oh-unit">' + field(['overhead_per_unit', 'Overhead per bungkus (Rp)', 'number'], s.overhead_per_unit) + '</div><div id="oh-batch">' + field(['overhead_per_batch', 'Overhead per sekali produksi (Rp)', 'number'], s.overhead_per_batch) + '</div>' + field(['target_margin', 'Target margin minimum (%)', 'number'], g('target_margin', 30)) + field(['kelipatan_harga', 'Pembulatan harga rekomendasi ke atas (Rp)', 'number'], g('kelipatan_harga', '500')) + field(['kategori_masuk_hpp', 'Kategori biaya yang SUDAH masuk HPP (pisahkan koma, mis. Listrik, Gas)'], s.kategori_masuk_hpp) + '<p class="muted">Biaya pada kategori ini tidak dipotong lagi dari laba bersih, supaya tidak terhitung dua kali.</p><button class="btn sec sm" data-act="ohsaran">Hitung saran overhead dari biaya bulan lalu</button><p class="muted" id="oh-saran"></p>');
+  const sOpen = S.sOpen = S.sOpen || {struk: true};
+  const grp = (id, t, sub, h) => h ? '<details class="set-grp" data-g="' + id + '"' + (sOpen[id] ? ' open' : '') + '><summary><span class="sg-t"><b>' + t + '</b><small>' + sub + '</small></span></summary>' + h + '</details>' : '';
+  m.innerHTML = '<button class="u-as-start chip" data-act="tab" data-t="menu">← Menu</button><div id="sf" class="u-mt8">' +
+    grp('struk', 'Usaha & struk', 'Nama usaha, logo, header dan footer, printer', cd.usaha + cd.logo + cd.hf + cd.printer) +
+    grp('jual', 'Penjualan', 'PPN, kantong, batas diskon, metode bayar', cd.ppn + cd.kantong + cd.kasir) +
+    grp('stok', 'Stok & HPP', 'Batas menipis, overhead, target margin, pustaka opsi', cd.stok + cd.pustaka + cd.hpp) +
+    grp('data', 'Kontrol data', 'Ambang persetujuan, referensi bayar, kunci periode', cd.kdata + cd.kunci) +
     '</div><div class="savebar"><button class="btn pri big" id="ssavebtn" data-act="ssave" disabled>Simpan pengaturan</button></div>';
   S.sSnap = setSnap(); S.dirty = false; sDepUpd();
 }
@@ -2196,7 +2208,7 @@ const ACT = {
   pbadd: pbAdd, pbmode: el => pbSetMode(el.dataset.m),
   pbfill: el => { const d = dsOf(el); S.pb.sel = d.id; S.pb.selq = Number(d.q); const m = /** @type {any} */ ($('#pb_m')), q = /** @type {any} */ ($('#pb_q')), h = /** @type {any} */ ($('#pb_h')); if (m) m.value = d.id; pbSetMode('sat'); if (q) q.value = pbQ(d.q); pbRefUpd(); if (h) h.focus(); },
   pbback: () => { const b = S.pb.back; S.pb.back = null; if (b) b(); else closeSheet(); },
-  go_master: () => { S.tab = 'master'; render(); }, go_riwayat: () => { S.tab = 'riwayat'; render(); }, go_laporan: () => { S.tab = 'laporan'; render(); }, go_shopee: () => { S.tab = 'shopee'; render(); }, go_resep: () => { S.tab = 'resep'; render(); }, go_cek: () => { S.tab = 'cek'; render(); }, go_users: () => { S.tab = 'users'; render(); }, go_settings: () => { S.tab = 'settings'; render(); },
+  go_master: () => { S.tab = 'master'; render(); }, go_biaya: () => { S.mt = 'expenses'; S.tab = 'master'; render(); }, go_riwayat: () => { S.tab = 'riwayat'; render(); }, go_laporan: () => { S.tab = 'laporan'; render(); }, go_shopee: () => { S.tab = 'shopee'; render(); }, go_resep: () => { S.tab = 'resep'; render(); }, go_cek: () => { S.tab = 'cek'; render(); }, go_users: () => { S.tab = 'users'; render(); }, go_settings: () => { S.tab = 'settings'; render(); },
   expvoid: el => { const why = vOf('xv_r').trim(); if (why.length < 3) return fieldErr('#xv_r', 'Alasan pembatalan wajib diisi (minimal 3 huruf)');
     return busy('Membatalkan…', async () => { try { await api('expense.void', {id: dsOf(el).id, alasan: why}); S.expLoaded = false; closeSheet(); loadExp(); toast('Biaya dibatalkan'); } catch (e) { toast(e.message); } }); },
   pbhist: () => pbHist(), pbcancel: el => pbCancel(dsOf(el).id), shapp: el => shiftApprove(dsOf(el).id, dsOf(el).d), shreopen: el => shiftReopen(dsOf(el).id),
@@ -2698,6 +2710,133 @@ document.addEventListener('change', e => {
 });
 OWN_TABS.push('lama'); MENU_TABS.push('lama'); APP.views.lama = vLama;
 Object.assign(ACT, {go_lama: () => { S.tab = 'lama'; render(); }, bd_add: bdAdd, bd_save: bdSave, bd_del: el => { BD.items.splice(Number(el.dataset.i), 1); BD.rid = ''; bdItems(); }});
+/* ---------- Stok awal massal: isi stok dan HPP awal banyak item sekaligus ----------
+   Memakai RPC stock.adjust yang sama dengan lembar Penyesuaian (satu panggilan per item, alasan "Stok awal"). Server mencatat penyesuaian PERTAMA sebuah item sebagai saldo
+   pembukaan (tanpa kerugian); penyesuaian berikutnya dihitung opname dan diakui sebagai kerugian persediaan. Karena itu layar ini hanya menampilkan item yang belum pernah diisi
+   (stok 0 dan HPP 0). Penyimpanan berurutan; yang gagal tetap tampil dengan pesannya, yang berhasil keluar dari daftar, jadi mengulang simpan selalu aman.
+   Nama berkas 1395 agar urutan build jatuh sesudah 139-* dan sebelum 14-mulai.js (penutup IIFE). ---------- */
+const SA = {t: 'varian', v: {}, f: {}};   // t: tab aktif; v: isian per kunci "tipe:id" -> {s: stok, h: hpp}; f: pesan galat per kunci
+const saKey = (t, id) => t + ':' + id;
+function saItems(t) {   // item yang belum pernah diisi; peran tanpa akses HPP tidak menerima hpp_rata2, jadi hanya stok yang diperiksa
+  const src = t === 'bahan' ? S.data.materials : S.data.variants;
+  return src.filter(x => !(Number(x.stok) > 0) && !(Number(x.hpp_rata2) > 0)).map(x => ({k: saKey(t, x.id), id: x.id, t: t, name: t === 'bahan' ? String(x.nama) : String(vName(x)), sub: t === 'bahan' ? '' : String(vSub(x)), unit: t === 'bahan' ? String(x.satuan || '') : 'pcs'}))
+    .sort((a, b) => a.name.localeCompare(b.name, 'id') || a.sub.localeCompare(b.sub, 'id'));
+}
+const saAll = () => saItems('varian').concat(can('materials') ? saItems('bahan') : []);
+const saFilled = () => saAll().filter(r => SA.v[r.k] && String(SA.v[r.k].s == null ? '' : SA.v[r.k].s).trim() !== '');
+function saCount() {   // tombol simpan mengikuti jumlah baris yang sudah diisi, tanpa menggambar ulang daftar (isian tidak hilang)
+  const b = /** @type {any} */ ($('#sa_save')); if (!b) return; const n = saFilled().length;
+  b.disabled = !n; b.textContent = n ? 'Simpan ' + num(n) + ' item' : 'Isi jumlah stok dulu';
+}
+function vStokAwal() {
+  const mat = can('materials'), t = SA.t === 'bahan' && mat ? 'bahan' : 'varian', nv = saItems('varian').length, nb = mat ? saItems('bahan').length : 0, rows = saItems(t);
+  const row = r => { const v = SA.v[r.k] || {}, f = SA.f[r.k];
+    return '<div class="u-blk li sa-row"><div class="st-n"><b>' + esc(r.name) + '</b>' + (r.sub ? '<div class="muted">' + esc(r.sub) + '</div>' : '') + '</div>' +
+      '<div class="row2"><label>Stok' + (r.unit ? ' (' + esc(r.unit) + ')' : '') + '<input class="inp" inputmode="decimal" data-sa="s" data-k="' + esc(r.k) + '" value="' + esc(v.s == null ? '' : v.s) + '"></label>' +
+      '<label>HPP' + (r.unit ? ' / ' + esc(r.unit) : '') + ' (Rp)<input class="inp" inputmode="decimal" data-sa="h" data-k="' + esc(r.k) + '" value="' + esc(v.h == null ? '' : v.h) + '"></label></div>' + (f ? '<div class="err" role="alert">' + esc(f) + '</div>' : '') + '</div>'; };
+  $('#main').innerHTML = '<button class="u-as-start u-mb-s3 chip" data-act="tab" data-t="stok">← Stok</button>' +
+    '<div class="u-blk li"><b>Isi stok awal</b><p class="muted">Isi jumlah stok yang ada sekarang untuk item yang belum pernah diisi. Kosongkan baris yang tidak perlu. HPP awal (harga pokok per satuan) boleh dikosongkan, tetapi tanpa itu laba belum akurat. Setelah tersimpan, perubahan berikutnya dihitung sebagai opname.</p></div>' +
+    (mat ? wrapChips('<button class="chip ' + (t === 'varian' ? 'on' : '') + '" data-act="sa_tab" data-s="varian">Produk jadi (' + num(nv) + ')</button><button class="chip ' + (t === 'bahan' ? 'on' : '') + '" data-act="sa_tab" data-s="bahan">Bahan dan kemasan (' + num(nb) + ')</button>') : '') +
+    (rows.length ? rows.map(row).join('') : emptyState('stok', 'Semua item sudah punya stok awal', 'Untuk mengoreksi jumlah, ketuk item di layar Stok.', '<button class="btn sec" data-act="tab" data-t="stok">Kembali ke Stok</button>')) +
+    '<div class="savebar"><button class="btn pri" id="sa_save" data-act="sa_save" disabled>Isi jumlah stok dulu</button></div>';
+  saCount();
+}
+async function saSave() {
+  if (!navigator.onLine) return toast('Perlu koneksi internet');
+  const rows = saFilled(); if (!rows.length) return toast('Isi jumlah stok minimal satu item');
+  let bad = 0; const body = [];
+  rows.forEach(r => {   // cek semua isian dulu: satu isian salah tidak boleh membuat sebagian tersimpan diam-diam
+    const s = dnum(SA.v[r.k].s), hs = String(SA.v[r.k].h == null ? '' : SA.v[r.k].h).trim(), h = hs === '' ? '' : dnum(hs);
+    if (!(s >= 0)) { SA.f[r.k] = 'Stok tidak valid. Isi angka 0 atau lebih.'; bad++; } else if (h !== '' && !(h >= 0)) { SA.f[r.k] = 'HPP tidak valid. Isi angka 0 atau lebih, atau kosongkan.'; bad++; } else { delete SA.f[r.k]; body.push({r: r, s: s, h: h}); }
+  });
+  if (bad) { vStokAwal(); const e = /** @type {any} */ (document.querySelector('#main .sa-row .err')); if (e && e.scrollIntoView) e.scrollIntoView({block: 'center'}); return toast(bad + ' isian perlu diperbaiki'); }
+  return busy('Menyimpan stok awal…', async () => {
+    let ok = 0, fail = 0, noHpp = 0, expired = false;
+    for (const x of body) {
+      if (expired) break;
+      try {
+        const res = await api('stock.adjust', {tipe: x.r.t, id: x.r.id, stok_baru: x.s, hpp: x.h, alasan: 'Stok awal'});
+        const it = x.r.t === 'bahan' ? S.data.materials.find(m => m.id === x.r.id) : vById(x.r.id); if (it) { it.stok = res.stok; it.hpp_rata2 = res.hpp_rata2; }
+        delete SA.v[x.r.k]; delete SA.f[x.r.k]; ok++; if (x.h === '' && !(Number(res.hpp_rata2) > 0)) noHpp++;
+      } catch (e) { if (e.auth) expired = true; SA.f[x.r.k] = e.auth ? 'Sesi berakhir, silakan masuk lagi.' : e.message; fail++; }
+    }
+    LS.set('data', S.data); if (S.tab === 'stokawal') vStokAwal();
+    toast(expired ? 'Sesi berakhir, silakan masuk lagi' : fail ? ok + ' tersimpan, ' + fail + ' gagal. Lihat pesan di barisnya.' : ok + ' item tersimpan' + (noHpp ? '. ' + noHpp + ' belum punya HPP.' : ''));
+  });
+}
+document.addEventListener('input', e => {
+  const t = /** @type {any} */ (e.target); if (S.tab !== 'stokawal' || !t || !t.dataset || !t.dataset.sa) return;
+  const k = t.dataset.k; (SA.v[k] = SA.v[k] || {})[t.dataset.sa] = t.value; saCount();
+});
+TAB_TITLE.stokawal = 'Stok awal'; TAB_CAP.stokawal = 'stockedit'; APP.views.stokawal = vStokAwal;
+Object.assign(ACT, {go_sawal: () => { S.tab = 'stokawal'; render(); }, sa_tab: el => { SA.t = el.dataset.s; vStokAwal(); }, sa_save: saSave});
+/* ---------- Tabel harga jual: semua varian x channel dalam satu layar ----------
+   Dulu: satu baris harga per varian x channel (3 varian x 2 channel = 6 baris), dan form mengharuskan memilih varian dan channel satu per satu.
+   Sekarang: satu kartu per varian dengan satu isian per channel. Hanya sel yang berubah yang disimpan, lewat master.save (upsert pada pasangan varian + channel)
+   yang sama dengan form lama, satu panggilan per sel. Sel yang gagal tetap tampil dengan pesannya, yang berhasil kembali ke nilai tersimpan, jadi mengulang simpan selalu aman.
+   Menghapus satu harga tetap lewat daftar lama di bagian bawah. Nama berkas 1396 agar urutan build jatuh sesudah 1395-* dan sebelum 14-mulai.js (penutup IIFE). ---------- */
+const HGR = {v: {}, f: {}};   // v: isian per kunci "variantId|channelId" (hanya sel yang pernah diubah); f: pesan galat per kunci
+const hgKey = (vid, cid) => vid + '|' + cid;
+const hgChans = () => (S.data.channels || []).filter(c => String(c.aktif) !== 'false');
+const hgVars = () => (S.data.variants || []).slice().sort((a, b) => String(vName(a)).localeCompare(String(vName(b)), 'id') || String(vSub(a)).localeCompare(String(vSub(b)), 'id'));
+/* Sel yang diubah dibanding harga tersimpan. Isian kosong pada harga yang belum ada = dilewati; kosong pada harga yang sudah ada = galat (menghapus lewat daftar di bawah). */
+function hgChanges() {
+  const out = [];
+  hgVars().forEach(v => hgChans().forEach(c => {
+    const k = hgKey(v.id, c.id); if (!(k in HGR.v)) return;
+    const raw = String(HGR.v[k] == null ? '' : HGR.v[k]).trim(), cur = priceOf(v.id, c.id), n = raw === '' ? NaN : dnum(raw);
+    if (raw === '') { if (cur != null) out.push({k: k, v: v, c: c, n: NaN, bad: 'Harga tidak boleh kosong. Untuk menghapus harga, pakai daftar di bagian bawah.'}); return; }
+    if (!(n >= 0) || !isFinite(n)) { out.push({k: k, v: v, c: c, n: n, bad: 'Harga tidak valid. Isi angka 0 atau lebih.'}); return; }
+    if (cur == null || Math.round(n) !== Math.round(cur)) out.push({k: k, v: v, c: c, n: Math.round(n), bad: ''});
+  }));
+  return out;
+}
+function hgCount() {   // tombol simpan mengikuti jumlah sel yang berubah, tanpa menggambar ulang kartu (isian tidak hilang)
+  const b = /** @type {any} */ ($('#hg_save')); if (!b) return; const n = hgChanges().length;
+  b.disabled = !n; b.textContent = n ? 'Simpan ' + num(n) + ' harga' : 'Ubah harga dulu';
+}
+function hargaBody() {
+  const chs = hgChans(), vs = hgVars();
+  if (!vs.length) return emptyState('katalog', 'Belum ada varian', 'Harga jual dipasang per varian. Buat produk dan variannya dulu.', '<button class="btn sec" data-act="mt" data-k="product_variants">Buka Varian</button>');
+  if (!chs.length) return emptyState('katalog', 'Belum ada channel', 'Harga jual dipasang per channel (mis. Offline, Shopee). Buat channel dulu.', '<button class="btn sec" data-act="mt" data-k="channels">Buka Channel</button>');
+  let last = null;
+  const cell = (v, c) => {
+    const k = hgKey(v.id, c.id), cur = priceOf(v.id, c.id), val = k in HGR.v ? HGR.v[k] : (cur == null ? '' : rpIn(String(Math.round(cur)))), f = HGR.f[k];
+    return '<label>' + esc(c.nama) + ' (Rp)<input class="inp" inputmode="numeric" autocomplete="off" data-rp data-hg="' + esc(k) + '" placeholder="belum ada" value="' + esc(val) + '"></label>' + (f ? '<div class="err" role="alert">' + esc(f) + '</div>' : '');
+  };
+  const rows = vs.map(v => {
+    const head = vName(v) !== last ? '<h3 class="hg-h">' + esc(vName(v)) + '</h3>' : ''; last = vName(v);
+    return head + '<div class="u-blk li hg-row"><div class="st-n"><b>' + esc(vSub(v) || 'Satu ukuran') + '</b></div><div class="hg-cells">' + chs.map(c => '<div class="hg-c">' + cell(v, c) + '</div>').join('') + '</div></div>';
+  }).join('');
+  const old = (S.data.prices || []).map(r => '<button class="li-flat li" data-act="medit" data-id="' + esc(r.id) + '"><span>' + esc(MT.channel_prices.t(r)) + '</span><span class="muted">Ubah</span></button>').join('');
+  return '<div class="u-blk li"><b>Harga jual per varian dan channel</b><p class="muted">Ubah angka yang perlu saja, lalu simpan sekali. Isian "belum ada" berarti varian itu belum dijual di channel tersebut; isi untuk mulai menjualnya.</p></div>' + rows +
+    '<details class="more"><summary>Daftar harga satu per satu (untuk menghapus harga)</summary>' + (old || '<p class="muted">Belum ada harga.</p>') + '</details>' +
+    '<div class="savebar"><button class="btn pri" id="hg_save" data-act="hg_save" disabled>Ubah harga dulu</button></div>';
+}
+async function hgSave() {
+  if (!navigator.onLine) return toast('Perlu koneksi internet');
+  const ch = hgChanges(); if (!ch.length) return toast('Belum ada harga yang diubah');
+  const bad = ch.filter(x => x.bad); ch.forEach(x => { if (x.bad) HGR.f[x.k] = x.bad; else delete HGR.f[x.k]; });   // cek semua isian dulu: satu isian salah tidak boleh membuat sebagian tersimpan diam-diam
+  if (bad.length) { vMaster(true); const e = /** @type {any} */ (document.querySelector('#main .hg-row .err')); if (e && e.scrollIntoView) e.scrollIntoView({block: 'center'}); return toast(bad.length + ' isian perlu diperbaiki'); }
+  return busy('Menyimpan harga…', async () => {
+    let ok = 0, fail = 0, expired = false;
+    for (const x of ch) {
+      if (expired) break;
+      try {
+        const rec = await api('master.save', {table: 'channel_prices', data: {variant_id: x.v.id, channel_id: x.c.id, harga_jual: x.n}});
+        if (!patchMaster('channel_prices', rec)) await loadData();
+        delete HGR.v[x.k]; delete HGR.f[x.k]; ok++;
+      } catch (e) { if (e.auth) expired = true; HGR.f[x.k] = e.auth ? 'Sesi berakhir, silakan masuk lagi.' : e.message; fail++; }
+    }
+    if (S.tab === 'master' && S.mt === 'channel_prices') vMaster(true);
+    toast(expired ? 'Sesi berakhir, silakan masuk lagi' : fail ? ok + ' harga tersimpan, ' + fail + ' gagal. Lihat pesan di barisnya.' : ok + ' harga tersimpan');
+  });
+}
+document.addEventListener('input', e => {
+  const t = /** @type {any} */ (e.target); if (S.tab !== 'master' || S.mt !== 'channel_prices' || !t || !t.dataset || !t.dataset.hg) return;
+  HGR.v[t.dataset.hg] = t.value; delete HGR.f[t.dataset.hg]; hgCount();
+});
+Object.assign(ACT, {hg_save: hgSave});
 /* ---------- Mulai ---------- */
 let swReg = null;
 function updBanner() { const b = $('#upd'); b.hidden = false; b.innerHTML = 'Versi baru tersedia <button data-act="reload">Muat ulang</button>'; }

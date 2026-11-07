@@ -145,7 +145,7 @@ function drawDash(d) {
     : '<div class="lsum">' + (nh ? '<span class="bdg out">' + num(nh) + ' habis</span> ' : '') + (nt ? '<span class="bdg low">' + num(nt) + ' menipis</span>' : '') + '</div>' + list.slice(0, 3).map(lrow).join('') +
       (list.length > 3 ? '<details class="more"><summary>Lihat ' + (list.length - 3) + ' lainnya</summary>' + list.slice(3).map(lrow).join('') + '</details>' : '') + lowNote + '<button class="u-mt8 btn sec" data-act="tab" data-t="stok">Buka Stok</button>';
   const notes = []; if (Number(c.diskon) > 0) notes.push('Diskon ' + rp(c.diskon)); if (Number(c.retur_n) > 0) notes.push('Retur ' + num(c.retur_n) + ' trx (' + rp(c.retur_rp) + ', sudah mengurangi omzet)');
-  $('#dbody').innerHTML = '<div class="rcaprow"><p class="muted rcap">' + esc(idRange(d.from, d.to)) + ' · omzet tanpa PPN · pembanding: ' + esc(idRange(pfrom, pto)) + '</p><span id="wbell"></span></div>' + heroHtml(d, lab) +
+  $('#dbody').innerHTML = '<div class="rcaprow"><p class="muted rcap">' + esc(idRange(d.from, d.to)) + ' · omzet tanpa PPN · pembanding: ' + esc(idRange(pfrom, pto)) + '</p><span id="wbell"></span></div>' + (A.setupCard ? A.setupCard() : '') + heroHtml(d, lab) +
     '<div class="kgrid ' + (t2 ? 'k3' : 'k2') + '">' + kpi('Transaksi', num(c.trx), sub(chg(c.trx, p && p.trx))) + (t2 ? kpi('Produk terjual', num(c.pcs) + ' pcs', sub(chg(c.pcs, p && p.pcs))) : '') + kpi('Rata-rata / transaksi', rp(avg), sub(chg(avg, pavg))) + '</div>' +
     (notes.length ? '<p class="muted dnote">' + notes.join(' · ') + '</p>' : '') +
     '<div class="dgrid"><div class="u-blk li" id="chcard">' + chInner(d) + '</div>' +
@@ -449,7 +449,7 @@ function rfv() {
 }
 
 /* ---------- Laporan ---------- */
-const RTYPES_ALL = [['labarugi', 'Laba rugi'], ['penjualan', 'Penjualan'], ['channel', 'Channel'], ['hpp', 'HPP & margin'], ['stok', 'Stok & nilai'], ['produksi', 'Produksi'], ['pembelian', 'Pembelian'], ['pengeluaran', 'Biaya'], ['metode', 'Pembayaran per metode'], ['transit', 'Dalam perjalanan'], ['penyesuaian', 'Penyesuaian stok'], ['selisih_kas', 'Selisih kas'], ['stok_minimum', 'Stok minimum & stockout'], ['lead_transfer', 'Lead time transfer'], ['durasi_shift', 'Durasi shift kasir'], ['opsi', 'Per opsi'], ['opsi', 'Per opsi'], ['konsolidasi', 'Semua outlet: laba rugi'], ['konsolidasi_stok', 'Semua outlet: nilai stok']];
+const RTYPES_ALL = [['labarugi', 'Laba rugi'], ['penjualan', 'Penjualan'], ['channel', 'Channel'], ['hpp', 'HPP & margin'], ['stok', 'Stok & nilai'], ['produksi', 'Produksi'], ['pembelian', 'Pembelian'], ['pengeluaran', 'Biaya'], ['metode', 'Pembayaran per metode'], ['transit', 'Dalam perjalanan'], ['penyesuaian', 'Penyesuaian stok'], ['selisih_kas', 'Selisih kas'], ['stok_minimum', 'Stok minimum & stockout'], ['lead_transfer', 'Lead time transfer'], ['durasi_shift', 'Durasi shift kasir'], ['opsi', 'Per opsi'], ['konsolidasi', 'Semua outlet: laba rugi'], ['konsolidasi_stok', 'Semua outlet: nilai stok']];
 /* F7: jenis laporan mengikuti peran (sama dengan rpc_report_legacy): tanpa akses biaya, laba rugi dan HPP disembunyikan. */
 const rtypes = () => RTYPES_ALL.filter(t => /^konsolidasi/.test(t[0]) ? (A.can('cost') && (S.data.outlets || []).length > 1) : (A.can('cost') || ['labarugi', 'hpp'].indexOf(t[0]) < 0));   // F-07: laporan semua outlet (hanya keanggotaan global; server yang menegakkan)
 const PRE = [['today', 'Hari ini'], ['yday', 'Kemarin'], ['7d', '7 hari'], ['month', 'Bulan ini'], ['lmonth', 'Bulan lalu'], ['custom', 'Custom']];
@@ -590,6 +590,7 @@ function checks() {
   const hasV = new Set(d.variants.map(v => v.product_id)), usedMat = new Set(d.recipe_items.map(i => i.material_id)), matIds = new Set(d.materials.map(m => m.id));
   const withPrice = new Set(d.prices.map(p => p.channel_id)), skuCount = {};
   d.variants.forEach(v => { const k = String(v.sku || '').trim().toLowerCase(); if (k) skuCount[k] = (skuCount[k] || 0) + 1; });
+  add('err', 'Belum ada produk (Kasir masih kosong)', d.products.length ? [] : ['Katalog kosong'], 'products', 'Tambahkan produk, varian, dan harga jual di Data Master.');
   add('err', 'Produk belum punya varian (tidak tampil di Kasir)', d.products.filter(p => !hasV.has(p.id)).map(p => p.nama), 'product_variants', 'Tambahkan varian (ukuran dan level pedas).');
   add('err', 'Varian belum punya harga jual di channel mana pun', d.variants.filter(v => !d.channels.some(c => priceOf(v.id, c.id) != null)).map(vLabel2), 'channel_prices', 'Isi di Data Master, Harga jual.');
   add('info', 'Varian belum punya harga di channel yang sudah dipakai produk lain', d.variants.flatMap(v => d.channels.filter(c => withPrice.has(c.id) && priceOf(v.id, c.id) == null && d.channels.some(x => priceOf(v.id, x.id) != null)).map(c => vLabel2(v) + ' → ' + c.nama)), 'channel_prices', 'Abaikan jika memang tidak dijual di channel itu.');
@@ -598,13 +599,17 @@ function checks() {
   add('err', 'Bahan dipakai resep tetapi HPP masih 0 (HPP produksi tidak akurat)', d.materials.filter(m => usedMat.has(m.id) && !(Number(m.hpp_rata2) > 0)).map(m => m.nama), 'stok', 'Isi lewat Pembelian bahan atau Penyesuaian stok (HPP awal).');
   add('info', 'Varian belum punya resep (belum bisa diproduksi dari aplikasi)', d.variants.filter(v => !d.recipes.some(r => r.variant_id === v.id)).map(vLabel2), 'resep', 'Abaikan untuk produk yang tidak diproduksi sendiri.');
   add('info', 'Varian dengan HPP 0 (laba kotor dan margin belum akurat)', d.variants.filter(v => !(Number(v.hpp_rata2) > 0)).map(vLabel2), 'stok', 'Isi HPP awal lewat Stok, atau selesaikan satu produksi.');
+  /* Stok awal: item tanpa stok DAN tanpa HPP dianggap belum pernah diisi. Bila semua item begitu, ini hal yang harus dibereskan sebelum berjualan. */
+  const stokItems = d.materials.map(m => ({n: m.nama, m: m})).concat(d.variants.map(v => ({n: vLabel2(v), m: v}))), kosong = stokItems.filter(x => !(Number(x.m.stok) > 0) && !(Number(x.m.hpp_rata2) > 0)), semua = kosong.length === stokItems.length;
+  add(semua ? 'err' : 'info', semua ? 'Stok awal belum diisi' : 'Item belum punya stok awal', kosong.map(x => x.n), 'stokawal', 'Isi jumlah dan HPP awal sekaligus di layar Stok awal. Abaikan untuk item yang memang belum dipakai.');
+  add('info', 'Overhead belum diisi (HPP belum termasuk gas, listrik, dan sejenisnya)', d.products.length && !(Number(set('overhead_per_unit')) > 0) && !(Number(set('overhead_per_batch')) > 0) ? ['Overhead per bungkus dan per produksi masih 0'] : [], 'settings', 'Isi di Pengaturan, HPP & Overhead. Abaikan bila memang tidak dihitung.');
   add('info', 'Produk tanpa kategori', d.products.filter(p => !String(p.kategori || '').trim()).map(p => p.nama), 'products', '');
   return out;
 }
 const vLabel2 = v => typeof v === 'string' ? v : A.vName(v) + ' ' + A.vSub(v);
 function vCek() {
   const c = checks(), err = c.filter(x => x.lv === 'err').length;
-  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-blk u-mt8 li"><b>Pemeriksaan data</b><p class="muted">Mengecek kelengkapan data master di perangkat ini (sesuai data terakhir yang dimuat). ' + (c.length ? err + ' hal perlu diperbaiki, ' + (c.length - err) + ' catatan.' : 'Semua data lengkap.') + '</p></div>' +
+  $('#main').innerHTML = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-blk u-mt8 li"><b>Pemeriksaan data</b><p class="muted">Mengecek kelengkapan data master di perangkat ini (sesuai data terakhir yang dimuat). ' + (c.length ? err + ' hal perlu diperbaiki, ' + (c.length - err) + ' catatan.' : !S.data.products.length ? 'Belum ada produk.' : 'Semua data lengkap.') + '</p></div>' +
     c.map(x => '<div class="u-blk li"><div class="kv"><b>' + esc(x.title) + '</b><span class="tag ' + (x.lv === 'err' ? 'red' : '') + '">' + (x.lv === 'err' ? 'Perbaiki' : 'Info') + ' · ' + x.items.length + '</span></div>' +
       '<div class="muted">' + x.items.slice(0, 8).map(esc).join(', ') + (x.items.length > 8 ? ' dan ' + (x.items.length - 8) + ' lainnya' : '') + '</div>' + (x.hint ? '<div class="muted">' + esc(x.hint) + '</div>' : '') +
       '<div class="u-mt6">' + x.extra + '<button class="chip" data-act="cekgo" data-t="' + x.go + '">Buka</button></div></div>').join('') +
@@ -624,7 +629,7 @@ async function stockAudit() {
 
 /* ---------- Aksi ---------- */
 Object.assign(ACT, {
-  caudit: stockAudit, cekgo: el => { const t = el.dataset.t; if (t === 'resep' || t === 'stok') S.tab = t; else { S.mt = t; S.tab = 'master'; } A.render(); },
+  caudit: stockAudit, cekgo: el => { const t = el.dataset.t; if (t === 'settings') S.sOpen = Object.assign(S.sOpen || {struk: true}, {stok: true}); /* temuan Overhead: buka kelompok Stok & HPP */ if (t === 'resep' || t === 'stok' || t === 'settings' || t === 'stokawal') S.tab = t; else { S.mt = t; S.tab = 'master'; } A.render(); },
   srec: el => busy('Memproses…', async () => { try { await api('sale.recover', {id: el.dataset.id, aksi: el.dataset.a}); await A.loadData(); toast(el.dataset.a === 'selesai' ? 'Transaksi diselesaikan' : 'Transaksi dibatalkan'); stockAudit(); } catch (e) { toast(e.message); } }),
   creco: el => busy('Menyelaraskan riwayat…', async () => { try { await api('stock.reconcile', {tipe: el.dataset.t, id: el.dataset.id}); toast('Riwayat disesuaikan'); stockAudit(); } catch (e) { toast(e.message); } }),
   dp: el => { const again = el.dataset.p === S.dp; S.dp = el.dataset.p; vDash(again); },
@@ -713,6 +718,12 @@ document.addEventListener('change', e => {
   else if (t.dataset && t.dataset.chg === 'rtsel') { S.rt = t.value; vLaporan(); }
   else if (t.dataset && t.dataset.chg === 'ropt') { S.ropt = t.value; runReport(); }
 });
+A.setupCard = () => { // kartu Beranda untuk Owner: hal yang masih harus dilengkapi (hasil Pemeriksaan data), maksimal 3 judul
+  try {
+    if (!A.own()) return ''; const c = checks().filter(x => x.lv === 'err' || x.title === 'Item belum punya stok awal' || x.title.indexOf('Overhead') === 0); if (!c.length) return '';
+    return '<div class="u-blk li setup-card"><div class="kv"><b>Perlu dilengkapi</b><span class="tag red">' + c.length + '</span></div><ul class="muted">' + c.slice(0, 3).map(x => '<li>' + esc(x.title) + '</li>').join('') + '</ul>' + (c.length > 3 ? '<div class="muted">dan ' + (c.length - 3) + ' lainnya</div>' : '') + '<button class="u-mt6 btn sec" data-act="go_cek">Lihat dan perbaiki</button></div>';
+  } catch (e) { return ''; }
+};
 A.issueCount = () => { try { return checks().filter(x => x.lv === 'err').length; } catch (e) { return 0; } };
 Object.assign(A.views, {dash: vDash, produksi: vProduksi, resep: vResep, laporan: vLaporan, shopee: vShopee, cek: vCek});
 Object.assign(A, {shopeeText: shLoad, parseCSV: parseCSV, parseNum: parseNum, normDate: normDate});

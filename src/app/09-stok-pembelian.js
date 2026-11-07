@@ -6,7 +6,8 @@ function vStok() {
   const tabs = o ? wrapChips('<button class="chip ' + (S.stab === 'varian' ? 'on' : '') + '" data-act="stab" data-s="varian">Produk jadi</button><button class="chip ' + (S.stab === 'bahan' ? 'on' : '') + '" data-act="stab" data-s="bahan">Bahan dan kemasan</button>') : '';
   const cats = bahan ? ['Semua', 'bahan', 'kemasan', 'barang jadi beli'] : ['Semua'].concat(Array.from(new Set(S.data.variants.map(v => String((pById(v.product_id) || {}).kategori || '')).filter(Boolean))));
   if (cats.indexOf(S.scat) < 0) S.scat = 'Semua';
-  $('#main').innerHTML = tabs + (bahan && can('stockedit') ? '<button class="u-mt0 btn pri" data-act="pbopen">+ Pembelian bahan</button>' : '') +
+  const nSa = can('stockedit') && can('cost') ? saAll().length : 0;   // peran tanpa akses HPP tidak menerima hpp_rata2, jadi hitungannya tidak bisa dipercaya
+  $('#main').innerHTML = tabs + (nSa ? '<button class="u-mt0 btn sec" data-act="go_sawal">Isi stok awal (' + num(nSa) + ' item belum diisi)</button>' : '') + (bahan && can('stockedit') ? '<button class="u-mt0 btn pri" data-act="pbopen">+ Pembelian bahan</button>' : '') +
     '<label class="u-mt8 search">' + svg('search', 18) + '<input id="sq" class="inp" data-in="sq" placeholder="' + (bahan ? 'Cari bahan' : 'Cari produk atau SKU') + '" value="' + esc(S.sq) + '" aria-label="Cari stok"></label>' +
     wrapChips(cats.map(c => '<button class="chip ' + (c === S.scat ? 'on' : '') + '" data-act="scat" data-c="' + esc(c) + '">' + esc(c === 'Semua' || !bahan ? c : c.charAt(0).toUpperCase() + c.slice(1)) + '</button>').join('')) + '<div id="ssum" class="ssum"></div><div id="slist"></div>';
   stokList();

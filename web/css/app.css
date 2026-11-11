@@ -459,6 +459,8 @@ img,svg,canvas,video{max-width:100%}
 .sw:has(input:disabled){cursor:not-allowed;color:var(--mut)}
 /* tombol bergaris dan gelap: keadaan tekan yang sejajar dengan tombol kuning */
 .btn.sec:active{background:var(--sunk)}.btn.dan:active{background:var(--err-bg)}.btn.wa:active{filter:brightness(.92)}
+/* baris nota yang hanya informasi (daftar "Perlu ditinjau"): bukan tombol, jadi tanpa kursor/hover tombol */
+div.rli-main,div.rli-main:hover,div.rli-main:active{cursor:default;background:none}
 /* dialog konfirmasi mengikuti area aman (HP berponi mendatar, bilah gestur) */
 .cfm{padding:max(var(--s4),env(safe-area-inset-top,0px)) var(--px) max(var(--s4),env(safe-area-inset-bottom,0px))}
 /* angka yang belum rata */

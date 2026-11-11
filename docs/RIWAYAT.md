@@ -15,3 +15,11 @@
 - RPC baru `sales_search` dan `sale_receipt` (pembungkus `rpc_*`, hak `authenticated`; `anon` ditolak). Fungsi lama tidak diubah.
 - **Urutan rilis:** pasang migrasi 0042 dulu, baru unggah klien 2.7.0 (`MIN_SCHEMA` = 0042; `deploy.yml` sudah berurutan). Klien 2.6.19 tetap berjalan di skema baru; `min_client` tidak naik.
 - Tes: `supabase/tests/019_riwayat_cari.test.sql` (SQL) dan `tests/riwayat_ui.js` (`npm run test:riw`).
+
+## Peringatan "perlu ditinjau" di Beranda (migrasi 0043)
+- Angka **N transaksi perlu ditinjau** menghitung semua nota outlet yang bertanda `review_flag`, dari tanggal mana pun. Itu **bukan** antrean di perangkat (yang ada di "Menunggu kirim"). Tanda hanya hilang bila Owner/Admin/Supervisor menekan **Tandai ditinjau** pada nota itu; membuka Riwayat tidak menghapusnya.
+- Riwayat harian hanya menampilkan satu hari, jadi nota bertanda yang lama sulit dicari. Tombol peringatan kini **Lihat transaksi**: membuka daftar semua nota bertanda (terbaru dulu, maks. 50, dengan nomor, tanggal, jam, alasan server), tiap baris punya **Lihat nota** dan **Tandai ditinjau**. Auditor hanya bisa melihat (tombol tandai tidak tampil, ada penjelasan).
+- RPC baru `sales_review_list` (pembungkus `rpc_sales_review_list`; hak `authenticated`; peran owner/admin/supervisor/auditor). Hanya menambah fungsi.
+- **Urutan rilis:** pasang migrasi 0043 dulu, baru unggah klien. `MIN_SCHEMA` tetap 0042: di skema lama tombol **Lihat transaksi** membuka Riwayat dengan petunjuk, tidak macet.
+- Tes: `supabase/tests/020_review_list.test.sql` (SQL) dan `tests/review_list.js` (`npm run test:revlist`).
+

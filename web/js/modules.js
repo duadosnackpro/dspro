@@ -74,7 +74,7 @@ const CMP = {hari: 'vs kemarin', minggu: 'vs 7 hari sebelumnya', bulan: 'vs peri
 function dashWarnings(d) {
   const w = [];
   if (d.stok_minus && d.stok_minus.length) w.push({judul: 'Stok minus, perlu opname', teks: d.stok_minus.slice(0, 4).map(x => x.nama + ' (' + dec(x.stok) + ')').join(', ') + (d.stok_minus.length > 4 ? ' dan ' + (d.stok_minus.length - 4) + ' lainnya' : '') + '. Penjualan tetap tercatat; stok server lebih kecil dari stok fisik.', tombol: 'Buka Stok', act: 'tab', t: 'stok'});
-  if (d.review_trx) w.push({judul: num(d.review_trx) + ' transaksi perlu ditinjau', teks: 'Diterima dengan harga server setelah tertunda/offline.', tombol: 'Buka Riwayat', act: 'tab', t: 'riwayat'});
+  if (d.review_trx) w.push({judul: num(d.review_trx) + ' transaksi perlu ditinjau', teks: 'Sudah tersimpan di server, tetapi harganya disesuaikan karena tertunda/offline atau ada isian yang kurang. Tanda ini baru hilang setelah nota ditandai ditinjau (bukan antrean di perangkat).', tombol: 'Lihat transaksi', act: 'revlist'});
   (d.peringatan || []).forEach(x => {
     const o = typeof x === 'string' ? {teks: x, aksi: 'set'} : x;
     if (o.aksi === 'hpp') w.push({judul: 'HPP belum lengkap', teks: o.teks, tombol: A.can('manage') ? 'Perbaiki HPP' : '', act: 'hppfix'});
@@ -641,6 +641,19 @@ Object.assign(ACT, {
     const c = recCalc(), f = c.f; if (!c.rec) return toast('Pilih resep dulu'); if (!(c.b > 0)) return fieldErr('#sheet [data-pq="batch"]', 'Isi jumlah batch lebih dari 0'); if (!(c.q > 0)) return fieldErr('#sheet [data-pq="qty"]', 'Isi hasil aktual lebih dari 0, atau kosongkan agar sesuai standar');
     return busy('Menyimpan produksi…', () => prodRun('production.record', {request_id: f.rid, recipe_id: f.recipe, jumlah_batch: c.b, jenis: f.jenis, catatan: f.catatan, qty_hasil: c.q,
       tenaga_kerja: f.tk === '' ? '' : N(f.tk), overhead: f.oh === '' ? '' : N(f.oh)}, () => { recRemember(f); S.prec = null; closeSheet(); }));
+  },
+  /* v2.7.3: daftar nota bertanda "perlu ditinjau" dari semua tanggal (angka peringatan menghitung semua tanggal, Riwayat hanya satu hari). Tiap baris: lihat nota, tandai ditinjau (Owner/Admin/Supervisor). */
+  revlist: async () => {
+    if (navigator.onLine === false) return toast('Daftar ini butuh koneksi internet');
+    let r; try { r = await api('sales.review_list', {}); } catch (e) { if (e.auth) return toast('Sesi berakhir, masuk lagi'); if (/sales_review_list|schema cache|Could not find/i.test(String(e.message))) { S.tab = 'riwayat'; A.render(); return toast('Server belum diperbarui ke 0043: cari nota berlabel "Perlu ditinjau" di Riwayat'); } return toast(e.message); }
+    const ok = A.can('approve'), rows = r.rows || [], more = Math.max(0, Number(r.total || 0) - rows.length);
+    sheet('<div class="grab"></div><div class="sh-h"><h2>Perlu ditinjau (' + Number(r.total || 0) + ')</h2></div>' +
+      '<p class="muted">Nota ini sudah tersimpan di server. Tandai ditinjau setelah selisihnya dijelaskan agar peringatan hilang.' + (ok ? '' : ' Hanya Owner, Admin, atau Supervisor yang bisa menandai; akun Anda hanya bisa melihat.') + '</p>' +
+      (rows.map(x => '<div class="li rli"><div class="rli-main"><span class="rli-t"><b>' + esc(x.nomor) + '</b>' + (x.ref_sale_id ? ' <span class="tag red">Retur</span>' : '') +
+        '<span class="muted rli-s">' + esc(idDate(x.tanggal)) + ' · ' + esc(String(x.tanggal).slice(11, 16)) + ' · ' + esc(A.chName(x.channel_id)) + ' · ' + esc(x.metode_bayar) + '</span>' +
+        (x.review_note ? '<span class="u-err muted rli-s">' + esc(x.review_note) + '</span>' : '') + '</span><b class="rli-n">' + rp(x.total) + '</b></div>' +
+        '<div class="rli-a"><button class="chip" data-act="rcpt" data-id="' + esc(x.id) + '">Lihat nota</button>' + (ok ? '<button class="chip" data-act="sreview" data-id="' + esc(x.id) + '">Tandai ditinjau</button>' : '') + '</div></div>').join('') || '<p class="muted">Tidak ada nota yang perlu ditinjau.</p>') +
+      (more ? '<p class="muted">Dan ' + more + ' nota lain yang lebih lama.</p>' : '') + '<button class="btn sec" data-act="close">Tutup</button>');
   },
   /* F-08: perbaiki HPP kosong pada penjualan periode Beranda: pratinjau dampak dulu, baru terapkan (hanya Owner/Admin; tercatat di audit). */
   dwarn: () => { const w = S.dwarn || []; sheet('<div class="sh-h"><h2>Peringatan (' + w.length + ')</h2></div>' + (w.map((x, i) => '<div class="warn-b" role="note"><div><b>' + esc(x.judul) + '</b><div class="muted">' + esc(x.teks) + '</div></div>' + (x.tombol ? '<button class="btn pri sm" data-act="dwgo" data-i="' + i + '" data-t="' + esc(x.t || '') + '">' + esc(x.tombol) + '</button>' : '') + '</div>').join('') || '<p class="muted">Tidak ada peringatan.</p>') + '<button class="btn sec" data-act="close">Tutup</button>'); },

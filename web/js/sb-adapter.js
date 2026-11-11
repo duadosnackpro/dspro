@@ -280,6 +280,7 @@ async function call(action, p, token, tokCb) {
     case 'sales.list': return rpc('sales_list', withOutlet(p), token);
     case 'sales.search': return rpc('sales_search', withOutlet(p), token);   // 0042: cari nota lintas hari (nomor, total, nama produk), dipaginasi di server
     case 'sale.receipt': return rpc('sale_receipt', p, token);                  // 0042: satu nota lengkap untuk menyusun ulang struk
+    case 'sales.review_list': return rpc('sales_review_list', withOutlet(p), token);   // 0043: nota bertanda 'perlu ditinjau' lintas tanggal (peringatan Beranda); skema 0042 belum punya => klien turun ke Riwayat
     case 'sale.reject_log': { const q = withOutlet(p), id = approvalId(q.override_token); delete q.override_token; if (id) q.approval_id = id; return rpc('sale_reject_log', q, token); }   // F3: dicatat di audit_logs (pelaku, outlet, alasan)
     case 'sale.recover': throw fail('Tidak diperlukan: transaksi di server selalu atomik (selesai atau tidak tercatat).');
     case 'shift.summary': return rpc('cash_summary', withOutlet(), token);

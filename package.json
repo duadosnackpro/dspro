@@ -13,7 +13,7 @@
     "test:release": "node tests/release_check.js",
     "test:fe": "node tests/fe_sb.js",
     "test:bt": "node tests/bt_printer.js",
-    "test": "npm run build:check && npm run test:release && npm run test:fe && npm run test:rt && npm run test:dash && npm run test:bt && npm run test:edge && npm run test:opsi && npm run test:prod && npm run test:beli && npm run test:lama && npm run test:ops && npm run test:dashui && npm run test:nav && npm run test:a11y && npm run test:setup && npm run test:sawal && npm run test:setgrp && npm run test:riw && npm run test:revlist && npm run test:min",
+    "test": "npm run build:check && npm run test:release && npm run test:fe && npm run test:rt && npm run test:dash && npm run test:bt && npm run test:edge && npm run test:opsi && npm run test:prod && npm run test:beli && npm run test:lama && npm run test:ops && npm run test:dashui && npm run test:nav && npm run test:a11y && npm run test:setup && npm run test:sawal && npm run test:setgrp && npm run test:riw && npm run test:revlist && npm run test:warn && npm run test:min",
     "check": "npm run lint && npm run typecheck && npm test",
     "test:edge": "node --experimental-strip-types --test supabase/functions/admin-users/authz_test.ts",
     "test:rt": "node tests/realtime.js",
@@ -30,7 +30,8 @@
     "test:sawal": "node tests/stok_awal.js",
     "test:setgrp": "node tests/pengaturan_harga.js",
     "test:riw": "node tests/riwayat_ui.js",
-    "test:revlist": "node tests/review_list.js"
+    "test:revlist": "node tests/review_list.js",
+    "test:warn": "node tests/warn_actions.js"
   },
   "devDependencies": {
     "@eslint/js": "9.17.0",

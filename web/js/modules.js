@@ -73,12 +73,20 @@ const CMP = {hari: 'vs kemarin', minggu: 'vs 7 hari sebelumnya', bulan: 'vs peri
 /* Peringatan Beranda dikumpulkan jadi satu ikon (bukan banner yang memakan layar). Ketuk ikon: daftar lengkap, tiap item tetap punya tombol aksinya. */
 function dashWarnings(d) {
   const w = [];
-  if (d.stok_minus && d.stok_minus.length) w.push({judul: 'Stok minus, perlu opname', teks: d.stok_minus.slice(0, 4).map(x => x.nama + ' (' + dec(x.stok) + ')').join(', ') + (d.stok_minus.length > 4 ? ' dan ' + (d.stok_minus.length - 4) + ' lainnya' : '') + '. Penjualan tetap tercatat; stok server lebih kecil dari stok fisik.', tombol: 'Buka Stok', act: 'tab', t: 'stok'});
+  if (d.stok_minus && d.stok_minus.length) {   // v2.7.3: buka tab Stok yang memuat item minus (bahan atau produk jadi); item minus sudah diurutkan paling atas di daftar Stok
+    const mats = new Set(((S.data && S.data.materials) || []).map(m => String(m.nama)));
+    w.push({judul: 'Stok minus, perlu opname', teks: d.stok_minus.slice(0, 4).map(x => x.nama + ' (' + dec(x.stok) + ')').join(', ') + (d.stok_minus.length > 4 ? ' dan ' + (d.stok_minus.length - 4) + ' lainnya' : '') + '. Penjualan tetap tercatat; stok server lebih kecil dari stok fisik. ' +
+      (A.can('stockedit') ? 'Buka Stok, ketuk item, lalu isi stok fisik (Penyesuaian); peringatan hilang setelah stok tidak minus.' : 'Minta Owner, Admin, atau Supervisor melakukan opname; peran Anda hanya bisa melihat.'),
+      tombol: 'Buka Stok', act: 'stokgo', t: d.stok_minus.some(x => mats.has(String(x.nama))) && A.can('materials') ? 'bahan' : 'varian'});
+  }
   if (d.review_trx) w.push({judul: num(d.review_trx) + ' transaksi perlu ditinjau', teks: 'Sudah tersimpan di server, tetapi harganya disesuaikan karena tertunda/offline atau ada isian yang kurang. Tanda ini baru hilang setelah nota ditandai ditinjau (bukan antrean di perangkat).', tombol: 'Lihat transaksi', act: 'revlist'});
   (d.peringatan || []).forEach(x => {
     const o = typeof x === 'string' ? {teks: x, aksi: 'set'} : x;
-    if (o.aksi === 'hpp') w.push({judul: 'HPP belum lengkap', teks: o.teks, tombol: A.can('manage') ? 'Perbaiki HPP' : '', act: 'hppfix'});
-    else if (o.aksi === 'stok') w.push({judul: 'Stok', teks: o.teks, tombol: 'Buka Stok', act: 'tab', t: 'stok'});
+    if (o.aksi === 'hpp') w.push({judul: 'HPP belum lengkap', teks: o.teks + (A.can('manage') ? ' Ketuk Perbaiki HPP untuk melihat dampaknya dulu; bila produknya belum punya HPP, isi HPP lewat Stok lebih dulu.' : ' Perbaikan hanya bisa dilakukan Owner atau Admin.'), tombol: A.can('manage') ? 'Perbaiki HPP' : '', act: 'hppfix'});
+    else if (o.aksi === 'stok') {   // v2.7.3: sebut varian yang dimaksud (server hanya memberi jumlahnya)
+      const vs = ((S.data && S.data.variants) || []).filter(v => Number(v.stok) > 0 && !(Number(v.hpp_rata2) > 0)).map(v => vLabel2(v));
+      w.push({judul: 'Stok', teks: o.teks + (vs.length ? ' Item: ' + vs.slice(0, 4).join(', ') + (vs.length > 4 ? ' dan ' + (vs.length - 4) + ' lainnya' : '') + '.' : ''), tombol: 'Buka Stok', act: 'stokgo', t: 'varian'});
+    }
     else w.push({judul: 'Perlu perhatian', teks: o.teks, tombol: 'Pengaturan', act: 'go_settings'});
   });
   return w;
@@ -143,7 +151,7 @@ function drawDash(d) {
     '<div class="u-blk li span2"><b>Stok bahan perlu perhatian</b>' + lowBody + '</div></div>';
   S.dashRange = {from: d.from, to: d.to};
   S.dwarn = dashWarnings(d).concat(A.setupWarn ? A.setupWarn() : []); drawBell();
-  if (c.trx && !(d.peringatan || []).some(w => w && w.aksi === 'hpp')) hppCheck(d.from, d.to).then(v => { if (!v.n || !$('#wbell')) return; S.dwarn.push({judul: 'Laba belum akurat', teks: v.n + ' produk belum punya resep/HPP: ' + v.names.slice(0, 3).join(', ') + (v.names.length > 3 ? ' dan ' + (v.names.length - 3) + ' lainnya' : ''), tombol: 'Lengkapi di Resep', act: 'go_resep'}); drawBell(); const mg = $('#mgn'); if (mg && c.omzet && c.laba / c.omzet >= .995) mg.innerHTML = qMark + ' belum akurat'; }).catch(() => {});
+  if (c.trx && !(d.peringatan || []).some(w => w && w.aksi === 'hpp')) hppCheck(d.from, d.to).then(v => { if (!v.n || !$('#wbell')) return; S.dwarn.push({judul: 'Laba belum akurat', teks: v.n + ' produk belum punya resep/HPP: ' + v.names.slice(0, 3).join(', ') + (v.names.length > 3 ? ' dan ' + (v.names.length - 3) + ' lainnya' : '') + (A.own() ? '' : '. Resep hanya bisa dilengkapi Owner atau Admin.'), tombol: A.own() ? 'Lengkapi di Resep' : '', act: 'go_resep'}); drawBell(); const mg = $('#mgn'); if (mg && c.omzet && c.laba / c.omzet >= .995) mg.innerHTML = qMark + ' belum akurat'; }).catch(() => {});
 }
 
 /* ---------- Biaya produksi (dipakai pratinjau, sama dengan hitungan server) ---------- */
@@ -642,6 +650,15 @@ Object.assign(ACT, {
     return busy('Menyimpan produksi…', () => prodRun('production.record', {request_id: f.rid, recipe_id: f.recipe, jumlah_batch: c.b, jenis: f.jenis, catatan: f.catatan, qty_hasil: c.q,
       tenaga_kerja: f.tk === '' ? '' : N(f.tk), overhead: f.oh === '' ? '' : N(f.oh)}, () => { recRemember(f); S.prec = null; closeSheet(); }));
   },
+  /* v2.7.3: aksi peringatan Beranda. stokgo = buka tab Stok yang memuat item (bahan/produk jadi) dengan pencarian bersih; dwskip = sembunyikan peringatan info yang memang tak bisa
+     diselesaikan (mis. item belum dipakai) di perangkat ini; muncul lagi bila daftar itemnya berubah (tanda tangan judul + item + pengguna). */
+  stokgo: el => { S.stab = el.dataset.t === 'bahan' && A.can('materials') ? 'bahan' : 'varian'; S.scat = 'Semua'; S.sq = ''; S.tab = 'stok'; A.render(); },
+  dwskip: el => {
+    const i = Number(el.dataset.i), x = (S.dwarn || [])[i]; if (!x || !x.abaikan) return;
+    const k = LS.get('dwskip', []).filter(z => z !== x.abaikan); k.push(x.abaikan); LS.set('dwskip', k.slice(-60));
+    S.dwarn.splice(i, 1); drawBell(); if (S.dwarn.length) ACT.dwarn(); else closeSheet();
+    toast('Disembunyikan di perangkat ini. Muncul lagi bila daftar item berubah.');
+  },
   /* v2.7.3: daftar nota bertanda "perlu ditinjau" dari semua tanggal (angka peringatan menghitung semua tanggal, Riwayat hanya satu hari). Tiap baris: lihat nota, tandai ditinjau (Owner/Admin/Supervisor). */
   revlist: async () => {
     if (navigator.onLine === false) return toast('Daftar ini butuh koneksi internet');
@@ -656,7 +673,7 @@ Object.assign(ACT, {
       (more ? '<p class="muted">Dan ' + more + ' nota lain yang lebih lama.</p>' : '') + '<button class="btn sec" data-act="close">Tutup</button>');
   },
   /* F-08: perbaiki HPP kosong pada penjualan periode Beranda: pratinjau dampak dulu, baru terapkan (hanya Owner/Admin; tercatat di audit). */
-  dwarn: () => { const w = S.dwarn || []; sheet('<div class="sh-h"><h2>Peringatan (' + w.length + ')</h2></div>' + (w.map((x, i) => '<div class="warn-b" role="note"><div><b>' + esc(x.judul) + '</b><div class="muted">' + esc(x.teks) + '</div></div>' + (x.tombol ? '<button class="btn pri sm" data-act="dwgo" data-i="' + i + '" data-t="' + esc(x.t || '') + '">' + esc(x.tombol) + '</button>' : '') + '</div>').join('') || '<p class="muted">Tidak ada peringatan.</p>') + '<button class="btn sec" data-act="close">Tutup</button>'); },
+  dwarn: () => { const w = S.dwarn || []; sheet('<div class="sh-h"><h2>Peringatan (' + w.length + ')</h2></div>' + (w.map((x, i) => '<div class="warn-b" role="note"><div><b>' + esc(x.judul) + '</b><div class="muted">' + esc(x.teks) + '</div></div>' + (x.tombol ? '<button class="btn pri sm" data-act="dwgo" data-i="' + i + '" data-t="' + esc(x.t || '') + '">' + esc(x.tombol) + '</button>' : '') + (x.abaikan ? '<button class="btn sec sm" data-act="dwskip" data-i="' + i + '">Abaikan</button>' : '') + '</div>').join('') || '<p class="muted">Tidak ada peringatan.</p>') + '<button class="btn sec" data-act="close">Tutup</button>'); },
   dwgo: el => { const x = (S.dwarn || [])[Number(el.dataset.i)]; closeSheet(); if (x && ACT[x.act]) ACT[x.act](el); },
   hppfix: () => busy('Menghitung…', async () => {
     const R = S.dashRange; if (!R) return;
@@ -725,7 +742,11 @@ document.addEventListener('change', e => {
 A.setupWarn = () => { // Owner: hal yang masih harus dilengkapi (hasil Pemeriksaan data) sebagai isi lonceng Beranda, bukan kartu yang memakan layar
   try {
     if (!A.own()) return [];
-    return checks().filter(x => x.lv === 'err' || x.title === 'Item belum punya stok awal' || x.title.indexOf('Overhead') === 0).map(x => ({judul: x.title, teks: x.items.slice(0, 3).join(', ') + (x.items.length > 3 ? ' dan ' + (x.items.length - 3) + ' lainnya' : ''), tombol: 'Lengkapi', act: 'cekgo', t: x.go}));
+    const skip = LS.get('dwskip', []), uid = S.data && S.data.user ? S.data.user.uid : '';
+    return checks().filter(x => x.lv === 'err' || x.title === 'Item belum punya stok awal' || x.title.indexOf('Overhead') === 0).map(x => {
+      const sig = uid + '|' + x.title + '|' + x.items.join('|'), dis = x.lv !== 'err';   // hanya catatan (bukan galat) yang boleh diabaikan
+      return {sig: sig, dis: dis, w: {judul: x.title, teks: x.items.slice(0, 3).join(', ') + (x.items.length > 3 ? ' dan ' + (x.items.length - 3) + ' lainnya' : '') + (dis ? '. Abaikan bila memang tidak dipakai (disembunyikan di perangkat ini sampai daftar berubah).' : ''), tombol: 'Lengkapi', act: 'cekgo', t: x.go, abaikan: dis ? sig : ''}};
+    }).filter(o => !(o.dis && skip.indexOf(o.sig) >= 0)).map(o => o.w);
   } catch (e) { return []; }
 };
 A.issueCount = () => { try { return checks().filter(x => x.lv === 'err').length; } catch (e) { return 0; } };

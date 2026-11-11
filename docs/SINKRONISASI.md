@@ -23,7 +23,7 @@ Sebelumnya sidik versi yang diperiksa tiap perangkat (`app.ping`) hanya mencakup
 - Urutan memakai `nextval` (tidak transaksional): transaksi yang dibatalkan paling jauh menyebabkan satu muat ulang yang tidak perlu.
 - Penyelarasan setelah tulis sendiri hanya satu kali; bila ping yang sedang berjalan lebih tua daripada tulisan, perubahan akan tertangkap pada pemeriksaan berikutnya (Realtime atau polling 45 detik / 3 menit).
 - **Realtime belum diuji di Supabase sungguhan** (lihat `SISA-PEKERJAAN.md` bagian C). Bila tidak tersambung, sinkronisasi antar perangkat bergantung pada polling dan paling lambat terlihat setelah 45 detik.
-- `staleSoon()`/`seenV` di `02-api-sinkron.js` adalah kode lama yang tidak dipanggil di mana pun; tidak diubah di sini.
+- `staleSoon()`/`seenV`/`QUIET` di `02-api-sinkron.js` adalah kode lama yang tidak dipanggil di mana pun; dihapus pada 2.7.2.
 
 ## Tes
 `npm run test:ops` (logika klien: `verSync`, `dverKey`, penyelarasan, toast, cache `vload`), `tests/fe_sb.js` (stempel bootstrap), `supabase/tests/017_ops_sync.test.sql` (ops_ver, sinyal, RLS, penggabungan).

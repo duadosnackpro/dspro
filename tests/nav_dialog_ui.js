@@ -20,6 +20,18 @@ ok(toastMs('') === 2600 && toastMs('Singkat') === 2600, 'pesan pendek: 2,6 dtk')
 ok(toastMs('x'.repeat(60)) > 5000 && toastMs('x'.repeat(60)) < toastMs('x'.repeat(100)), 'makin panjang makin lama');
 ok(toastMs('x'.repeat(500)) === 10000, 'dibatasi 10 dtk');
 
+// ===== 2b. sheet struk bukan "isian belum disimpan" =====
+// Sheet "Pembayaran berhasil" (Kasir) dan struk dari Riwayat memuat kolom #wa (nomor WhatsApp tujuan, opsional). Bila #wa dihitung sebagai isian,
+// mengetuk Cetak/Kirim/Salin lalu "Transaksi baru" memunculkan "Data belum disimpan" padahal transaksinya sudah tersimpan.
+{
+  const sf = inti.match(/const SHEET_FIELD = '([^']*)';/); ok(sf, 'SHEET_FIELD ada di 01-inti.js');
+  ok(sf[1].indexOf(':not(#wa)') >= 0, 'SHEET_FIELD mengecualikan #wa (kolom nomor WhatsApp di sheet struk)');
+  const users = ['src/app/07-kasir-foto.js', 'src/app/08-riwayat.js'].filter(f => /id="wa"/.test(rd(f)));
+  ok(users.length === 2, 'kolom #wa hanya dipakai sheet struk Kasir dan Riwayat; bila ada sheet lain, periksa pengamannya');
+  const other = fs.readdirSync(path.join(__dirname, '../src/app')).filter(f => /\.js$/.test(f) && users.indexOf('src/app/' + f) < 0 && /id="wa"/.test(rd('src/app/' + f)));
+  ok(other.length === 0, 'tidak ada sheet lain berkolom #wa: ' + other);
+}
+
 // ===== 3. riwayat Back =====
 function boot(o) {
   o = o || {}; let m0;

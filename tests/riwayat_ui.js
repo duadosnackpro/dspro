@@ -99,16 +99,36 @@ const reply = (op, b) => op === 'sales.search' ? {rows: [row('s1', 'OUT-001-2611
   ok(/data-act="retur" data-id="s1"/.test(h) && /data-act="print"/.test(h) && /data-act="share"/.test(h) && /data-act="copyrc"/.test(h) && /data-act="rawbt"/.test(h) && /data-act="wa"/.test(h), 'sheet: Retur, Cetak, Bagikan, Salin, Bluetooth, WhatsApp');
   ok(/Retur terkait/.test(h) && /data-act="rcpt" data-id="r1"/.test(h), 'sheet: daftar retur terkait dapat dibuka'); ok(/Kembalian/.test(h), 'sheet: kembalian untuk tunai');
   let doc = m.docText(m.receiptDoc(rc, {w: 32}), 32);
-  ok(/SALINAN STRUK/.test(doc) && /No\s+: OUT-001-261107-001/.test(doc) && /Kasir\s+: Kasir X/.test(doc) && /Basreng 100g \(Level 3\)/.test(doc) && /TOTAL\s+20\.000/.test(doc) && /Tunai\s+25\.000/.test(doc) && /Kembalian\s+5\.000/.test(doc), 'struk salinan: tanda SALINAN, nomor, kasir, item, total, tunai, kembalian');
+  ok(/SALINAN STRUK/.test(doc) && /No\. OUT-001-261107-001/.test(doc) && /Kasir: Kasir X/.test(doc) && /Basreng 100g \(Level 3\)/.test(doc) && /TOTAL\s+20\.000/.test(doc) && /Tunai\s+25\.000/.test(doc) && /Kembalian\s+5\.000/.test(doc), 'struk salinan: tanda SALINAN, nomor, kasir, item, total, tunai, kembalian');
   ok(!/RETUR/.test(doc), 'struk penjualan tidak bertanda RETUR');
   doc = m.docText(m.receiptDoc(Object.assign({}, rc, {salinan: false}), {w: 48}), 48); ok(!/SALINAN/.test(doc), 'tanpa flag salinan: struk asli tidak berubah');
   ok(m.docText(m.receiptDoc({rid: 'zz', time: 1794050100000, kasir: 'K', ch: 'Toko', metode: 'tunai', terima: 5000, kembali: 0, sub: 5000, dis: 0, ppn: 0, total: 5000, lines: [{n: 'A', q: 1, h: 5000}]}, {w: 32}), 32).indexOf('(menunggu sinkron)') > 0, 'struk transaksi baru (tanpa nomor) tetap menulis menunggu sinkron');
+
+  // v2.7.3: desain struk ringkas (TOTAL tidak lagi ukuran ganda, kepala dua baris, item qty 1 satu baris, Subtotal hanya bila ada diskon/PPN)
+  {
+    const base = {rid: 'q1', nomor: 'UJI-001', time: 1794050100000, kasir: 'Ade WN', ch: 'Uji coba', metode: 'tunai', terima: 20000, kembali: 3000, sub: 17000, dis: 0, ppn: 0, total: 17000, lines: [{n: 'Contoh Produk A 80gr', q: 1, h: 7000}, {n: 'Contoh Produk B 100gr', q: 1, h: 10000}]};
+    const D0 = m.receiptDoc(base, {w: 32, rich: true}), T0 = m.docText(D0, 32).split('\n');
+    ok(D0.some(x => /^TOTAL/.test(x.s) && x.b) && !D0.some(x => /^TOTAL/.test(x.s) && x.z === 2), 'struk: TOTAL tebal tetapi berukuran biasa (bukan ukuran ganda), juga pada printer thermal (rich)');
+    ok(!T0.some(l => /Subtotal/.test(l)), 'struk: tanpa diskon/PPN, baris Subtotal tidak dicetak (nilainya sama dengan TOTAL)');
+    ok(T0.some(l => /^Contoh Produk A 80gr\s+7\.000$/.test(l)) && !T0.some(l => /1 x /.test(l)), 'struk: item qty 1 satu baris "nama ... jumlah"');
+    ok(T0.some(l => /^No\. UJI-001\s+Uji coba$/.test(l)) && T0.some(l => /^\d\d\/\d\d\/\d\d \d\d:\d\d\s+Kasir: Ade WN$/.test(l)), 'struk: kepala dua baris (No + channel, waktu + kasir), tanpa detik');
+    ok(T0.every(l => l.length <= 32), 'struk 32 kolom: tidak ada baris melebihi lebar kertas');
+    ok(T0.length <= 12, 'struk: ringkas (contoh 2 item = ' + T0.length + ' baris, dulu 17)');
+    const T1 = m.docText(m.receiptDoc(Object.assign({}, base, {lines: [{n: 'Basreng 100g', q: 2, h: 7000}], sub: 14000, dis: 1000, total: 13000}), {w: 32}), 32).split('\n');
+    ok(T1.some(l => /^\s+2 x 7\.000\s+14\.000$/.test(l)) && T1.some(l => /^Subtotal\s+14\.000$/.test(l)) && T1.some(l => /^Diskon\s+-1\.000$/.test(l)), 'struk: qty > 1 dua baris; Subtotal dan Diskon tampil bila ada diskon');
+    const T2 = m.docText(m.receiptDoc(Object.assign({}, base, {nomor: '', rid: 'baru', ch: 'Bawa pulang'}), {w: 32}), 32).split('\n');
+    ok(T2.some(l => /^No\. \(menunggu sinkron\)$/.test(l)) && T2.some(l => /^Bawa pulang$/.test(l)) && T2.every(l => l.length <= 32), 'struk: bila nomor + channel tidak muat satu baris, keduanya turun ke baris sendiri dan tidak melebihi lebar');
+    ok(m.docText(m.receiptDoc(Object.assign({}, base, {nomor: '', rid: 'baru'}), {w: 32}), 32).indexOf('No. (menunggu sinkron)  ') > 0, 'struk: nomor + channel pendek tetap satu baris');
+    ok(!/Kembalian/.test(m.docText(m.receiptDoc(Object.assign({}, base, {terima: 17000, kembali: 0}), {w: 32}), 32)) && /Kembalian\s+3\.000/.test(m.docText(D0, 32)), 'struk: uang pas tidak mencetak "Kembalian 0"; kembalian > 0 tetap dicetak');
+    const T3 = m.docText(m.receiptDoc(base, {w: 48}), 48).split('\n');
+    ok(T3.every(l => l.length <= 48) && T3.some(l => /^\s+TOTAL\s+17\.000$/.test(l)) && T3.some(l => /^ITEM\s+QTY\s+HARGA\s+TOTAL$/.test(l)), 'struk 48 kolom: tabel ITEM/QTY/HARGA/TOTAL tetap, TOTAL sejajar dengan baris jumlah');
+  }
 
   // retur: tanda, nota asal, refund, tanpa tombol Retur
   const sret = Object.assign({}, sale, {id: 'r1', nomor: 'RT-OUT-001-261107-001', jenis: 'return', ref_sale_id: 's1', ref_nomor: 'OUT-001-261107-001', subtotal: -10000, total: -10000, terima: 10000, kembali: 0, alasan: 'salah input'});
   m = boot({reply: () => ({sale: sret, items: [{nama: 'Basreng 100g', label: null, qty: -1, harga: 10000, total: -10000}], returns: []})}); await m.rcptOpen('r1');
   h = m.sheets[0]; ok(!/data-act="retur"/.test(h) && /Lihat nota asal OUT-001-261107-001/.test(h) && /data-act="rcpt" data-id="s1"/.test(h) && /Dikembalikan/.test(h) && /salah input/.test(h), 'sheet retur: tanpa tombol Retur, tautan nota asal, nilai dikembalikan, alasan');
-  doc = m.docText(m.receiptDoc(m.S.rc, {w: 32}), 32); ok(/\*\*\* RETUR \*\*\*/.test(doc) && /Asal\s+: OUT-001-261107-001/.test(doc) && /Refund Tunai\s+10\.000/.test(doc) && !/Kembalian/.test(doc) && /TOTAL\s+-10\.000/.test(doc), 'struk retur: RETUR, nota asal, Refund, total negatif, tanpa kembalian');
+  doc = m.docText(m.receiptDoc(m.S.rc, {w: 32}), 32); ok(/\*\*\* RETUR \*\*\*/.test(doc) && /Asal: OUT-001-261107-001/.test(doc) && /Refund Tunai\s+10\.000/.test(doc) && !/Kembalian/.test(doc) && /TOTAL\s+-10\.000/.test(doc), 'struk retur: RETUR, nota asal, Refund, total negatif, tanpa kembalian');
   // nota batal
   m = boot({reply: () => ({sale: Object.assign({}, sale, {status: 'batal'}), items: [], returns: []})}); await m.rcptOpen('s1'); ok(!/data-act="retur"/.test(m.sheets[0]) && /Batal<\/span>/.test(m.sheets[0]), 'nota batal: tanda Batal, tanpa Retur');
   // perlu ditinjau

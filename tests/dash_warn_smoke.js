@@ -1,6 +1,6 @@
 const fs=require('fs'), src=fs.readFileSync(require('path').join(__dirname,'..','web/js/modules.js'),'utf8'), assert=require('assert');
 const cut=(a,b)=>src.slice(src.indexOf(a), src.indexOf(b, src.indexOf(a)));
-const code = cut('function dashWarnings','function drawDash') + '\n' + cut("  dwarn: () =>", "  hppfix:").replace(/^  dwarn: /,'const H_dwarn = ').replace(/,\n  dwgo: /, ';\nconst H_dwgo = ').replace(/,\s*$/,';');
+const code = cut('function dashWarnings','function drawDash') + '\n' + cut("  dwarn: () =>", "  hppfix:").replace(/^ {2}dwarn: /,'const H_dwarn = ').replace(/,\n {2}dwgo: /, ';\nconst H_dwgo = ').replace(/,\s*$/,';');
 const dom={wbell:{innerHTML:''}}, calls=[]; let sheetHtml='', closed=0;
 const f=new Function('S','A','num','dec','esc','$','sheet','ACT','closeSheet', code+'\nreturn {dashWarnings,drawBell,H_dwarn,H_dwgo};');
 const S={}, ACT={tab:el=>calls.push('tab:'+el.dataset.t), hppfix:()=>calls.push('hppfix'), go_settings:()=>calls.push('set')};

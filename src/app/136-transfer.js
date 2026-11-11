@@ -47,7 +47,7 @@ function trDetail(id) {
 }
 async function trAct(id, a) {
   const t = (S.trs || []).find(x => x.id === id); if (!t) return; const p = {id: id, action: a};
-  if (a === 'receive') { p.items = t.items.map((it, i) => { const el = document.querySelector('[data-rc="' + i + '"]'); return {item_type: it.tipe, item_id: it.item_id, qty_received: dnum(el ? el.value : it.dikirim)}; }); const bi = p.items.findIndex(x => isNaN(x.qty_received)); if (bi >= 0) return fieldErr('#sheet [data-rc="' + bi + '"]', 'Jumlah diterima tidak valid'); }
+  if (a === 'receive') { p.items = t.items.map((it, i) => { const el = /** @type {HTMLInputElement|null} */ (document.querySelector('[data-rc="' + i + '"]')); return {item_type: it.tipe, item_id: it.item_id, qty_received: dnum(el ? el.value : it.dikirim)}; }); const bi = p.items.findIndex(x => isNaN(x.qty_received)); if (bi >= 0) return fieldErr('#sheet [data-rc="' + bi + '"]', 'Jumlah diterima tidak valid'); }
   if (['reject', 'cancel'].indexOf(a) >= 0 && !await confirmBox({title: a === 'reject' ? 'Tolak transfer ini?' : 'Batalkan transfer ini?', msg: a === 'reject' ? 'Transfer ini tidak akan diproses.' : t.status === 'sent' ? 'Barang yang sudah dikirim dikembalikan ke outlet asal.' : 'Transfer tidak akan dikirim.', stay: 'Kembali', leave: a === 'reject' ? 'Tolak transfer' : 'Batalkan transfer'})) return;
   return busy('Memproses…', async () => { try { await api('transfer.action', p); await loadData(); closeSheet(); vTransfer(); toast('Transfer diperbarui'); } catch (e) { toast(e.message); } });
 }
@@ -55,8 +55,8 @@ async function trSave(aj) {
   const f = S.trf; if (!f.items.length) return fieldErr('#sheet [data-act="tradd"]', 'Tambahkan minimal satu item: pilih item, isi jumlah, lalu ketuk Tambah.');
   return busy('Menyimpan transfer…', async () => { try { await api('transfer.create', {from_outlet_id: S.data.outlet.id, to_outlet_id: f.to, items: f.items, catatan: f.catatan, ajukan: aj}); closeSheet(); vTransfer(); toast(aj ? 'Transfer diajukan' : 'Draft tersimpan'); } catch (e) { toast(e.message); } });
 }
-document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.tf; if (k && S.trf) S.trf[k] = e.target.value; });
-document.addEventListener('change', e => { const k = e.target && e.target.dataset && e.target.dataset.tf; if (k && S.trf) { S.trf[k] = e.target.value; } });
+document.addEventListener('input', e => { const et = /** @type {HTMLInputElement} */ (e.target), k = et && et.dataset && et.dataset.tf; if (k && S.trf) S.trf[k] = et.value; });
+document.addEventListener('change', e => { const et = /** @type {HTMLInputElement} */ (e.target), k = et && et.dataset && et.dataset.tf; if (k && S.trf) { S.trf[k] = et.value; } });
 APP.views.transfer = vTransfer;
 Object.assign(ACT, {
   go_transfer: () => { S.tab = 'transfer'; render(); }, trnew: trNewSheet, trdetail: el => trDetail(el.dataset.id), tract: el => trAct(el.dataset.id, el.dataset.a),

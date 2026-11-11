@@ -4,14 +4,14 @@ let pass = 0, fail = 0; const ok = (c, m) => { if (c) pass++; else { fail++; con
 const SRC = fs.readFileSync(path.join(__dirname, '../src/app/045-bt-printer.js'), 'utf8');
 const RASTER = [0x1D, 0x76, 0x30, 0, 2, 0, 3, 0, 1, 2, 3, 4, 5, 6]; // 2 byte x 3 baris
 function mk(o) {
-  o = o || {}; const store = {}, log = {toast: [], err: []}, listeners = [];
+  o = o || {}; const store = {}, log = {toast: [], err: []};
   const mkChr = (w, nm) => ({uuid: 'chr-' + nm, properties: w, service: null, _w: [], async writeValueWithoutResponse(v) { await this._h(v); }, async writeValueWithResponse(v) { await this._h(v); }, async writeValue(v) { await this._h(v); },
     async _h(v) { dev.cc++; dev.max = Math.max(dev.max, dev.cc); await Promise.resolve(); try { if (dev.failAt && dev.writes.length + 1 === dev.failAt.n) { dev.failAt = null; if (dev.failDrop) dev.gatt.drop(); const e = new Error('GATT Error: write failed'); e.name = 'NetworkError'; throw e; } dev.writes.push(Array.from(v)); } finally { dev.cc--; } }});
   const mkDev = (id, name, svcs) => { const ls = [], d = {id, name, writes: [], cc: 0, max: 0, connects: 0, hang: 0, failAt: null, failDrop: false,
     addEventListener(t, f) { if (ls.indexOf(f) < 0) ls.push(f); }, removeEventListener(t, f) { const i = ls.indexOf(f); if (i >= 0) ls.splice(i, 1); }, nls: () => ls.length, forgot: false, async forget() { d.forgot = true; },
     gatt: {connected: false, connect() { d.connects++; if (d.hang > 0) { d.hang--; return new Promise(() => {}); } d.gatt.connected = true; return Promise.resolve(d.gatt); }, disconnect() { if (d.gatt.connected) { d.gatt.connected = false; setTimeout(() => ls.slice().forEach(f => f({target: d})), 0); } }, drop() { d.gatt.connected = false; ls.slice().forEach(f => f({target: d})); },
       async getPrimaryServices() { return svcs; }, async getPrimaryService(u) { const s = svcs.find(x => x.uuid === u); if (!s) throw new Error('no svc'); return s; }}};
-    svcs.forEach(s => s.chars.forEach(c => { c.service = s; c._h = c._h; })); return d; };
+    svcs.forEach(s => s.chars.forEach(c => { c.service = s; c._h = c._h; })); return d; }; // eslint-disable-line no-self-assign -- membuat properti _h pada karakteristik tiruan
   const chr1 = mkChr({writeWithoutResponse: true, write: true}, 'a'), svc1 = {uuid: '0000ff00-0000-1000-8000-00805f9b34fb', chars: [chr1], async getCharacteristics() { return this.chars; }, async getCharacteristic(u) { const c = this.chars.find(x => x.uuid === u); if (!c) throw new Error('no chr'); return c; }};
   chr1._h = function (v) { return Object.getPrototypeOf(chr1)._h ? 0 : 0; };
   const dev = mkDev(o.id || 'dev-1', o.name || 'PRN-A', o.svcs || [svc1]);

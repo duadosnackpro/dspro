@@ -15,10 +15,10 @@ const sw = rd('sw.js'), cfg = rd('js/config.js'), html = rd('index.html'), css =
 const vSw = (sw.match(/const VERSION = 'duado-v([^']+)'/) || [])[1], vCfg = (cfg.match(/VERSION:\s*'([^']+)'/) || [])[1];
 ok(vSw && vCfg && vSw === vCfg, 'versi sw.js (' + vSw + ') harus sama dengan config.js (' + vCfg + ')');
 
-const core = (sw.match(/const CORE = \[([^\]]*)\]/) || [, ''])[1].match(/'([^']+)'/g) || [];
+const core = (sw.match(/const CORE = \[([^\]]*)\]/) || [null, ''])[1].match(/'([^']+)'/g) || [];
 ok(core.length >= 9, 'daftar CORE terbaca (' + core.length + ' berkas)');
 core.map(x => x.slice(1, -1)).forEach(f => ok(f === './' || ex(f), 'berkas CORE sw.js ada: ' + f));
-(sw.match(/const OPTIONAL = \[([^\]]*)\]/) || [, ''])[1].match(/'([^']+)'/g) || []; // OPTIONAL boleh kosong
+(sw.match(/const OPTIONAL = \[([^\]]*)\]/) || [null, ''])[1].match(/'([^']+)'/g) || []; // OPTIONAL boleh kosong
 
 [...html.matchAll(/(?:src|href)="([^"#?]+)"/g)].map(m => m[1]).filter(u => !/^(https?:|data:)/.test(u)).forEach(u => ok(ex(u), 'index.html merujuk berkas yang ada: ' + u));
 [...css.matchAll(/url\(([^)]+)\)/g)].map(m => m[1].replace(/["']/g, '')).filter(u => !/^(data:|#)/.test(u)).forEach(u => ok(ex(path.normalize(path.join('css', u))), 'CSS merujuk berkas yang ada: ' + u));

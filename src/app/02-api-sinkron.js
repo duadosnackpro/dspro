@@ -1,8 +1,5 @@
 /* ---------- API dan sinkronisasi ---------- */
 let pending = 0;
-const QUIET = {ping: 1, 'stock.get': 1, bootstrap: 1, login: 1, logout: 1, 'client.log': 1, 'client.errors': 1}; // aksi yang tidak memicu pemeriksaan versi (mereka sendiri yang menyinkronkan)
-let staleT = null, seenV = ''; // seenV: versi terbaru yang pernah terlihat di jawaban server
-function staleSoon() { if (staleT) return; staleT = setTimeout(() => { staleT = null; if (S.data && dverKey() !== seenV) checkUpdates(true); }, 400); } // bila saat timer berjalan data sudah sama dengan versi terakhir yang terlihat, tak perlu ping
 function netState() { document.body.classList.toggle('net', pending > 0); badge(); }
 async function api(action, payload, opt) {
   if (!window.SBAPI || !window.SBAPI.enabled()) throw new Error('SUPABASE_URL / SUPABASE_KEY belum diisi di js/config.js');

@@ -2,7 +2,7 @@
    Disimpan di pengaturan `logo_data` sebagai "L1;<lebar>x<tinggi>;<t|h>;<base64>" (1 = titik hitam, MSB dahulu, per baris).
    t = hitam-putih tegas (ambang), h = halftone (Floyd-Steinberg). Dicetak dengan perintah raster ESC/POS `GS v 0`.
    Ukuran logo sudah final saat disimpan (persen dari lebar kertas); bila kertas diganti jadi lebih sempit, logo dikecilkan saat cetak. */
-const LOGO_MAX_H = 256, LOGO_BAND = 64, LOGO_RE = /^L1;(\d{1,3})x(\d{1,3});([th]);([A-Za-z0-9+\/]+={0,2})$/;
+const LOGO_MAX_H = 256, LOGO_BAND = 64, LOGO_RE = /^L1;(\d{1,3})x(\d{1,3});([th]);([A-Za-z0-9+/]+={0,2})$/;
 const paperDots = () => rcWidth() === 48 ? 576 : 384; // 203 dpi = 8 titik per mm (58 mm: 384 titik, 80 mm: 576 titik)
 const cfgOn = (k, def) => { const v = cfg(k); return v == null || v === '' ? !!def : T(v); };
 function logoPack(mono, w, h) { // mono: Uint8Array w*h (1 = hitam) -> byte per baris, bit tertinggi = titik paling kiri
@@ -79,7 +79,7 @@ const logoPct = lg => Math.min(100, lg.w / paperDots() * 100).toFixed(1) + '%';
 let LGE = null;
 const loadImg = f => new Promise((ok, no) => { const u = URL.createObjectURL(f), im = new Image(); im.onload = () => { URL.revokeObjectURL(u); ok(im); }; im.onerror = () => { URL.revokeObjectURL(u); no(new Error('gambar')); }; im.src = u; });
 function logoDraw(src, sw, sh, w, h) { // skala bertahap (maks. 2x per langkah) agar gambar besar tetap halus; latar transparan menjadi putih
-  const mk = (a, b) => { const c = document.createElement('canvas'); c.width = a; c.height = b; const x = c.getContext('2d', {willReadFrequently: true}); x.fillStyle = '#fff'; x.fillRect(0, 0, a, b); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; return [c, x]; };
+  const mk = /** @type {(a: number, b: number) => [HTMLCanvasElement, CanvasRenderingContext2D]} */ ((a, b) => { const c = document.createElement('canvas'); c.width = a; c.height = b; const x = c.getContext('2d', {willReadFrequently: true}); x.fillStyle = '#fff'; x.fillRect(0, 0, a, b); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; return [c, x]; });
   let cur = src, cw = sw, ch = sh;
   while (cw > w * 2 || ch > h * 2) { const nw = Math.max(w, Math.ceil(cw / 2)), nh = Math.max(h, Math.ceil(ch / 2)), p = mk(nw, nh); p[1].drawImage(cur, 0, 0, nw, nh); cur = p[0]; cw = nw; ch = nh; }
   const p = mk(w, h); p[1].drawImage(cur, 0, 0, w, h); return p[0];

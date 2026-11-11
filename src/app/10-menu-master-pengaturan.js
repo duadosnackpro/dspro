@@ -68,7 +68,7 @@ function field(f, val) {
   return '<label>' + l + '<input class="inp" data-f="' + k + '"' + (sug ? ' list="dl_' + k + '"' : '') + (t === 'number' ? ' inputmode="decimal"' : '') + ' value="' + esc(v) + '">' +
     (sug ? '<datalist id="dl_' + k + '">' + sug.map(x => '<option value="' + esc(x) + '">').join('') + '</datalist>' : '') + '</label>';
 }
-function readForm() { const o = {}; document.querySelectorAll('#sheet [data-f]').forEach(e => o[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value); return o; }
+function readForm() { const o = {}; /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sheet [data-f]')).forEach(e => o[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value); return o; }
 function vMaster(noLoad) {
   const cfg = MT[S.mt], rows = S.mt === 'expenses' ? (S.exp || []) : (S.data[cfg.k] || []);
   const head = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-mt8 chips">' + Object.keys(MT).map(k => '<button class="chip ' + (k === S.mt ? 'on' : '') + '" data-act="mt" data-k="' + k + '">' + MT[k].l + '</button>').join('') + '<button class="chip" data-act="go_resep">Resep</button></div>';
@@ -160,9 +160,9 @@ async function uSave(id) {
   });
 }
 const selF = (k, l, pairs, cur) => '<label>' + l + '<select class="inp" data-f="' + k + '">' + pairs.map(p => '<option value="' + p[0] + '"' + (String(cur) === p[0] ? ' selected' : '') + '>' + p[1] + '</option>').join('') + '</select></label>';
-const setSnap = () => JSON.stringify(Array.from(document.querySelectorAll('#sf [data-f]')).map(e => e.type === 'checkbox' ? e.checked : e.value));
+const setSnap = () => JSON.stringify(Array.from(/** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sf [data-f]'))).map(e => e.type === 'checkbox' ? e.checked : e.value));
 function sDepUpd() { // field yang bergantung: tarif PPN hanya saat PPN aktif; overhead sesuai cara hitung yang dipilih
-  const on = k => { const e = document.querySelector('#sf [data-f=' + k + ']'); return e && e.checked; }, m = (document.querySelector('#sf [data-f=metode_overhead]') || {}).value || 'per_unit';
+  const on = k => { const e = /** @type {HTMLInputElement|null} */ (document.querySelector('#sf [data-f=' + k + ']')); return e && e.checked; }, m = (/** @type {any} */ (document.querySelector('#sf [data-f=metode_overhead]')) || {}).value || 'per_unit';
   const set = (id, show) => { const e = $('#' + id); if (e) e.hidden = !show; };
   set('ppn-x', on('ppn_aktif')); set('hdr-x', on('header_aktif')); set('ftr-x', on('footer_aktif')); set('oh-unit', m === 'per_unit'); set('oh-batch', m === 'per_batch');
   const h = $('#oh-hint'); if (h) h.textContent = m === 'per_batch' ? 'Biaya overhead (gas, listrik, dll.) dihitung tetap setiap sekali produksi, berapa pun hasilnya.' : 'Biaya overhead (gas, listrik, dll.) dihitung per bungkus yang dihasilkan. Contoh: Rp300 × 118 bungkus.';
@@ -215,7 +215,7 @@ function vSettings() {
 }
 async function sSave() {
   return busy('Menyimpan pengaturan…', async () => {
-  const v = {}; document.querySelectorAll('#sf [data-f]').forEach(e => v[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value);
+  const v = {}; /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sf [data-f]')).forEach(e => v[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value);
   ['opname_ambang_nilai', 'transfer_ambang_nilai', 'bayar_referensi_min'].forEach(k => { if (k in v) v[k] = String(v[k]).replace(/\D/g, ''); });   // angka bulat atau kosong (kosong = nonaktif)
   ['ppn_persen', 'overhead_per_unit', 'overhead_per_batch', 'target_margin', 'stok_menipis', 'diskon_maks_persen', 'kelipatan_harga'].forEach(k => { if (k in v) { const n = dnum(v[k]); v[k] = isNaN(n) ? 0 : n; } });
   try { await api('setting.setMany', {values: v}); S.dirty = false; await loadData(); render(); toast('Pengaturan tersimpan'); } catch (e) { toast(e.message); }

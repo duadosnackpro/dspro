@@ -1,7 +1,7 @@
 /* Modul Owner: Beranda (dashboard), Produksi + Resep (HPP produksi), Laporan, Impor Shopee. Memakai API di app.js lewat window.APP. */
 (function () {
 'use strict';
-const A = window.APP, S = A.S, $ = A.$, api = A.api, rp = A.rp, num = A.num, esc = A.esc, LS = A.LS, T = A.T, sheet = A.sheet, closeSheet = A.closeSheet, toast = A.toast, busy = A.busy, skel = A.skel, ACT = A.ACT, confirmBox = A.confirmBox, fieldErr = A.fieldErr;
+const A = window.APP, S = A.S, $ = A.$, api = A.api, rp = A.rp, num = A.num, esc = A.esc, LS = A.LS, sheet = A.sheet, closeSheet = A.closeSheet, toast = A.toast, busy = A.busy, skel = A.skel, ACT = A.ACT, confirmBox = A.confirmBox, fieldErr = A.fieldErr;
 const set = k => S.data.settings[k];
 const newRid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2);   // request_id produksi: sama selama isian tidak berubah (kirim ulang aman), baru bila isian berubah
 const mById = id => S.data.materials.find(m => m.id === id);
@@ -41,16 +41,6 @@ function vDash(force) { // force: tombol muat ulang (↻) memaksa ambil ulang da
 }
 function delta(c, p, lab) { if (!p) return '<span>—</span> ' + lab + ' (belum ada data)'; const x = (c - p) / Math.abs(p) * 100; return '<span class="' + (x >= 0 ? 'u-ok' : 'u-err') + ' u-b8">' + (x >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(x)) + '</span> ' + lab; }
 const kpi = (l, v, sub) => '<div class="kpi"><div class="muted">' + l + '</div><b>' + v + '</b><div class="muted">' + sub + '</div></div>';
-function barChart(ser) {
-  const W = 320, H = 130, pad = 18, n = ser.length, max = Math.max(1, ...ser.map(s => s.omzet)), bw = (W - 8) / n; let g = '';
-  ser.forEach((s, i) => {
-    const h = Math.max(1, Math.round(s.omzet / max * (H - pad - 14))), lh = Math.max(0, Math.round(Math.max(s.laba, 0) / max * (H - pad - 14))), x = 4 + i * bw + bw * .15, w = bw * .7;
-    g += '<rect data-b="' + i + '" x="' + x + '" y="' + (H - pad - h) + '" width="' + w + '" height="' + h + '" rx="3" class="bc-o"/><rect data-b="' + i + '" x="' + x + '" y="' + (H - pad - lh) + '" width="' + w + '" height="' + lh + '" rx="3" class="bc-l"/>';
-    if (n <= 8 || i % 5 === 0) g += '<text x="' + (x + w / 2) + '" y="' + (H - 4) + '" font-size="10" text-anchor="middle" class="bc-t">' + s.d.slice(8) + '</text>';
-    g += '<rect data-act="bar" data-i="' + i + '" x="' + (4 + i * bw) + '" y="0" width="' + bw + '" height="' + H + '" class="bc-hit"/>'; // area ketuk selebar kolom
-  });
-  return '<svg class="bchart" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Omzet dan laba kotor per hari. Ketuk batang untuk melihat nilai.">' + g + '</svg>';
-}
 /* Warna grafik ada di CSS sebagai token (--ch1 ... --ch5, kelas ch1 ... ch5; batang Beranda: bc-o, bc-l, bc-t). Jangan menanam #hex di sini. */
 function donut(parts, total) { // batang bertumpuk per channel
   return '<div class="stack" role="img" aria-label="Komposisi penjualan per channel">' + parts.map((p, i) => '<i class="ch' + (i % 5 + 1) + '" data-dw="' + (total ? p.omzet / total * 100 : 0) + '%"></i>').join('') + '</div>';
@@ -134,7 +124,7 @@ function drawDash(d) {
   /* Server selalu mengirim minimal 7 hari untuk grafik (konteks "Hari ini"). "Bulan ini" hanya menampilkan tanggal bulan berjalan: tanpa hari bulan lalu. */
   if (d.period === 'bulan') d = Object.assign({}, d, {series: (d.series || []).filter(x => x.d >= d.from && x.d <= d.to)});
   const c = d.cur, p = d.prev, lab = CMP[d.period] || 'vs sebelumnya', t2 = c.pcs !== undefined; S.dd = d;
-  const days = Math.round((new Date(d.to + 'T12:00:00') - new Date(d.from + 'T12:00:00')) / 86400000) + 1, pto = d.pto || A.addDays(d.from, -1), pfrom = d.pfrom || A.addDays(pto, -(days - 1)); S.dser = d.series;
+  const days = Math.round((+new Date(d.to + 'T12:00:00') - +new Date(d.from + 'T12:00:00')) / 86400000) + 1, pto = d.pto || A.addDays(d.from, -1), pfrom = d.pfrom || A.addDays(pto, -(days - 1)); S.dser = d.series;
   const avg = c.trx ? c.omzet / c.trx : 0, pavg = p && p.trx ? p.omzet / p.trx : 0, sub = x => x ? x + ' ' + lab : '&nbsp;';
   /* Stok bahan: yang 0 = Habis (dahulukan), sisanya Menipis; jumlah sebenarnya dari server bila ada (daftar dibatasi 10), 3 teratas, sisanya dilipat */
   const low = d.low || [], habis = low.filter(l => Number(l.stok) <= 0), tipis = low.filter(l => Number(l.stok) > 0), list = habis.concat(tipis);
@@ -366,7 +356,7 @@ function vResep() {
 function dupSheet(id) {
   const r = S.data.recipes.find(x => x.id === id); if (!r) return;
   const items = recItems(id), src = A.vById(r.variant_id), pid = src && src.product_id, hasR = vid => S.data.recipes.filter(x => x.variant_id === vid).map(x => x.nama);
-  const vs = S.data.variants.filter(v => v.id !== r.variant_id && !A.isAddon(v)).map((v, i) => [v, i]).sort((a, b) => ((b[0].product_id === pid) - (a[0].product_id === pid)) || (a[1] - b[1])).map(x => x[0]); // varian produk yang sama di atas
+  const vs = S.data.variants.filter(v => v.id !== r.variant_id && !A.isAddon(v)).map((v, i) => [v, i]).sort((a, b) => (Number(b[0].product_id === pid) - Number(a[0].product_id === pid)) || (a[1] - b[1])).map(x => x[0]); // varian produk yang sama di atas
   S.dp2 = {src: id, nama: r.nama, sel: {}};
   sheet('<div class="grab"></div><h2>Duplikat resep</h2><p class="muted">Menyalin <b>' + esc(r.nama) + '</b>: ' + items.length + ' bahan, hasil ' + dec(r.hasil_standar) + ' unit per batch, tenaga kerja ' + rp(r.tenaga_kerja || 0) + '. Pilih varian tujuan. Setelah dibuat, tiap resep bisa disesuaikan (mis. jumlah cabai untuk level lebih pedas).</p>' +
     '<label>Nama dasar resep<input class="inp" data-dp="nama" value="' + esc(r.nama) + '"></label>' +
@@ -416,7 +406,7 @@ function rfSheet() {
   const f = S.rf, mats = S.data.materials, ri = S.ri; if (!mats.some(x => x.id === ri.m)) ri.m = mats[0] ? mats[0].id : '';
   const old = /** @type {any} */ (document.querySelector('#sheet .sheet')), keep = old && !$('#sheet').hidden ? old.scrollTop : 0; // tetap di posisi gulir yang sama setelah tambah/hapus bahan
   const adder = mats.length ? '<div class="card-s ri-add"><label>Bahan<select class="inp" id="ri_m" data-ri="m">' + mats.map(x => '<option value="' + esc(x.id) + '"' + (x.id === ri.m ? ' selected' : '') + '>' + esc(x.nama) + ' (' + esc(x.satuan) + ')</option>').join('') + '</select></label>' +
-    '<div class="row2 ri-add-r"><div class="u-f2"><label id="ri_l">Jumlah per batch</label><input class="inp" id="ri_q" data-ri="q" inputmode="decimal" placeholder="mis. 0,5" value="' + esc(ri.q) + '"></div><div class="u-f12" id="ri_uw"><label>Satuan</label><select class="inp" id="ri_u" data-ri="u"></select></div></div>' +
+    '<div class="row2 ri-add-r"><div class="u-f2"><label id="ri_l" for="ri_q">Jumlah per batch</label><input class="inp" id="ri_q" data-ri="q" inputmode="decimal" placeholder="mis. 0,5" value="' + esc(ri.q) + '"></div><div class="u-f12" id="ri_uw"><label for="ri_u">Satuan</label><select class="inp" id="ri_u" data-ri="u"></select></div></div>' +
     '<div class="chips" id="ri_ch"></div><div class="u-minh18 muted" id="ri_h"></div><button class="btn pri" data-act="riadd">+ Tambah ke resep</button></div>'
     : '<div class="card-s"><p class="muted">Belum ada bahan di Data Master. Tambahkan dulu bahan dan kemasan yang dipakai resep.</p><button class="btn pri" data-act="rimat">Buka Data Master, Bahan</button></div>';
   sheet('<div class="grab"></div><h2>' + (f.id ? 'Ubah resep' : 'Resep baru') + '</h2><label>Nama resep<input class="inp" data-rf="nama" value="' + esc(f.nama) + '"></label><label>Produk hasil (varian)<select class="inp" data-rf="variant_id">' + S.data.variants.map(v => '<option value="' + esc(v.id) + '"' + (v.id === f.variant_id ? ' selected' : '') + '>' + esc(A.vName(v) + ' ' + A.vSub(v)) + '</option>').join('') + '</select></label>' +
@@ -507,7 +497,7 @@ function runReport() {
         r.rows.map(row => '<tr>' + row.map((v, i) => '<td class="' + (r.fmt[i] === 'txt' ? '' : 'n') + '">' + cell(row, i, v) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' :
         emptyState('laporan', 'Tidak ada data', 'Belum ada data pada periode ini. Pilih periode lain.', '')) +
       '<div class="row2"><button class="btn sec" data-act="rcsv">Unduh CSV</button><button class="btn sec" data-act="rwa">Bagikan WhatsApp</button></div>';
-    const show = v => { if (!v.n || !$('#hppw')) return; $('#hppw').innerHTML = warnBanner(v); document.querySelectorAll('.mgv').forEach(e => { if (Number(e.dataset.v) >= 99.5) e.innerHTML = qMark; }); };
+    const show = v => { if (!v.n || !$('#hppw')) return; $('#hppw').innerHTML = warnBanner(v); /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.mgv')).forEach(e => { if (Number(e.dataset.v) >= 99.5) e.innerHTML = qMark; }); };
     if (!A.can('cost')) return; if (r.type === 'penjualan' || r.type === 'hpp') show(hppOf(r.rows)); else if (r.type === 'labarugi' || r.type === 'channel') hppCheck(r.from, r.to).then(show).catch(() => {});
   }, {fail: e => { if ($('#rres')) $('#rres').innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }});
 }
@@ -516,6 +506,7 @@ function download(name, text) { try { const a = document.createElement('a'); a.h
 function reportText(r) { return [(set('nama_usaha') || 'Duado Snack') + ' - ' + r.title, r.from + ' s/d ' + r.to].concat(r.summary.map(s => s.label + ': ' + fmtCell(s.value, s.fmt)), r.rows.slice(0, 12).map(row => row.map((v, i) => r.fmt[i] === 'txt' ? v : v == null ? '-' : fmtCell(v, r.fmt[i])).join(' | '))).join('\n'); }
 
 /* ---------- Impor Shopee (CSV) ---------- */
+/** @type {Array<[string, string, RegExp[]]>} */
 const SM = [['order', 'No. pesanan', [/no\.?\s*pesanan/i, /order\s*(id|sn|no)/i, /nomor\s*pesanan/i]], ['sku', 'SKU (harus sama dengan SKU varian)', [/nomor referensi sku/i, /sku variasi|variation sku/i, /sku/i]], ['qty', 'Jumlah', [/^jumlah$/i, /quantity|^qty$/i, /jumlah/i]],
   ['harga', 'Harga satuan (opsional)', [/harga setelah diskon/i, /price after/i, /harga satuan|unit price/i, /harga awal/i]], ['tanggal', 'Tanggal pesanan (opsional)', [/waktu pesanan dibuat/i, /order creation/i, /waktu pesanan|tanggal/i]], ['status', 'Status (opsional)', [/status pesanan|order status/i, /^status/i]]];
 function parseCSV(text) {
@@ -536,7 +527,7 @@ function parseNum(s) {
 }
 function normDate(s) {
   s = String(s || '').trim(); let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/); if (m) return m[1] + '-' + m[2] + '-' + m[3] + ' ' + p2(m[4]) + ':' + m[5] + ':' + (m[6] || '00');
-  m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/); if (m) return m[3] + '-' + p2(m[2]) + '-' + p2(m[1]) + ' ' + p2(m[4] || 0) + ':' + (m[5] || '00') + ':' + (m[6] || '00');
+  m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/); if (m) return m[3] + '-' + p2(m[2]) + '-' + p2(m[1]) + ' ' + p2(m[4] || 0) + ':' + (m[5] || '00') + ':' + (m[6] || '00');
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? s + ' 12:00:00' : '';
 }
 function shLoad(text) {
@@ -634,7 +625,7 @@ Object.assign(ACT, {
   creco: el => busy('Menyelaraskan riwayat…', async () => { try { await api('stock.reconcile', {tipe: el.dataset.t, id: el.dataset.id}); toast('Riwayat disesuaikan'); stockAudit(); } catch (e) { toast(e.message); } }),
   dp: el => { const again = el.dataset.p === S.dp; S.dp = el.dataset.p; vDash(again); },
   dtab: el => dashTab(el.dataset.t), dtop: el => dashTop(el.dataset.t),
-  bar: el => { const s = (S.dser || [])[Number(el.dataset.i)], bt = $('#bt'); if (!s || !bt) return; bt.innerHTML = '<b>' + esc(idDate(s.d)) + '</b> · Omzet <b>' + rp(s.omzet) + '</b> · Laba kotor <b>' + rp(s.laba) + '</b>'; document.querySelectorAll('.bchart [data-b]').forEach(r => { const on = r.dataset.b === el.dataset.i; r.style.opacity = on ? 1 : .35; if (r.getAttribute('role') === 'button') r.setAttribute('aria-pressed', on ? 'true' : 'false'); }); },
+  bar: el => { const s = (S.dser || [])[Number(el.dataset.i)], bt = $('#bt'); if (!s || !bt) return; bt.innerHTML = '<b>' + esc(idDate(s.d)) + '</b> · Omzet <b>' + rp(s.omzet) + '</b> · Laba kotor <b>' + rp(s.laba) + '</b>'; /** @type {NodeListOf<SVGElement>} */ (document.querySelectorAll('.bchart [data-b]')).forEach(r => { const on = r.dataset.b === el.dataset.i; r.style.opacity = on ? '1' : '0.35'; if (r.getAttribute('role') === 'button') r.setAttribute('aria-pressed', on ? 'true' : 'false'); }); },
   rpre: el => { S.rpre = el.dataset.p; if (S.rpre !== 'custom') setPreset(); vLaporan(S.rpre === 'custom'); },
   pnew: () => { S.rsq = ''; prodNew(); }, pjenis: el => { S.pform.jenis = el.dataset.j; S.rsq = ''; prodNew(); },
   pedit: el => prodEdit(el.dataset.id), pesave: () => busy('Menyimpan perubahan…', prodEditSave),
@@ -687,7 +678,7 @@ Object.assign(ACT, {
   shgo: shGo
 });
 document.addEventListener('input', e => {
-  const t = e.target, d = t.dataset || {};
+  const t = /** @type {HTMLInputElement} */ (e.target), d = t.dataset || {};
   if (d.pf) { S.pform[d.pf] = t.value; S.pform.rid = newRid(); if (d.pf === 'recipe' || d.pf === 'batch') pv(); }
   else if (d.pd) { S.pd[d.pd] = t.value; S.pd.rid = newRid(); pdv(); }
   else if (d.pe && S.pe) { S.pe[d.pe] = /** @type {any} */ (t).value; S.pe.rid = newRid(); if (d.pe === 'batch') pev(); }

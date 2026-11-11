@@ -72,7 +72,6 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
   try { await ov.S.call('override.grant', {username: 'owner1', pin: '123789'}); ok(false, 'jenis persetujuan wajib'); } catch (e) { ok(/tidak dikenal/.test(e.message), 'override.grant tanpa jenis ditolak'); }
 
   // aksi yang dilayani fungsi database (dashboard, laporan, produksi, resep, biaya, audit stok)
-  const A = {BRG: 'Bearer ' + good};
   const rt = {}, hh = (url, opt, body) => {
     const m = url.match(/rpc_([a-z_]+)/); if (m) { rt[m[1]] = body.p; }
     if (/rpc_dashboard/.test(url)) return {status: 200, body: {period: 'hari', cur: {omzet: 0}}};
@@ -306,7 +305,7 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
   try { await m.S.call('master.remove', {table: 'expenses', id: U1}, good); ok(false, 'tabel tak didukung'); } catch (e) { ok(/belum didukung/.test(e.message), 'tabel tak didukung => galat eksplisit'); }
   try { await m.S.call('master.remove', {table: 'channel_prices', id: 'bukan-uuid'}, good); ok(false, 'id buruk'); } catch (e) { ok(/tidak valid/.test(e.message), 'id harga tidak valid ditolak'); }
   const pb = load((url, opt, body) => /grant_type=password/.test(url) ? {status: 200, body: {access_token: good, refresh_token: 'r1'}} : /rpc_bootstrap/.test(url) ? {status: 200, body: Object.assign(boot('owner'), {prices: [{variant_id: U1, channel_id: U2, harga_jual: 5000}]})} : {status: 404, body: {message: 'x'}});
-  const bl = await pb.S.call('login', {username: 'tia', pin: '123789'}); const bs = await pb.S.call('bootstrap', {}, good);
+  await pb.S.call('login', {username: 'tia', pin: '123789'}); const bs = await pb.S.call('bootstrap', {}, good);
   ok(bs.prices[0].id === U1 + ':' + U2, 'bootstrap memberi id majemuk pada baris harga');
 
   // ---- P1-4: logout membersihkan outlet tersimpan dan refresh token ----

@@ -1,7 +1,7 @@
 /* Duado Snack POS - frontend local-first. Sumber ada di src/app/*.js; tools/build.js menyambungnya menjadi web/js/app.js (jangan mengedit hasil bangun). Data master disimpan di perangkat; transaksi masuk antrean lalu disinkronkan. */
 (function () {
 'use strict';
-const C = window.CONFIG || {};
+const C = window.CONFIG || /** @type {Window['CONFIG']} */ ({});
 const $ = s => document.querySelector(s);
 const rp = n => 'Rp\u00a0' + Math.round(Number(n) || 0).toLocaleString('id-ID');
 const num = n => Math.round(Number(n) || 0).toLocaleString('id-ID');
@@ -61,7 +61,7 @@ const Store = (() => {
 const devId = () => { let d = LS.get('dev', ''); if (!/^[0-9a-f]{32}$/.test(d)) { const a = new Uint8Array(16); (window.crypto && window.crypto.getRandomValues) ? window.crypto.getRandomValues(a) : a.forEach((_, i) => { a[i] = Math.floor(Math.random() * 256); }); d = Array.from(a, b => ('0' + b.toString(16)).slice(-2)).join(''); LS.set('dev', d); } return d; }; // id perangkat untuk penguncian login (server hanya menyimpan hash-nya)
 const LS = {get: Store.get, set: (k, v) => Store.set(k, v, ['queue', 'cart', 'token', 'hideOut', 'metode', 'ch'].indexOf(k) >= 0), del: Store.del};
 const T = v => String(v).toUpperCase() === 'TRUE';
-const APP = window.APP = {views: {}};
+const APP = window.APP = /** @type {any} */ ({views: {}});
 const S = {token: null, data: null, queue: [], tab: 'kasir', ch: null, cat: 'Semua', q: '',
   cart: [], diskon: '', metode: 'tunai', terima: '', catatan: '', nomor: {}, mt: 'products', stab: 'varian', day: null, pb: {items: [], ongkir: '', sup: '', rid: '', mode: 'sat'}, pbLast: null, adj: null, rc: null,
   sq: '', scat: 'Semua', hideOut: false, dirty: false, sheetDirty: false, sheetTtl: '', cfmOpen: false, rcustom: false, installEv: null, opt: null, pus: null, pgid: ''};
@@ -129,7 +129,7 @@ function watchMore() {
 }
 /* v2.6.13: lama toast mengikuti panjang pesan (dulu tetap 2,6 dtk sehingga pesan panjang hilang sebelum selesai dibaca): dasar 1,8 dtk + 55 ms per huruf, 2,6 sampai 10 dtk. */
 const toastMs = s => Math.min(10000, Math.max(2600, 1800 + String(s).length * 55));
-function toast(m) { const t = $('#toast'), s = String(m == null ? '' : m); t.textContent = s; t.className = 'show'; clearTimeout(toast.t); toast.t = setTimeout(() => t.className = '', toastMs(s)); }
+function toast(m) { const t = $('#toast'), s = String(m == null ? '' : m); t.textContent = s; t.className = 'show'; const tt = /** @type {any} */ (toast); clearTimeout(tt.t); tt.t = setTimeout(() => t.className = '', toastMs(s)); }
 /* v2.6.13: galat validasi tampil DI BAWAH kolomnya (role=alert, tidak hilang sendiri), kolom diberi aria-invalid + aria-describedby dan langsung difokuskan.
    Hilang begitu kolom diubah. Target tidak ketemu (mis. layar sudah berganti) = jatuh ke toast, jadi pesan tidak pernah hilang tanpa terbaca. Selalu mengembalikan undefined supaya `return fieldErr(...)` tetap sama seperti `return toast(...)`. */
 let ferrN = 0;
@@ -179,8 +179,9 @@ function closeSheet() { S.sheetDirty = false; S.sheetTtl = ''; if (S.opin) { con
 
 /* Pengaman form di dalam sheet: ketukan di luar kotak, tombol Esc, dan tombol Batal/Tutup tidak boleh membuang isian yang belum disimpan tanpa konfirmasi.
    Sheet dianggap "berisi isian" bila punya kolom input/select/textarea (kecuali kolom cari) dan sudah disentuh (diketik, diganti, atau ada tombol aksi diketuk di dalamnya).
-   Keranjang kasir (#cl) dikecualikan: isinya tersimpan di perangkat dan tidak hilang saat ditutup. closeSheet() langsung tetap dipakai setelah simpan/berhasil. */
-const SHEET_FIELD = 'input:not([type=hidden]):not([type=search]):not([data-rs]):not([data-in]),select,textarea';
+   Keranjang kasir (#cl) dikecualikan: isinya tersimpan di perangkat dan tidak hilang saat ditutup. closeSheet() langsung tetap dipakai setelah simpan/berhasil.
+   Kolom #wa (nomor WhatsApp tujuan kirim struk, opsional) juga dikecualikan: sheet struk (setelah bayar dan dari Riwayat) tidak punya data yang perlu disimpan, jadi mengetuk Cetak/Kirim/Salin lalu "Transaksi baru" tidak boleh memunculkan "Data belum disimpan". */
+const SHEET_FIELD = 'input:not([type=hidden]):not([type=search]):not([data-rs]):not([data-in]):not(#wa),select,textarea';
 function sheetHasForm() { const b = $('#sheet'), d = b && !b.hidden && !b.querySelector('#cl') ? b.querySelector('.sheet') : null; return !!(d && d.querySelector(SHEET_FIELD)); }
 const sheetDirtyNow = () => !!S.sheetDirty && sheetHasForm();
 function markSheetDirty(/** @type {Event} */ e) {

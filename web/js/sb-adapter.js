@@ -8,7 +8,7 @@ const enabled = () => /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(C.SUPABASE_URL
 const EMAIL_DOMAIN = '@users.duado.local';
 const LSK = {rt: 'sb_rt', outlet: 'sb_outlet'};
 const ls = {get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }};
-let outletId = ls.get(LSK.outlet) || null, refreshing = null, onToken = null, lastBoot = null, myUid = null;
+let outletId = ls.get(LSK.outlet) || null, refreshing = null, onToken = null, myUid = null;
 
 const fail = (msg, o) => Object.assign(new Error(msg), {server: true}, o || {});
 const uuid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
@@ -250,10 +250,10 @@ async function call(action, p, token, tokCb) {
       ls.set(LSK.rt, r.body.refresh_token);
       schemaOkAt = 0; try { await checkSchema(r.body.access_token); } catch (e) { ls.set(LSK.rt, null); throw e; }
       let b; try { b = await bootWithOps(r.body.access_token); } catch (e) { throw fail('Akun belum diaktifkan di outlet mana pun. Hubungi Owner.'); }
-      lastBoot = b; return {token: r.body.access_token, role: b.user.role, nama: b.user.nama, uid: b.user.uid, pin_lemah: false};
+      return {token: r.body.access_token, role: b.user.role, nama: b.user.nama, uid: b.user.uid, pin_lemah: false};
     }
-    case 'logout': { schemaOkAt = 0; try { await raw('/auth/v1/logout?scope=local', {method: 'POST'}, token); } catch (e) {} ls.set(LSK.rt, null); ls.set(LSK.outlet, null); outletId = null; myUid = null; lastBoot = null; return {ok: true}; }
-    case 'bootstrap': { await checkSchema(token); const b = await bootWithOps(token); lastBoot = null; return b; }
+    case 'logout': { schemaOkAt = 0; try { await raw('/auth/v1/logout?scope=local', {method: 'POST'}, token); } catch (e) {} ls.set(LSK.rt, null); ls.set(LSK.outlet, null); outletId = null; myUid = null; return {ok: true}; }
+    case 'bootstrap': { await checkSchema(token); const b = await bootWithOps(token); return b; }
     case 'ping': { const r = await rpc('ping', withOutlet(), token); return r; }
     case 'stock.get': return rpc('stock_get', withOutlet(), token);
     case 'override.grant': return overrideGrant(p);

@@ -10,6 +10,7 @@ Aplikasi dipakai kasir sambil berdiri, satu tangan, di HP kecil sampai tablet, s
 - Urutan berkas: token, dasar, kerangka, kontrol, permukaan, Kasir, lapisan (sheet/toast), struk, login, interaksi pointer, tablet, gerak berkurang, utilitas.
 - Font memakai berkas lokal (`web/fonts/baloo2-600.woff2`, `baloo2-800.woff2`); tidak ada permintaan ke Google Fonts.
 - Hanya ada satu blok `:root` (dijaga `tests/release_check.js`).
+- Meta viewport memakai `interactive-widget=resizes-content` agar papan ketik layar tidak menutup tombol Bayar di sheet (Chrome Android).
 
 ## 2. Aturan menulis gaya (ditegakkan tes)
 
@@ -50,7 +51,7 @@ Token turunan (semuanya di blok `:root`):
 - **Lapisan:** `--scrim`, `--scrim-2`, `--ring` (cincin fokus kolom), bayangan `--sh-sm`, `--sh-knob`, `--sh-sheet`, `--sh-card`, `--sh-dlg`, `--sh-logo`, `--sh-text`, `--float`; pudar tepi `--paper-0`, `--sunk-0`.
 - **Kartu Beranda (di atas `--brand`):** `--hero-bar`, `--hero-bar-i`, `--hero-bar-ti`, `--hero-chip`, `--cb-i`, `--ini`, `--heat-bg`, `--login-glow`.
 - **Grafik:** `--ch1`..`--ch5` = maroon, cabai, kuning, hijau, abu hangat (rujuk token di atas).
-- **Foto produk:** `--tn0-a/-b` .. `--tn5-a/-b`, enam pasang gradien yang dipilih dari hash id produk.
+- **Foto produk:** `--tn0-a/-b` .. `--tn5-a/-b`, enam pasang gradien yang dipilih dari hash id produk. Kedua ujung tiap gradien harus memberi kontras >= 3:1 dengan inisial putih 90% (`--ini`, teks besar 34px); hitung ulang bila mengubah nada.
 - **Struk:** `--rc-paper` (`#fff`) dan `--rc-ink` (`#000`).
 
 ## 4. Tipografi
@@ -63,12 +64,14 @@ Token turunan (semuanya di blok `:root`):
 
 ## 5. Jarak, bentuk, gerak
 
-- Jarak: `--s1` 4, `--s2` 8, `--s3` 12, `--s4` 16, `--s5` 24, `--s6` 32 px. Tepi halaman `--px` 16 px.
+- Jarak: `--s1` 4, `--s2` 8, `--s3` 12, `--s4` 16, `--s5` 24, `--s6` 32 px. Tepi halaman `--px` 16 px, atau lebih besar bila HP berponi dipakai mendatar: `--px` = `max(16px, env(safe-area-inset-left), env(safe-area-inset-right))`. Elemen penuh lebar yang memakai nilai literal (navigasi bawah, `.cartbar`, `main` di tablet) ikut area aman lewat `max()` yang sama; tulis `var(--px)` untuk jarak kiri-kanan baru, jangan angka.
 - Sudut: `--r-sm` 10, `--r-md` 14, `--r-lg` 20 px. Pil 999px.
 - Navigasi bawah `--nav-h` 68 px (di luar area aman).
 - Durasi: `--t-fast` 120, `--t-med` 200, `--t-slow` 280 ms; kurva `--ease`.
 - Lebar: satu kolom maksimum 640 px. Mulai 768 px, Kasir terbagi dua panel (kolom pesanan 340 px; 400 px mulai 900 px).
-- `prefers-reduced-motion: reduce` mematikan animasi; hanya pemuat dan bilah kemajuan yang tetap berputar.
+- `prefers-reduced-motion: reduce` mematikan animasi dan transisi, termasuk pada `::before`/`::after` (selektor `*` saja tidak mengenai pseudo-elemen, jadi aturannya ditulis `*,*::before,*::after`); hanya pemuat dan bilah kemajuan yang tetap berputar.
+- Pemusatan vertikal layar yang bisa lebih tinggi dari layar (login) memakai dua pengisi `::before`/`::after` dengan `flex:1 0 0`, bukan `justify-content:center`: yang terakhir memotong bagian atas yang tidak bisa digulir (HP mendatar, papan ketik terbuka).
+- Ponsel: `.kasir-ctl` (info kasir + channel) bermargin bawah `--s3` karena `.kasir-top` di bawahnya bermargin atas -12px dan berlatar solid; margin yang lebih kecil membuat latar itu menimpa dasar pemilih channel. Posisi menempel `.kasir-top` (`top:-12px`) menyeimbangkan padding `<main>`; jangan diubah tanpa mengukur keduanya.
 
 ## 6. Komponen
 
@@ -86,12 +89,24 @@ Token turunan (semuanya di blok `:root`):
 | Lapisan | `.sheet`, `.sheet-bg`, `.cfm-box`, `#toast`, `#busy`, `#upd` | sheet mengunci fokus dan mengembalikannya ke tombol asal |
 | Struk | `pre.rc`, `.lg-paper`, `#rtxt` | **fungsional**: jangan ubah ukuran atau lebar karakter |
 
+Isi struk disusun satu kali oleh `receiptDoc()` (`src/app/03-ikon-tampilan-struk.js`) untuk pratinjau, cetak browser, Bluetooth/ESC-POS, dan teks WhatsApp, jadi mengubah tata letak cukup di satu tempat. Aturan tata letak (v2.7.3):
+- Hanya nama usaha yang berukuran ganda (pada printer thermal). **TOTAL tebal tetapi berukuran biasa**; ukuran ganda untuk angka total terlalu besar di kertas 58 mm.
+- Kepala dua baris: `No. … | channel` dan `tanggal jam | Kasir: …` (tanpa detik, tahun dua digit). Pasangan yang tidak muat satu baris turun ke dua baris, jadi tidak pernah melebihi lebar kertas.
+- Item qty 1 yang muat: satu baris `nama … jumlah`. Selain itu nama (turun baris bila panjang) lalu `  qty x harga … jumlah`. Kertas 80 mm tetap memakai tabel ITEM/QTY/HARGA/TOTAL.
+- `Subtotal` hanya dicetak bila ada diskon atau PPN; `Kembalian` hanya bila lebih dari 0. Tidak ada garis pemisah antara TOTAL dan baris pembayaran.
+- Tes yang mengunci aturan ini: `tests/riwayat_ui.js` (bagian "desain struk ringkas").
+
 ## 7. Aksesibilitas (batas minimum)
 
 - Sasaran ketuk minimal 44 x 44 px (tombol 52, bar navigasi 56).
 - Kontras teks minimal 4,5:1; ikon, garis kolom, dan grafis minimal 3:1. Pasangan token di bagian 3 sudah dihitung; hitung ulang bila menambah pasangan baru.
-- Fokus terlihat: `:focus-visible` memakai garis 3 px `--brand` (`--yel` di atas permukaan gelap). Kolom isian memakai tepi `--brand` + cincin `--ring`.
+- Fokus terlihat: `:focus-visible` memakai garis 3 px `--brand` (`--yel` di atas permukaan gelap). Kolom isian memakai tepi `--brand` + cincin `--ring`; kolom galat (`aria-invalid="true"`) yang fokus menambah garis 3 px `--err` karena aturan galat menimpa tepi dan cincin biasa.
+- Cincin fokus tidak boleh terpotong. Wadah dengan `overflow` selain `visible` memotong garis yang di luar kotak elemen: di dalam `.chips` dan `.seg-wrap` cincin dipindah ke dalam (`outline-offset:-3px`; chip aktif memakai `--yel` karena latarnya `--brand`), dan `.kleft` (tablet) memberi ruang 5 px (outline 3 px + offset 2 px) dengan margin negatif agar posisi isi tetap. Wadah gulir baru harus lolos uji ini: fokuskan elemen pertama dengan papan ketik dan periksa cincinnya utuh.
 - Status tidak hanya warna: lencana punya teks dan penanda; selisih kas memakai tanda `+`/`-` dan angka, bukan hanya hijau/merah.
+- Grafik batang bertumpuk dan kotak legenda (`.stack i`, `.lgd`) memakai garis dalam 1px `--ink-2` agar tiap segmen terlihat tanpa bergantung pada warna; angka tetap ada di baris legenda.
+- Inisial produk (`.ini`) bersifat dekoratif: `aria-hidden="true"`, nama produk sudah ada di teks kartu. Kolom isian tanpa label tampak harus punya `aria-label` (mis. formulir kas masuk/keluar) atau `<label for>`.
+- Panah dekoratif lewat CSS (`content`) ditulis dengan teks alternatif kosong: `content:"▾" / ""`.
+- `prefers-reduced-motion`: semua animasi dimatikan, kecuali pemuat/bilah kemajuan; `.qdot` (titik antrean) menjadi statis.
 - Pengumuman: `#toast`, `#busy`, `#sann` memakai `aria-live="polite"`; galat penting memakai `role="alert"`.
 - Elemen interaktif memakai `<button>` atau `role="button"` + `tabindex`; ikon dekoratif `aria-hidden="true"`.
 
@@ -114,5 +129,7 @@ npm run lint
 npm run typecheck
 npm test             # termasuk tests/release_check.js (CSP, tanpa style/#hex, berkas ini ada)
 ```
+
+Saat rilis, `deploy.yml` memperkecil JS/CSS hanya di paket situs (`tools/minify.js`: spasi dan sintaks, tanpa mengganti nama variabel); sumber di repo tetap terbaca. `npm run test:min` menjalankan ulang uji perilaku pada hasil perkecil. Lint dan tipe dijaga di nol (`--max-warnings 0`, `types/baseline.txt` kosong): jangan menambah peringatan atau galat baru.
 
 Setelah mengubah berkas di `web/`, naikkan versi (`package.json`, `web/js/config.js`, `web/sw.js`, judul `supabase/README.md`); service worker memakai cache per versi sehingga perangkat lama tidak menerima CSS/JS baru tanpa itu.

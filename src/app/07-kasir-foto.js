@@ -28,10 +28,10 @@ const TILES = 6; // 6 nada foto; pasangan warnanya ada di CSS sebagai token (--t
 const tileOf = v => { let h = 0; String(v.product_id || v.id).split('').forEach(c => { h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return 'tn' + (h % TILES); };
 /* ===== v1.9.1 (tahap 2): foto produk. Foto = satu per PRODUK (semua varian memakainya), disimpan di Supabase Storage (bucket product-photos); products.photo_url menyimpan alamatnya ===== */
 const fotoOf = p => p && /^https:\/\//.test(p.foto_url || '') ? p.foto_url : '';
-const photoInner = (p, name) => '<span class="ini">' + esc(String(name).trim().charAt(0).toUpperCase()) + '</span>' + (fotoOf(p) ? '<img src="' + esc(fotoOf(p)) + '" alt="" crossorigin="anonymous" referrerpolicy="no-referrer" decoding="async" loading="lazy" data-foto="1">' : '');
+const photoInner = (p, name) => '<span class="ini" aria-hidden="true">' + esc(String(name).trim().charAt(0).toUpperCase()) + '</span>' + (fotoOf(p) ? '<img src="' + esc(fotoOf(p)) + '" alt="" crossorigin="anonymous" referrerpolicy="no-referrer" decoding="async" loading="lazy" data-foto="1">' : '');
 const photoHtml = v => photoInner(pById(v.product_id), vName(v));
 function fotoErr(im) { // gagal muat: sekali coba tanpa CORS (hanya online, tidak masuk cache); gagal lagi = buang gambar, huruf awal di bawahnya tampil
-  if (!im.dataset.r && im.hasAttribute('crossorigin')) { im.dataset.r = '1'; im.removeAttribute('crossorigin'); im.src = im.src; } else im.remove();
+  if (!im.dataset.r && im.hasAttribute('crossorigin')) { im.dataset.r = '1'; im.removeAttribute('crossorigin'); im.src = im.src; } else im.remove(); // eslint-disable-line no-self-assign -- sengaja: memuat ulang gambar setelah atribut crossorigin dibuang
 }
 const FOTO = {side: 480, target: 32 * 1024, small: 40 * 1024, cache: 'duado-foto'};
 const blobB64 = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = () => no(new Error('baca')); r.readAsDataURL(b); });
@@ -81,7 +81,7 @@ async function fotoDel() {
   const pid = S.fotoFor; if (!pid || !await confirmBox({title: 'Hapus foto produk ini?', msg: 'Kartu produk di Kasir kembali tanpa foto.', stay: 'Batal', leave: 'Hapus foto'})) return;
   return busy('Menghapus foto…', async () => { try { await api('produk.foto', {product_id: pid, data: ''}); fotoApply(pid, ''); toast('Foto dihapus'); } catch (e) { toast(e.message); } });
 }
-document.addEventListener('error', ev => { const t = ev.target; if (t && t.tagName === 'IMG' && t.hasAttribute('data-foto')) fotoErr(t); }, true); // error gambar tidak menggelembung: ditangkap di fase capture (CSP v1.9.7 melarang onerror inline; sebelumnya fotoErr juga tidak terjangkau dari atribut)
+document.addEventListener('error', ev => { const t = /** @type {HTMLElement|null} */ (ev.target); if (t && t.tagName === 'IMG' && t.hasAttribute('data-foto')) fotoErr(t); }, true); // error gambar tidak menggelembung: ditangkap di fase capture (CSP v1.9.7 melarang onerror inline; sebelumnya fotoErr juga tidak terjangkau dari atribut)
 let fotoBusy = false;
 async function fotoWarm() { // simpan semua foto katalog ke cache offline (satu per satu, ringan) dan buang yang sudah tidak dipakai
   if (fotoBusy || !S.data || !window.caches || navigator.onLine === false) return; fotoBusy = true;
@@ -106,7 +106,7 @@ function grid() {
   const d = S.data, q = S.q.toLowerCase(), avail = v => (Number(v.stok) || 0) > 0;
   const base = d.variants.filter(v => !isAddon(v) && (S.cat === 'Semua' || String((pById(v.product_id) || {}).kategori) === S.cat) && (!q || (vName(v) + ' ' + vSub(v) + ' ' + v.sku).toLowerCase().indexOf(q) >= 0));
   let list = S.hideOut ? base.filter(avail) : base;
-  list = list.map((v, i) => [v, i]).sort((x, y) => (avail(y[0]) - avail(x[0])) || (x[1] - y[1])).map(x => x[0]); // tersedia di atas, habis di bawah, urutan asli dijaga
+  list = list.map((v, i) => [v, i]).sort((x, y) => (Number(avail(y[0])) - Number(avail(x[0]))) || (x[1] - y[1])).map(x => x[0]); // tersedia di atas, habis di bawah, urutan asli dijaga
   const sig = S.cat + '|' + q + '|' + S.hideOut; if (S.gsig !== sig) { S.gsig = sig; delete LIM.grid; const mn = $('#main'); if (mn) mn.scrollTop = 0; } // filter berganti: mulai dari halaman pertama dan dari atas (tanpa ini browser menahan posisi di dasar daftar baru dan sentinel memuat berantai sampai semua baris)
   const kc = $('#kcount'); if (kc) kc.textContent = list.length + ' produk' + (S.hideOut && base.length > list.length ? ' · ' + (base.length - list.length) + ' habis disembunyikan' : '');
   $('#grid').innerHTML = (list.slice(0, lim('grid')).map(v => {
@@ -122,7 +122,7 @@ function updCard(id) { // perbarui satu kartu saja, tanpa menggambar ulang selur
   el.innerHTML = cardHtml(v); el.classList.toggle('in', cartQty(id) > 0);
   ['role', 'tabindex', 'aria-disabled', 'aria-label'].forEach(a => el.removeAttribute(a));
   const at = cardAttrs(v); Object.keys(at).forEach(k => el.setAttribute(k, at[k]));
-  if (had) { const nx = /** @type {HTMLElement|null} */ ((cartQty(id) > 0 ? el.querySelector('[data-act="inc1"]') : null) || el); if (nx) nx.focus({preventScroll: true}); } el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  if (had) { const nx = /** @type {HTMLElement|null} */ ((cartQty(id) > 0 ? el.querySelector('[data-act="inc1"]') : null) || el); if (nx) nx.focus({preventScroll: true}); } el.classList.remove('pop'); void /** @type {HTMLElement} */ (el).offsetWidth; el.classList.add('pop');
 }
 function barRender() {
   const el = $('#cartbar'); if (!el) return;

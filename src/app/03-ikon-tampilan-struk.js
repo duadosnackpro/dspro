@@ -43,7 +43,7 @@ const emptyState = (ic, t, d, a) => '<div class="empty-s"><div class="es-i">' + 
 const wrapChips = h => '<div class="chips-wrap"><div class="chips">' + h + '</div></div>';
 function initFades() { // petunjuk geser: gradient di tepi chip yang bisa digeser, dan chip aktif otomatis terlihat
   document.querySelectorAll('.chips-wrap').forEach(w => {
-    const c = w.firstElementChild; if (!c) return;
+    const c = /** @type {any} */ (w.firstElementChild); if (!c) return;
     const upd = () => { w.classList.toggle('fade-r', c.scrollWidth - c.clientWidth - c.scrollLeft > 4); w.classList.toggle('fade-l', c.scrollLeft > 4); };
     if (!c._fx) { c._fx = 1; c.addEventListener('scroll', upd, {passive: true}); }
     if (!c._sc) { c._sc = 1; const on = c.querySelector('.chip.on,.seg button.on'); if (on) c.scrollLeft = Math.max(0, on.offsetLeft - (c.clientWidth - on.offsetWidth) / 2); }
@@ -101,8 +101,7 @@ const ljust = (s, n) => s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.len
 const rjust = (s, n) => ' '.repeat(Math.max(0, n - s.length)) + s;
 const lr = (a, b, w) => { a = String(a); b = String(b); return a + ' '.repeat(Math.max(1, w - a.length - b.length)) + b; };
 const padC = (s, n) => ' '.repeat(Math.max(0, (n - s.length) >> 1)) + s;
-const dmy = d => { d = new Date(d); return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear(); };
-const hms = d => { d = new Date(d); return p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()); };
+const dtm = d => { d = new Date(d); return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + String(d.getFullYear()).slice(-2) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()); }; // 11/11/26 13:52 (tanpa detik: struk lebih pendek)
 function noteLines(t, w) { // catatan header/footer: rata tengah, *tebal*, baris kosong di ujung dibuang
   const o = [];
   String(t == null ? '' : t).split(/\r?\n/).forEach(p => { p = p.trim(); const m = /^\*(.+)\*$/.exec(p); if (m) p = m[1].trim(); wrapWords(p, w).forEach(s => o.push({s: s, a: 'c', b: !!m})); });
@@ -115,21 +114,27 @@ function receiptDoc(rc, o) { // o: {w: lebar, rich: ukuran ganda + QR bawaan pri
   if (!o.logo) { const nm = String(cfg('nama_usaha') || 'Duado Snack').toUpperCase(), z = rich && nm.length * 2 <= w; wrapWords(nm, z ? w >> 1 : w).forEach(x => add(x, {a: 'c', b: true, z: z ? 2 : 1})); }
   if (cfgOn('header_aktif', true)) noteLines(cfg('header_struk'), w).forEach(x => D.push(x));
   hr(); if (rc.retur) add('*** RETUR ***', {a: 'c', b: true}); if (rc.salinan) add('SALINAN STRUK', {a: 'c'}); // cetak ulang dari Riwayat (2.7.0)
-  const nomor = rc.nomor || S.nomor[rc.rid] || '(menunggu sinkron)', kasir = String(rc.kasir || ''), kv = (k, v, lw, n) => ljust(k, lw) + ': ' + String(v).slice(0, n);
-  if (wide) { add(ljust(kv('No', nomor, 8, 18), 28) + kv('Waktu', hms(rc.time), 6, 12)); add(ljust(kv('Tanggal', dmy(rc.time), 8, 18), 28) + kv('Kasir', kasir, 6, 12)); add(kv('Via', rc.ch, 8, 38)); }
-  else { add(kv('No', nomor, 6, 24)); add(kv('Waktu', dmy(rc.time) + ' ' + hms(rc.time), 6, 24)); if (kasir) add(kv('Kasir', kasir, 6, 24)); add(kv('Via', rc.ch, 6, 24)); }
-  if (rc.ref) add(kv('Asal', rc.ref, wide ? 8 : 6, 38));
+  const nomor = rc.nomor || S.nomor[rc.rid] || '(menunggu sinkron)', kasir = String(rc.kasir || '');
+  /* v2.7.3 desain ringkas: kepala dua baris (pasangan kiri-kanan; bila tidak muat turun ke dua baris), item qty 1 satu baris,
+     Subtotal hanya bila ada diskon/PPN, TOTAL tebal berukuran biasa (tanpa ukuran ganda), tanpa garis di antara TOTAL dan pembayaran. */
+  const pair = (a, b) => { if (!b) add(a); else if (a.length + 1 + b.length > w) { add(a); add(b); } else add(lr(a, b, w)); };
+  pair('No. ' + String(nomor).slice(0, 24), String(rc.ch || '')); pair(dtm(rc.time), kasir ? 'Kasir: ' + kasir.slice(0, 24) : '');
+  if (rc.ref) add('Asal: ' + String(rc.ref).slice(0, w - 6));
   hr();
   if (wide) { // tabel: ITEM | QTY | HARGA | TOTAL (satu baris per item; nama panjang turun ke baris berikutnya)
     const Q = 4, H = 10, TT = 11, N = w - Q - H - TT - 3;
     add(ljust('ITEM', N) + ' ' + rjust('QTY', Q) + ' ' + rjust('HARGA', H) + ' ' + rjust('TOTAL', TT), {b: true}); hr();
     rc.lines.forEach(l => wrapWords(l.n, N).forEach((x, i) => add(i ? x : ljust(x, N) + ' ' + rjust(String(l.q), Q) + ' ' + rjust(num(l.h), H) + ' ' + rjust(num(l.q * l.h), TT))));
-  } else rc.lines.forEach(l => { wrapWords(l.n, w).forEach(x => add(x)); add(lr('  ' + l.q + ' x ' + num(l.h), num(l.q * l.h), w)); });
+  } else rc.lines.forEach(l => { // qty 1 dan muat: satu baris "nama ... jumlah"; selain itu nama (turun baris) lalu "  qty x harga ... jumlah"
+    const tot = num(l.q * l.h);
+    if (l.q === 1 && l.n.length + 1 + tot.length <= w) add(lr(l.n, tot, w));
+    else { wrapWords(l.n, w).forEach(x => add(x)); add(lr('  ' + l.q + ' x ' + num(l.h), tot, w)); }
+  });
   const ind = wide ? 20 : 0, pad = ' '.repeat(ind), S2 = (a, b) => add(pad + lr(a, b, w - ind));
-  hr(); S2('Subtotal', num(rc.sub)); if (rc.dis) S2('Diskon', rc.dis < 0 ? num(-rc.dis) : '-' + num(rc.dis)); if (rc.ppn) S2(T(cfg('ppn_inklusif')) ? 'PPN (incl.)' : 'PPN', num(rc.ppn));
-  hr(); const tz = rich && 'TOTAL'.length + 1 + num(rc.total).length <= w >> 1; add(lr('TOTAL', num(rc.total), tz ? w >> 1 : w), {b: true, z: tz ? 2 : 1});
-  hr(); const pl = pay === 'qris' ? 'QRIS' : pay.charAt(0).toUpperCase() + pay.slice(1);
-  if (rc.retur) S2('Refund ' + pl, num(-rc.total)); else { S2(pl, num(rc.terima)); if (pay === 'tunai') S2('Kembalian', num(rc.kembali)); }
+  hr(); if (rc.dis || rc.ppn) { S2('Subtotal', num(rc.sub)); if (rc.dis) S2('Diskon', rc.dis < 0 ? num(-rc.dis) : '-' + num(rc.dis)); if (rc.ppn) S2(T(cfg('ppn_inklusif')) ? 'PPN (incl.)' : 'PPN', num(rc.ppn)); }
+  add(pad + lr('TOTAL', num(rc.total), w - ind), {b: true});
+  const pl = pay === 'qris' ? 'QRIS' : pay.charAt(0).toUpperCase() + pay.slice(1);
+  if (rc.retur) S2('Refund ' + pl, num(-rc.total)); else { S2(pl, num(rc.terima)); if (pay === 'tunai' && rc.kembali > 0) S2('Kembalian', num(rc.kembali)); } // uang pas: baris "Kembalian 0" tidak dicetak
   const ft = cfgOn('footer_aktif', true) ? noteLines(cfg('footer_struk'), w) : [], qr = String(cfg('qr_struk') || '').trim();
   if (ft.length || qr) hr();
   ft.forEach(x => D.push(x));
@@ -151,7 +156,7 @@ const QR_T = [null, [26, 10, 1, 16], [44, 16, 1, 28], [70, 26, 1, 44], [100, 18,
 function qrMake(text) { // -> matriks [baris][kolom] berisi 1 (gelap) / 0, atau null bila terlalu panjang
   const bytes = Array.from(unescape(encodeURIComponent(String(text)))).map(c => c.charCodeAt(0)); let v = 1;
   while (v <= 7 && bytes.length > QR_T[v][2] * QR_T[v][3] - 2) v++; if (v > 7) return null;
-  const tot = QR_T[v][0], ecn = QR_T[v][1], nb = QR_T[v][2], dpb = QR_T[v][3], nd = nb * dpb, size = 17 + 4 * v, bits = [], put = (x, n) => { for (let i = n - 1; i >= 0; i--) bits.push((x >> i) & 1); };
+  const ecn = QR_T[v][1], nb = QR_T[v][2], dpb = QR_T[v][3], nd = nb * dpb, size = 17 + 4 * v, bits = [], put = (x, n) => { for (let i = n - 1; i >= 0; i--) bits.push((x >> i) & 1); };
   put(4, 4); put(bytes.length, 8); bytes.forEach(x => put(x, 8)); put(0, Math.min(4, nd * 8 - bits.length)); while (bits.length % 8) bits.push(0);
   const cw = []; for (let i = 0; i < bits.length; i += 8) cw.push(parseInt(bits.slice(i, i + 8).join(''), 2)); for (let pd = 0xEC; cw.length < nd; pd ^= 0xFD) cw.push(pd);
   const ex = new Array(512), lg = new Array(256); for (let i = 0, x = 1; i < 255; i++) { ex[i] = x; lg[x] = i; x <<= 1; if (x & 256) x ^= 0x11D; } for (let i = 255; i < 512; i++) ex[i] = ex[i - 255];
@@ -201,7 +206,7 @@ function qrImg(text) { // pratinjau layar
 function escpos(rc) { // byte ESC/POS untuk printer thermal (dikirim lewat RawBT atau BLE langsung)
   const lg = logoOn(), w = rcWidth(), D = receiptDoc(rc, {w: w, rich: true, logo: lg}), out = [0x1B, 0x40], add = a => { for (const c of ascii(a)) out.push(c.charCodeAt(0)); out.push(10); };
   if (lg) { out.push(0x1B, 0x61, 1); const r = logoRaster(logoFit(lg, paperDots())); for (let i = 0; i < r.length; i++) out.push(r[i]); out.push(10, 0x1B, 0x61, 0); } // logo di tengah, atas struk
-  D.forEach(x => {
+  /** @type {any[]} */ (D).forEach(x => {
     if (x.qr) { const qb = qrBitmap(x.qr, paperDots()); if (qb) { out.push(0x1B, 0x61, 1); logoRaster(qb).forEach(v => out.push(v)); out.push(10, 0x1B, 0x61, 0); } return; }
     out.push(0x1B, 0x61, x.a === 'c' ? 1 : 0, 0x1B, 0x45, x.b ? 1 : 0, 0x1D, 0x21, x.z === 2 ? 0x11 : 0); add(x.s);
   });

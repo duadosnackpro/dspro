@@ -38,7 +38,7 @@ const ACT = {
   queue: queueSheet, qnow: () => { flush(); setTimeout(() => { if (S.qopen) queueSheet(); }, 700); },
   btmode: el => btSetMode(el.dataset.m), btstat: () => btStat(), btpick: () => btConnUser(true), btconn: () => btConnUser(false), btdisc: async () => { await btDisconnect(); toast('Printer diputus'); }, btforget: () => btForget(), btuuid: () => btUuidSave(),
   btbeat: el => btOpt('btbeat', el.checked), btwake: el => btOpt('btwake', el.checked), btraw: () => { if (S.rc) btRawbt(S.rc); },
-  skugen: el => { const f = {}; document.querySelectorAll('#sheet [data-f]').forEach(e => f[e.dataset.f] = e.value); if (!f.product_id) return fieldErr('#sheet [data-f="product_id"]', 'Pilih produk dulu'); const i = document.querySelector('#sheet [data-f=sku]'); if (i) i.value = genSkuLocal(f, el.dataset.id || ''); },
+  skugen: el => { const f = {}; /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sheet [data-f]')).forEach(e => f[e.dataset.f] = e.value); if (!f.product_id) return fieldErr('#sheet [data-f="product_id"]', 'Pilih produk dulu'); const i = /** @type {HTMLInputElement|null} */ (document.querySelector('#sheet [data-f=sku]')); if (i) i.value = genSkuLocal(f, el.dataset.id || ''); },
   dtwa: () => waSend(testRc(), ''), dtbt: () => printBT(testRc()), dtshare: () => shareRc(testRc()),
   dping: async () => { const el = $('#dres'); el.textContent = 'Menguji…'; const t0 = performance.now(); try { S.srvMs = undefined; await api('ping', {}, {silent: true}); const a = Math.round(performance.now() - t0), ms1 = S.srvMs; // lalu muat data penuh: ukuran dan waktu server untuk bootstrap (hasil dibuang)
       el.textContent = 'Ping: ' + a + ' ms' + (ms1 !== undefined ? ' (server ' + ms1 + ' ms)' : '') + '. Mengukur muat data…'; const t1 = performance.now(); S.srvMs = undefined; const b = await api('bootstrap', {}, {silent: true}); const bt = Math.round(performance.now() - t1), kb = Math.round(JSON.stringify(b).length / 1024);
@@ -66,8 +66,8 @@ const ACT = {
   retur: el => returOpen(el.dataset.id), retur_ok: () => returGo(),
   rcpt: el => rcptOpen(el.dataset.id), rcpt_rev: async el => { await ACT.sreview(el); if (S.tab === 'riwayat') rcptOpen(el.dataset.id); },   // v2.7.0: struk per nota dari Riwayat
   crspan: el => { const R = crState(); R.span = Number(el.dataset.n) || 1; crGo(false); }, crmore: () => crGo(true),
-  retur_all: () => { document.querySelectorAll('#sheet [data-rv]').forEach(e => { e.value = e.max; }); },
-  ohsaran: async () => { const el = $('#oh-saran'); try { const r = await api('overhead.saran', {}); if (r.saran_per_unit == null) { if (el) el.textContent = r.pesan || 'Belum bisa dihitung.'; return; } if (el) el.textContent = 'Bulan ' + r.bulan + ': biaya ' + rp(r.biaya) + ' dibagi ' + num(r.unit) + ' unit = ' + rp(r.saran_per_unit) + ' per bungkus. Diisikan ke kolom di atas; tekan Simpan pengaturan.'; const f = document.querySelector('#sf [data-f="overhead_per_unit"]'), m = document.querySelector('#sf [data-f="metode_overhead"]'); if (m && m.value !== 'per_unit') { m.value = 'per_unit'; m.dispatchEvent(new Event('change', {bubbles: true})); } if (f) { f.value = r.saran_per_unit; f.dispatchEvent(new Event('input', {bubbles: true})); } } catch (e) { toast(e.message); } },
+  retur_all: () => { /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sheet [data-rv]')).forEach(e => { e.value = e.max; }); },
+  ohsaran: async () => { const el = $('#oh-saran'); try { const r = await api('overhead.saran', {}); if (r.saran_per_unit == null) { if (el) el.textContent = r.pesan || 'Belum bisa dihitung.'; return; } if (el) el.textContent = 'Bulan ' + r.bulan + ': biaya ' + rp(r.biaya) + ' dibagi ' + num(r.unit) + ' unit = ' + rp(r.saran_per_unit) + ' per bungkus. Diisikan ke kolom di atas; tekan Simpan pengaturan.'; const f = /** @type {HTMLInputElement|null} */ (document.querySelector('#sf [data-f="overhead_per_unit"]')), m = /** @type {HTMLInputElement|null} */ (document.querySelector('#sf [data-f="metode_overhead"]')); if (m && m.value !== 'per_unit') { m.value = 'per_unit'; m.dispatchEvent(new Event('change', {bubbles: true})); } if (f) { f.value = r.saran_per_unit; f.dispatchEvent(new Event('input', {bubbles: true})); } } catch (e) { toast(e.message); } },
   stab: el => { S.stab = el.dataset.s; S.scat = 'Semua'; S.sq = ''; vStok(); },
   adj: el => adjSheet(el.dataset.t, el.dataset.id), adjsave: el => adjSave(el.dataset.t, el.dataset.id),
   pbopen: () => { Object.assign(S.pb, {need: [], back: null, sel: '', selq: ''}); pbSheet(); pbLastLoad(); }, pbdel: el => { S.pb.items.splice(el.dataset.i, 1); pbTouch(); pbSheet(); }, pbsave: pbSave,
@@ -89,13 +89,13 @@ const ACT = {
   } catch (e) { if (e.auth) softLogout(); else toast('Gagal memperbarui: ' + e.message); } })
 };
 document.addEventListener('click', e => {
-  const el = e.target.closest('[data-act]'), a = el && el.dataset.act; if (!el || !ACT[a]) return;
+  const el = /** @type {HTMLElement|null} */ (/** @type {Element} */ (e.target).closest('[data-act]')), a = el && el.dataset.act; if (!el || !ACT[a]) return;
   if (S.dirty && S.tab === 'settings' && (a === 'tab' || a === 'logout' || a === 'sync' || /^go_/.test(a))) { confirmBox({title: 'Perubahan belum disimpan', msg: 'Perubahan pengaturan akan hilang kalau Anda keluar sekarang.', stay: 'Lanjut mengisi', leave: 'Buang dan keluar'}).then(ok => { if (ok) { S.dirty = false; ACT[a](el); } }); return; }
   ACT[a](el);
 });
-document.addEventListener('input', e => { if (S.tab === 'settings' && e.target.closest && e.target.closest('#sf')) sDirty(); });
-document.addEventListener('change', e => { const t0 = /** @type {HTMLSelectElement} */ (e.target); if (t0 && t0.dataset && t0.dataset.f === 'role' && t0.closest && t0.closest('#sheet')) { const ri = $('#role-info'); if (ri) ri.textContent = ROLE_INFO[t0.value] || 'Pilih peran untuk melihat hak aksesnya.'; const pl = $('#pin-lbl'); if (pl && pl.firstChild) pl.firstChild.textContent = credLabel(t0.value, (($('[data-act="usave"]') || {dataset: {}}).dataset || {}).id); return; } if (e.target.id === 'foto_file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; fotoLoad(f); return; } if (e.target.id === 'logo_file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; logoLoad(f); return; } if (S.tab === 'settings' && e.target.closest && e.target.closest('#sf')) sDirty(); });
-document.addEventListener('input', e => { if (e.target.dataset && e.target.dataset.lg) logoEdit(e.target); });
+document.addEventListener('input', e => { const tg = /** @type {Element} */ (e.target); if (S.tab === 'settings' && tg.closest && tg.closest('#sf')) sDirty(); });
+document.addEventListener('change', e => { const t0 = /** @type {HTMLSelectElement} */ (e.target), tg = /** @type {any} */ (e.target); if (t0 && t0.dataset && t0.dataset.f === 'role' && t0.closest && t0.closest('#sheet')) { const ri = $('#role-info'); if (ri) ri.textContent = ROLE_INFO[t0.value] || 'Pilih peran untuk melihat hak aksesnya.'; const pl = $('#pin-lbl'); if (pl && pl.firstChild) pl.firstChild.textContent = credLabel(t0.value, (($('[data-act="usave"]') || {dataset: {}}).dataset || {}).id); return; } if (tg.id === 'foto_file') { const f = tg.files && tg.files[0]; tg.value = ''; fotoLoad(f); return; } if (tg.id === 'logo_file') { const f = tg.files && tg.files[0]; tg.value = ''; logoLoad(f); return; } if (S.tab === 'settings' && tg.closest && tg.closest('#sf')) sDirty(); });
+document.addEventListener('input', e => { const tg = /** @type {HTMLInputElement} */ (e.target); if (tg.dataset && tg.dataset.lg) logoEdit(tg); });
 window.addEventListener('beforeunload', e => { if (S.dirty || sheetDirtyNow()) { e.preventDefault(); e.returnValue = ''; } });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEv = e; if (S.tab === 'menu' && S.data) vMenu(); });
 window.addEventListener('appinstalled', () => { S.installEv = null; if (S.tab === 'menu' && S.data) vMenu(); });
@@ -108,7 +108,7 @@ document.addEventListener('input', e => {   // pemisah ribuan pada kolom uang [d
   try { t.setSelectionRange(p, p); } catch (x) {}
 }, true);
 document.addEventListener('input', e => {
-  const k = e.target.dataset && e.target.dataset.in; if (!k) return; let v = e.target.value;
+  const et = /** @type {HTMLInputElement} */ (e.target), k = et.dataset && et.dataset.in; if (!k) return; let v = et.value;
   if (k === 'cr') return crType(v);
   if (k === 'q') { S.q = v; clearTimeout(S.qT); S.qT = setTimeout(() => { if ($('#grid')) grid(); }, 90); return; } // v1.9.9: gabungkan ketikan beruntun menjadi satu penggambaran
   if (k === 'sq') { S.sq = v; return stokList(); }
@@ -121,7 +121,7 @@ document.addEventListener('input', e => {
   if (k === 'diskon' || k === 'terima') { v = v.replace(/\D/g, ''); S[k] = v; return upd(); }
 });
 document.addEventListener('input', e => { if (/** @type {HTMLElement|null} */ (e.target) && /** @type {HTMLElement} */ (e.target).id === 'a_h') adjHppUpd(); });   // peringatan "menimpa HPP" muncul begitu kolom HPP diisi
-document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.chg === 'day') { S.day = e.target.value; vRiwayat(); } });
+document.addEventListener('change', e => { const tg = /** @type {HTMLInputElement} */ (e.target); if (tg.dataset && tg.dataset.chg === 'day') { S.day = tg.value; vRiwayat(); } });
 document.addEventListener('keydown', e => {   // radiogroup metode bayar: panah memilih metode berikutnya/sebelumnya (pola radio standar)
   const t = /** @type {any} */ (e.target); if (!t || !t.matches || !t.matches('#mchips [role="radio"]') || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
   const all = Array.from(t.parentNode.querySelectorAll('[role="radio"]')), i = all.indexOf(t), step = /Right|Down/.test(e.key) ? 1 : -1, nx = all[(i + step + all.length) % all.length];

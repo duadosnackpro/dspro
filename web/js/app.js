@@ -1,7 +1,7 @@
 /* Duado Snack POS - frontend local-first. Sumber ada di src/app/*.js; tools/build.js menyambungnya menjadi web/js/app.js (jangan mengedit hasil bangun). Data master disimpan di perangkat; transaksi masuk antrean lalu disinkronkan. */
 (function () {
 'use strict';
-const C = window.CONFIG || {};
+const C = window.CONFIG || /** @type {Window['CONFIG']} */ ({});
 const $ = s => document.querySelector(s);
 const rp = n => 'Rp\u00a0' + Math.round(Number(n) || 0).toLocaleString('id-ID');
 const num = n => Math.round(Number(n) || 0).toLocaleString('id-ID');
@@ -61,7 +61,7 @@ const Store = (() => {
 const devId = () => { let d = LS.get('dev', ''); if (!/^[0-9a-f]{32}$/.test(d)) { const a = new Uint8Array(16); (window.crypto && window.crypto.getRandomValues) ? window.crypto.getRandomValues(a) : a.forEach((_, i) => { a[i] = Math.floor(Math.random() * 256); }); d = Array.from(a, b => ('0' + b.toString(16)).slice(-2)).join(''); LS.set('dev', d); } return d; }; // id perangkat untuk penguncian login (server hanya menyimpan hash-nya)
 const LS = {get: Store.get, set: (k, v) => Store.set(k, v, ['queue', 'cart', 'token', 'hideOut', 'metode', 'ch'].indexOf(k) >= 0), del: Store.del};
 const T = v => String(v).toUpperCase() === 'TRUE';
-const APP = window.APP = {views: {}};
+const APP = window.APP = /** @type {any} */ ({views: {}});
 const S = {token: null, data: null, queue: [], tab: 'kasir', ch: null, cat: 'Semua', q: '',
   cart: [], diskon: '', metode: 'tunai', terima: '', catatan: '', nomor: {}, mt: 'products', stab: 'varian', day: null, pb: {items: [], ongkir: '', sup: '', rid: '', mode: 'sat'}, pbLast: null, adj: null, rc: null,
   sq: '', scat: 'Semua', hideOut: false, dirty: false, sheetDirty: false, sheetTtl: '', cfmOpen: false, rcustom: false, installEv: null, opt: null, pus: null, pgid: ''};
@@ -129,7 +129,7 @@ function watchMore() {
 }
 /* v2.6.13: lama toast mengikuti panjang pesan (dulu tetap 2,6 dtk sehingga pesan panjang hilang sebelum selesai dibaca): dasar 1,8 dtk + 55 ms per huruf, 2,6 sampai 10 dtk. */
 const toastMs = s => Math.min(10000, Math.max(2600, 1800 + String(s).length * 55));
-function toast(m) { const t = $('#toast'), s = String(m == null ? '' : m); t.textContent = s; t.className = 'show'; clearTimeout(toast.t); toast.t = setTimeout(() => t.className = '', toastMs(s)); }
+function toast(m) { const t = $('#toast'), s = String(m == null ? '' : m); t.textContent = s; t.className = 'show'; const tt = /** @type {any} */ (toast); clearTimeout(tt.t); tt.t = setTimeout(() => t.className = '', toastMs(s)); }
 /* v2.6.13: galat validasi tampil DI BAWAH kolomnya (role=alert, tidak hilang sendiri), kolom diberi aria-invalid + aria-describedby dan langsung difokuskan.
    Hilang begitu kolom diubah. Target tidak ketemu (mis. layar sudah berganti) = jatuh ke toast, jadi pesan tidak pernah hilang tanpa terbaca. Selalu mengembalikan undefined supaya `return fieldErr(...)` tetap sama seperti `return toast(...)`. */
 let ferrN = 0;
@@ -179,8 +179,9 @@ function closeSheet() { S.sheetDirty = false; S.sheetTtl = ''; if (S.opin) { con
 
 /* Pengaman form di dalam sheet: ketukan di luar kotak, tombol Esc, dan tombol Batal/Tutup tidak boleh membuang isian yang belum disimpan tanpa konfirmasi.
    Sheet dianggap "berisi isian" bila punya kolom input/select/textarea (kecuali kolom cari) dan sudah disentuh (diketik, diganti, atau ada tombol aksi diketuk di dalamnya).
-   Keranjang kasir (#cl) dikecualikan: isinya tersimpan di perangkat dan tidak hilang saat ditutup. closeSheet() langsung tetap dipakai setelah simpan/berhasil. */
-const SHEET_FIELD = 'input:not([type=hidden]):not([type=search]):not([data-rs]):not([data-in]),select,textarea';
+   Keranjang kasir (#cl) dikecualikan: isinya tersimpan di perangkat dan tidak hilang saat ditutup. closeSheet() langsung tetap dipakai setelah simpan/berhasil.
+   Kolom #wa (nomor WhatsApp tujuan kirim struk, opsional) juga dikecualikan: sheet struk (setelah bayar dan dari Riwayat) tidak punya data yang perlu disimpan, jadi mengetuk Cetak/Kirim/Salin lalu "Transaksi baru" tidak boleh memunculkan "Data belum disimpan". */
+const SHEET_FIELD = 'input:not([type=hidden]):not([type=search]):not([data-rs]):not([data-in]):not(#wa),select,textarea';
 function sheetHasForm() { const b = $('#sheet'), d = b && !b.hidden && !b.querySelector('#cl') ? b.querySelector('.sheet') : null; return !!(d && d.querySelector(SHEET_FIELD)); }
 const sheetDirtyNow = () => !!S.sheetDirty && sheetHasForm();
 function markSheetDirty(/** @type {Event} */ e) {
@@ -326,9 +327,6 @@ window.addEventListener('popstate', () => {
 });
 /* ---------- API dan sinkronisasi ---------- */
 let pending = 0;
-const QUIET = {ping: 1, 'stock.get': 1, bootstrap: 1, login: 1, logout: 1, 'client.log': 1, 'client.errors': 1}; // aksi yang tidak memicu pemeriksaan versi (mereka sendiri yang menyinkronkan)
-let staleT = null, seenV = ''; // seenV: versi terbaru yang pernah terlihat di jawaban server
-function staleSoon() { if (staleT) return; staleT = setTimeout(() => { staleT = null; if (S.data && dverKey() !== seenV) checkUpdates(true); }, 400); } // bila saat timer berjalan data sudah sama dengan versi terakhir yang terlihat, tak perlu ping
 function netState() { document.body.classList.toggle('net', pending > 0); badge(); }
 async function api(action, payload, opt) {
   if (!window.SBAPI || !window.SBAPI.enabled()) throw new Error('SUPABASE_URL / SUPABASE_KEY belum diisi di js/config.js');
@@ -535,7 +533,7 @@ const emptyState = (ic, t, d, a) => '<div class="empty-s"><div class="es-i">' + 
 const wrapChips = h => '<div class="chips-wrap"><div class="chips">' + h + '</div></div>';
 function initFades() { // petunjuk geser: gradient di tepi chip yang bisa digeser, dan chip aktif otomatis terlihat
   document.querySelectorAll('.chips-wrap').forEach(w => {
-    const c = w.firstElementChild; if (!c) return;
+    const c = /** @type {any} */ (w.firstElementChild); if (!c) return;
     const upd = () => { w.classList.toggle('fade-r', c.scrollWidth - c.clientWidth - c.scrollLeft > 4); w.classList.toggle('fade-l', c.scrollLeft > 4); };
     if (!c._fx) { c._fx = 1; c.addEventListener('scroll', upd, {passive: true}); }
     if (!c._sc) { c._sc = 1; const on = c.querySelector('.chip.on,.seg button.on'); if (on) c.scrollLeft = Math.max(0, on.offsetLeft - (c.clientWidth - on.offsetWidth) / 2); }
@@ -593,8 +591,7 @@ const ljust = (s, n) => s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.len
 const rjust = (s, n) => ' '.repeat(Math.max(0, n - s.length)) + s;
 const lr = (a, b, w) => { a = String(a); b = String(b); return a + ' '.repeat(Math.max(1, w - a.length - b.length)) + b; };
 const padC = (s, n) => ' '.repeat(Math.max(0, (n - s.length) >> 1)) + s;
-const dmy = d => { d = new Date(d); return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear(); };
-const hms = d => { d = new Date(d); return p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()); };
+const dtm = d => { d = new Date(d); return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + String(d.getFullYear()).slice(-2) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()); }; // 11/11/26 13:52 (tanpa detik: struk lebih pendek)
 function noteLines(t, w) { // catatan header/footer: rata tengah, *tebal*, baris kosong di ujung dibuang
   const o = [];
   String(t == null ? '' : t).split(/\r?\n/).forEach(p => { p = p.trim(); const m = /^\*(.+)\*$/.exec(p); if (m) p = m[1].trim(); wrapWords(p, w).forEach(s => o.push({s: s, a: 'c', b: !!m})); });
@@ -607,21 +604,27 @@ function receiptDoc(rc, o) { // o: {w: lebar, rich: ukuran ganda + QR bawaan pri
   if (!o.logo) { const nm = String(cfg('nama_usaha') || 'Duado Snack').toUpperCase(), z = rich && nm.length * 2 <= w; wrapWords(nm, z ? w >> 1 : w).forEach(x => add(x, {a: 'c', b: true, z: z ? 2 : 1})); }
   if (cfgOn('header_aktif', true)) noteLines(cfg('header_struk'), w).forEach(x => D.push(x));
   hr(); if (rc.retur) add('*** RETUR ***', {a: 'c', b: true}); if (rc.salinan) add('SALINAN STRUK', {a: 'c'}); // cetak ulang dari Riwayat (2.7.0)
-  const nomor = rc.nomor || S.nomor[rc.rid] || '(menunggu sinkron)', kasir = String(rc.kasir || ''), kv = (k, v, lw, n) => ljust(k, lw) + ': ' + String(v).slice(0, n);
-  if (wide) { add(ljust(kv('No', nomor, 8, 18), 28) + kv('Waktu', hms(rc.time), 6, 12)); add(ljust(kv('Tanggal', dmy(rc.time), 8, 18), 28) + kv('Kasir', kasir, 6, 12)); add(kv('Via', rc.ch, 8, 38)); }
-  else { add(kv('No', nomor, 6, 24)); add(kv('Waktu', dmy(rc.time) + ' ' + hms(rc.time), 6, 24)); if (kasir) add(kv('Kasir', kasir, 6, 24)); add(kv('Via', rc.ch, 6, 24)); }
-  if (rc.ref) add(kv('Asal', rc.ref, wide ? 8 : 6, 38));
+  const nomor = rc.nomor || S.nomor[rc.rid] || '(menunggu sinkron)', kasir = String(rc.kasir || '');
+  /* v2.7.3 desain ringkas: kepala dua baris (pasangan kiri-kanan; bila tidak muat turun ke dua baris), item qty 1 satu baris,
+     Subtotal hanya bila ada diskon/PPN, TOTAL tebal berukuran biasa (tanpa ukuran ganda), tanpa garis di antara TOTAL dan pembayaran. */
+  const pair = (a, b) => { if (!b) add(a); else if (a.length + 1 + b.length > w) { add(a); add(b); } else add(lr(a, b, w)); };
+  pair('No. ' + String(nomor).slice(0, 24), String(rc.ch || '')); pair(dtm(rc.time), kasir ? 'Kasir: ' + kasir.slice(0, 24) : '');
+  if (rc.ref) add('Asal: ' + String(rc.ref).slice(0, w - 6));
   hr();
   if (wide) { // tabel: ITEM | QTY | HARGA | TOTAL (satu baris per item; nama panjang turun ke baris berikutnya)
     const Q = 4, H = 10, TT = 11, N = w - Q - H - TT - 3;
     add(ljust('ITEM', N) + ' ' + rjust('QTY', Q) + ' ' + rjust('HARGA', H) + ' ' + rjust('TOTAL', TT), {b: true}); hr();
     rc.lines.forEach(l => wrapWords(l.n, N).forEach((x, i) => add(i ? x : ljust(x, N) + ' ' + rjust(String(l.q), Q) + ' ' + rjust(num(l.h), H) + ' ' + rjust(num(l.q * l.h), TT))));
-  } else rc.lines.forEach(l => { wrapWords(l.n, w).forEach(x => add(x)); add(lr('  ' + l.q + ' x ' + num(l.h), num(l.q * l.h), w)); });
+  } else rc.lines.forEach(l => { // qty 1 dan muat: satu baris "nama ... jumlah"; selain itu nama (turun baris) lalu "  qty x harga ... jumlah"
+    const tot = num(l.q * l.h);
+    if (l.q === 1 && l.n.length + 1 + tot.length <= w) add(lr(l.n, tot, w));
+    else { wrapWords(l.n, w).forEach(x => add(x)); add(lr('  ' + l.q + ' x ' + num(l.h), tot, w)); }
+  });
   const ind = wide ? 20 : 0, pad = ' '.repeat(ind), S2 = (a, b) => add(pad + lr(a, b, w - ind));
-  hr(); S2('Subtotal', num(rc.sub)); if (rc.dis) S2('Diskon', rc.dis < 0 ? num(-rc.dis) : '-' + num(rc.dis)); if (rc.ppn) S2(T(cfg('ppn_inklusif')) ? 'PPN (incl.)' : 'PPN', num(rc.ppn));
-  hr(); const tz = rich && 'TOTAL'.length + 1 + num(rc.total).length <= w >> 1; add(lr('TOTAL', num(rc.total), tz ? w >> 1 : w), {b: true, z: tz ? 2 : 1});
-  hr(); const pl = pay === 'qris' ? 'QRIS' : pay.charAt(0).toUpperCase() + pay.slice(1);
-  if (rc.retur) S2('Refund ' + pl, num(-rc.total)); else { S2(pl, num(rc.terima)); if (pay === 'tunai') S2('Kembalian', num(rc.kembali)); }
+  hr(); if (rc.dis || rc.ppn) { S2('Subtotal', num(rc.sub)); if (rc.dis) S2('Diskon', rc.dis < 0 ? num(-rc.dis) : '-' + num(rc.dis)); if (rc.ppn) S2(T(cfg('ppn_inklusif')) ? 'PPN (incl.)' : 'PPN', num(rc.ppn)); }
+  add(pad + lr('TOTAL', num(rc.total), w - ind), {b: true});
+  const pl = pay === 'qris' ? 'QRIS' : pay.charAt(0).toUpperCase() + pay.slice(1);
+  if (rc.retur) S2('Refund ' + pl, num(-rc.total)); else { S2(pl, num(rc.terima)); if (pay === 'tunai' && rc.kembali > 0) S2('Kembalian', num(rc.kembali)); } // uang pas: baris "Kembalian 0" tidak dicetak
   const ft = cfgOn('footer_aktif', true) ? noteLines(cfg('footer_struk'), w) : [], qr = String(cfg('qr_struk') || '').trim();
   if (ft.length || qr) hr();
   ft.forEach(x => D.push(x));
@@ -643,7 +646,7 @@ const QR_T = [null, [26, 10, 1, 16], [44, 16, 1, 28], [70, 26, 1, 44], [100, 18,
 function qrMake(text) { // -> matriks [baris][kolom] berisi 1 (gelap) / 0, atau null bila terlalu panjang
   const bytes = Array.from(unescape(encodeURIComponent(String(text)))).map(c => c.charCodeAt(0)); let v = 1;
   while (v <= 7 && bytes.length > QR_T[v][2] * QR_T[v][3] - 2) v++; if (v > 7) return null;
-  const tot = QR_T[v][0], ecn = QR_T[v][1], nb = QR_T[v][2], dpb = QR_T[v][3], nd = nb * dpb, size = 17 + 4 * v, bits = [], put = (x, n) => { for (let i = n - 1; i >= 0; i--) bits.push((x >> i) & 1); };
+  const ecn = QR_T[v][1], nb = QR_T[v][2], dpb = QR_T[v][3], nd = nb * dpb, size = 17 + 4 * v, bits = [], put = (x, n) => { for (let i = n - 1; i >= 0; i--) bits.push((x >> i) & 1); };
   put(4, 4); put(bytes.length, 8); bytes.forEach(x => put(x, 8)); put(0, Math.min(4, nd * 8 - bits.length)); while (bits.length % 8) bits.push(0);
   const cw = []; for (let i = 0; i < bits.length; i += 8) cw.push(parseInt(bits.slice(i, i + 8).join(''), 2)); for (let pd = 0xEC; cw.length < nd; pd ^= 0xFD) cw.push(pd);
   const ex = new Array(512), lg = new Array(256); for (let i = 0, x = 1; i < 255; i++) { ex[i] = x; lg[x] = i; x <<= 1; if (x & 256) x ^= 0x11D; } for (let i = 255; i < 512; i++) ex[i] = ex[i - 255];
@@ -693,7 +696,7 @@ function qrImg(text) { // pratinjau layar
 function escpos(rc) { // byte ESC/POS untuk printer thermal (dikirim lewat RawBT atau BLE langsung)
   const lg = logoOn(), w = rcWidth(), D = receiptDoc(rc, {w: w, rich: true, logo: lg}), out = [0x1B, 0x40], add = a => { for (const c of ascii(a)) out.push(c.charCodeAt(0)); out.push(10); };
   if (lg) { out.push(0x1B, 0x61, 1); const r = logoRaster(logoFit(lg, paperDots())); for (let i = 0; i < r.length; i++) out.push(r[i]); out.push(10, 0x1B, 0x61, 0); } // logo di tengah, atas struk
-  D.forEach(x => {
+  /** @type {any[]} */ (D).forEach(x => {
     if (x.qr) { const qb = qrBitmap(x.qr, paperDots()); if (qb) { out.push(0x1B, 0x61, 1); logoRaster(qb).forEach(v => out.push(v)); out.push(10, 0x1B, 0x61, 0); } return; }
     out.push(0x1B, 0x61, x.a === 'c' ? 1 : 0, 0x1B, 0x45, x.b ? 1 : 0, 0x1D, 0x21, x.z === 2 ? 0x11 : 0); add(x.s);
   });
@@ -703,7 +706,7 @@ function escpos(rc) { // byte ESC/POS untuk printer thermal (dikirim lewat RawBT
    Disimpan di pengaturan `logo_data` sebagai "L1;<lebar>x<tinggi>;<t|h>;<base64>" (1 = titik hitam, MSB dahulu, per baris).
    t = hitam-putih tegas (ambang), h = halftone (Floyd-Steinberg). Dicetak dengan perintah raster ESC/POS `GS v 0`.
    Ukuran logo sudah final saat disimpan (persen dari lebar kertas); bila kertas diganti jadi lebih sempit, logo dikecilkan saat cetak. */
-const LOGO_MAX_H = 256, LOGO_BAND = 64, LOGO_RE = /^L1;(\d{1,3})x(\d{1,3});([th]);([A-Za-z0-9+\/]+={0,2})$/;
+const LOGO_MAX_H = 256, LOGO_BAND = 64, LOGO_RE = /^L1;(\d{1,3})x(\d{1,3});([th]);([A-Za-z0-9+/]+={0,2})$/;
 const paperDots = () => rcWidth() === 48 ? 576 : 384; // 203 dpi = 8 titik per mm (58 mm: 384 titik, 80 mm: 576 titik)
 const cfgOn = (k, def) => { const v = cfg(k); return v == null || v === '' ? !!def : T(v); };
 function logoPack(mono, w, h) { // mono: Uint8Array w*h (1 = hitam) -> byte per baris, bit tertinggi = titik paling kiri
@@ -780,7 +783,7 @@ const logoPct = lg => Math.min(100, lg.w / paperDots() * 100).toFixed(1) + '%';
 let LGE = null;
 const loadImg = f => new Promise((ok, no) => { const u = URL.createObjectURL(f), im = new Image(); im.onload = () => { URL.revokeObjectURL(u); ok(im); }; im.onerror = () => { URL.revokeObjectURL(u); no(new Error('gambar')); }; im.src = u; });
 function logoDraw(src, sw, sh, w, h) { // skala bertahap (maks. 2x per langkah) agar gambar besar tetap halus; latar transparan menjadi putih
-  const mk = (a, b) => { const c = document.createElement('canvas'); c.width = a; c.height = b; const x = c.getContext('2d', {willReadFrequently: true}); x.fillStyle = '#fff'; x.fillRect(0, 0, a, b); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; return [c, x]; };
+  const mk = /** @type {(a: number, b: number) => [HTMLCanvasElement, CanvasRenderingContext2D]} */ ((a, b) => { const c = document.createElement('canvas'); c.width = a; c.height = b; const x = c.getContext('2d', {willReadFrequently: true}); x.fillStyle = '#fff'; x.fillRect(0, 0, a, b); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; return [c, x]; });
   let cur = src, cw = sw, ch = sh;
   while (cw > w * 2 || ch > h * 2) { const nw = Math.max(w, Math.ceil(cw / 2)), nh = Math.max(h, Math.ceil(ch / 2)), p = mk(nw, nh); p[1].drawImage(cur, 0, 0, nw, nh); cur = p[0]; cw = nw; ch = nh; }
   const p = mk(w, h); p[1].drawImage(cur, 0, 0, w, h); return p[0];
@@ -1365,10 +1368,10 @@ const TILES = 6; // 6 nada foto; pasangan warnanya ada di CSS sebagai token (--t
 const tileOf = v => { let h = 0; String(v.product_id || v.id).split('').forEach(c => { h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return 'tn' + (h % TILES); };
 /* ===== v1.9.1 (tahap 2): foto produk. Foto = satu per PRODUK (semua varian memakainya), disimpan di Supabase Storage (bucket product-photos); products.photo_url menyimpan alamatnya ===== */
 const fotoOf = p => p && /^https:\/\//.test(p.foto_url || '') ? p.foto_url : '';
-const photoInner = (p, name) => '<span class="ini">' + esc(String(name).trim().charAt(0).toUpperCase()) + '</span>' + (fotoOf(p) ? '<img src="' + esc(fotoOf(p)) + '" alt="" crossorigin="anonymous" referrerpolicy="no-referrer" decoding="async" loading="lazy" data-foto="1">' : '');
+const photoInner = (p, name) => '<span class="ini" aria-hidden="true">' + esc(String(name).trim().charAt(0).toUpperCase()) + '</span>' + (fotoOf(p) ? '<img src="' + esc(fotoOf(p)) + '" alt="" crossorigin="anonymous" referrerpolicy="no-referrer" decoding="async" loading="lazy" data-foto="1">' : '');
 const photoHtml = v => photoInner(pById(v.product_id), vName(v));
 function fotoErr(im) { // gagal muat: sekali coba tanpa CORS (hanya online, tidak masuk cache); gagal lagi = buang gambar, huruf awal di bawahnya tampil
-  if (!im.dataset.r && im.hasAttribute('crossorigin')) { im.dataset.r = '1'; im.removeAttribute('crossorigin'); im.src = im.src; } else im.remove();
+  if (!im.dataset.r && im.hasAttribute('crossorigin')) { im.dataset.r = '1'; im.removeAttribute('crossorigin'); im.src = im.src; } else im.remove(); // eslint-disable-line no-self-assign -- sengaja: memuat ulang gambar setelah atribut crossorigin dibuang
 }
 const FOTO = {side: 480, target: 32 * 1024, small: 40 * 1024, cache: 'duado-foto'};
 const blobB64 = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = () => no(new Error('baca')); r.readAsDataURL(b); });
@@ -1418,7 +1421,7 @@ async function fotoDel() {
   const pid = S.fotoFor; if (!pid || !await confirmBox({title: 'Hapus foto produk ini?', msg: 'Kartu produk di Kasir kembali tanpa foto.', stay: 'Batal', leave: 'Hapus foto'})) return;
   return busy('Menghapus foto…', async () => { try { await api('produk.foto', {product_id: pid, data: ''}); fotoApply(pid, ''); toast('Foto dihapus'); } catch (e) { toast(e.message); } });
 }
-document.addEventListener('error', ev => { const t = ev.target; if (t && t.tagName === 'IMG' && t.hasAttribute('data-foto')) fotoErr(t); }, true); // error gambar tidak menggelembung: ditangkap di fase capture (CSP v1.9.7 melarang onerror inline; sebelumnya fotoErr juga tidak terjangkau dari atribut)
+document.addEventListener('error', ev => { const t = /** @type {HTMLElement|null} */ (ev.target); if (t && t.tagName === 'IMG' && t.hasAttribute('data-foto')) fotoErr(t); }, true); // error gambar tidak menggelembung: ditangkap di fase capture (CSP v1.9.7 melarang onerror inline; sebelumnya fotoErr juga tidak terjangkau dari atribut)
 let fotoBusy = false;
 async function fotoWarm() { // simpan semua foto katalog ke cache offline (satu per satu, ringan) dan buang yang sudah tidak dipakai
   if (fotoBusy || !S.data || !window.caches || navigator.onLine === false) return; fotoBusy = true;
@@ -1443,7 +1446,7 @@ function grid() {
   const d = S.data, q = S.q.toLowerCase(), avail = v => (Number(v.stok) || 0) > 0;
   const base = d.variants.filter(v => !isAddon(v) && (S.cat === 'Semua' || String((pById(v.product_id) || {}).kategori) === S.cat) && (!q || (vName(v) + ' ' + vSub(v) + ' ' + v.sku).toLowerCase().indexOf(q) >= 0));
   let list = S.hideOut ? base.filter(avail) : base;
-  list = list.map((v, i) => [v, i]).sort((x, y) => (avail(y[0]) - avail(x[0])) || (x[1] - y[1])).map(x => x[0]); // tersedia di atas, habis di bawah, urutan asli dijaga
+  list = list.map((v, i) => [v, i]).sort((x, y) => (Number(avail(y[0])) - Number(avail(x[0]))) || (x[1] - y[1])).map(x => x[0]); // tersedia di atas, habis di bawah, urutan asli dijaga
   const sig = S.cat + '|' + q + '|' + S.hideOut; if (S.gsig !== sig) { S.gsig = sig; delete LIM.grid; const mn = $('#main'); if (mn) mn.scrollTop = 0; } // filter berganti: mulai dari halaman pertama dan dari atas (tanpa ini browser menahan posisi di dasar daftar baru dan sentinel memuat berantai sampai semua baris)
   const kc = $('#kcount'); if (kc) kc.textContent = list.length + ' produk' + (S.hideOut && base.length > list.length ? ' · ' + (base.length - list.length) + ' habis disembunyikan' : '');
   $('#grid').innerHTML = (list.slice(0, lim('grid')).map(v => {
@@ -1459,7 +1462,7 @@ function updCard(id) { // perbarui satu kartu saja, tanpa menggambar ulang selur
   el.innerHTML = cardHtml(v); el.classList.toggle('in', cartQty(id) > 0);
   ['role', 'tabindex', 'aria-disabled', 'aria-label'].forEach(a => el.removeAttribute(a));
   const at = cardAttrs(v); Object.keys(at).forEach(k => el.setAttribute(k, at[k]));
-  if (had) { const nx = /** @type {HTMLElement|null} */ ((cartQty(id) > 0 ? el.querySelector('[data-act="inc1"]') : null) || el); if (nx) nx.focus({preventScroll: true}); } el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  if (had) { const nx = /** @type {HTMLElement|null} */ ((cartQty(id) > 0 ? el.querySelector('[data-act="inc1"]') : null) || el); if (nx) nx.focus({preventScroll: true}); } el.classList.remove('pop'); void /** @type {HTMLElement} */ (el).offsetWidth; el.classList.add('pop');
 }
 function barRender() {
   const el = $('#cartbar'); if (!el) return;
@@ -1980,7 +1983,7 @@ function field(f, val) {
   return '<label>' + l + '<input class="inp" data-f="' + k + '"' + (sug ? ' list="dl_' + k + '"' : '') + (t === 'number' ? ' inputmode="decimal"' : '') + ' value="' + esc(v) + '">' +
     (sug ? '<datalist id="dl_' + k + '">' + sug.map(x => '<option value="' + esc(x) + '">').join('') + '</datalist>' : '') + '</label>';
 }
-function readForm() { const o = {}; document.querySelectorAll('#sheet [data-f]').forEach(e => o[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value); return o; }
+function readForm() { const o = {}; /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sheet [data-f]')).forEach(e => o[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value); return o; }
 function vMaster(noLoad) {
   const cfg = MT[S.mt], rows = S.mt === 'expenses' ? (S.exp || []) : (S.data[cfg.k] || []);
   const head = '<button class="chip" data-act="tab" data-t="menu">← Menu</button><div class="u-mt8 chips">' + Object.keys(MT).map(k => '<button class="chip ' + (k === S.mt ? 'on' : '') + '" data-act="mt" data-k="' + k + '">' + MT[k].l + '</button>').join('') + '<button class="chip" data-act="go_resep">Resep</button></div>';
@@ -2072,9 +2075,9 @@ async function uSave(id) {
   });
 }
 const selF = (k, l, pairs, cur) => '<label>' + l + '<select class="inp" data-f="' + k + '">' + pairs.map(p => '<option value="' + p[0] + '"' + (String(cur) === p[0] ? ' selected' : '') + '>' + p[1] + '</option>').join('') + '</select></label>';
-const setSnap = () => JSON.stringify(Array.from(document.querySelectorAll('#sf [data-f]')).map(e => e.type === 'checkbox' ? e.checked : e.value));
+const setSnap = () => JSON.stringify(Array.from(/** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sf [data-f]'))).map(e => e.type === 'checkbox' ? e.checked : e.value));
 function sDepUpd() { // field yang bergantung: tarif PPN hanya saat PPN aktif; overhead sesuai cara hitung yang dipilih
-  const on = k => { const e = document.querySelector('#sf [data-f=' + k + ']'); return e && e.checked; }, m = (document.querySelector('#sf [data-f=metode_overhead]') || {}).value || 'per_unit';
+  const on = k => { const e = /** @type {HTMLInputElement|null} */ (document.querySelector('#sf [data-f=' + k + ']')); return e && e.checked; }, m = (/** @type {any} */ (document.querySelector('#sf [data-f=metode_overhead]')) || {}).value || 'per_unit';
   const set = (id, show) => { const e = $('#' + id); if (e) e.hidden = !show; };
   set('ppn-x', on('ppn_aktif')); set('hdr-x', on('header_aktif')); set('ftr-x', on('footer_aktif')); set('oh-unit', m === 'per_unit'); set('oh-batch', m === 'per_batch');
   const h = $('#oh-hint'); if (h) h.textContent = m === 'per_batch' ? 'Biaya overhead (gas, listrik, dll.) dihitung tetap setiap sekali produksi, berapa pun hasilnya.' : 'Biaya overhead (gas, listrik, dll.) dihitung per bungkus yang dihasilkan. Contoh: Rp300 × 118 bungkus.';
@@ -2127,7 +2130,7 @@ function vSettings() {
 }
 async function sSave() {
   return busy('Menyimpan pengaturan…', async () => {
-  const v = {}; document.querySelectorAll('#sf [data-f]').forEach(e => v[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value);
+  const v = {}; /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sf [data-f]')).forEach(e => v[e.dataset.f] = e.type === 'checkbox' ? e.checked : e.value);
   ['opname_ambang_nilai', 'transfer_ambang_nilai', 'bayar_referensi_min'].forEach(k => { if (k in v) v[k] = String(v[k]).replace(/\D/g, ''); });   // angka bulat atau kosong (kosong = nonaktif)
   ['ppn_persen', 'overhead_per_unit', 'overhead_per_batch', 'target_margin', 'stok_menipis', 'diskon_maks_persen', 'kelipatan_harga'].forEach(k => { if (k in v) { const n = dnum(v[k]); v[k] = isNaN(n) ? 0 : n; } });
   try { await api('setting.setMany', {values: v}); S.dirty = false; await loadData(); render(); toast('Pengaturan tersimpan'); } catch (e) { toast(e.message); }
@@ -2150,7 +2153,7 @@ async function vTutup() {
     }
     const mv = (r.gerakan || []).map(g => '<div class="kv"><span>' + (g.jenis === 'in' ? 'Kas masuk' : 'Kas keluar') + ' · ' + esc(g.alasan) + '</span><span>' + rp(g.nominal) + '</span></div>').join('');
     $('#tbody').innerHTML = '<div class="u-blk li">' + kv('Sejak', esc(String(r.dari).slice(0, 16))) + kv('Jumlah transaksi', num(r.jumlah_trx)) + kv('Modal awal', rp(r.modal_awal)) + mv + '</div>' +
-      '<div class="u-blk li"><b>Kas masuk/keluar</b><p class="muted">Mis. beli es batu memakai uang laci. Catat SAAT terjadi, dengan alasan. Kas keluar otomatis tercatat sebagai biaya sesuai kategorinya.</p><div class="row2"><select class="inp" id="mj"><option value="out">Keluar</option><option value="in">Masuk</option></select><input class="inp" id="mn" inputmode="numeric" placeholder="Nominal"></div><select class="inp" id="mk"><option value="">Kategori biaya (wajib untuk kas keluar)</option>' + KAS_CATS.map(c => '<option>' + esc(c) + '</option>').join('') + '</select><input class="inp" id="ma" placeholder="Alasan (min. 3 huruf)"><button class="btn sec" data-act="kmove">Catat</button></div>' +
+      '<div class="u-blk li"><b>Kas masuk/keluar</b><p class="muted">Mis. beli es batu memakai uang laci. Catat SAAT terjadi, dengan alasan. Kas keluar otomatis tercatat sebagai biaya sesuai kategorinya.</p><div class="row2"><select class="inp" id="mj" aria-label="Jenis kas"><option value="out">Keluar</option><option value="in">Masuk</option></select><input class="inp" id="mn" inputmode="numeric" aria-label="Nominal" placeholder="Nominal"></div><select class="inp" id="mk" aria-label="Kategori biaya"><option value="">Kategori biaya (wajib untuk kas keluar)</option>' + KAS_CATS.map(c => '<option>' + esc(c) + '</option>').join('') + '</select><input class="inp" id="ma" aria-label="Alasan" placeholder="Alasan (min. 3 huruf)"><button class="btn sec" data-act="kmove">Catat</button></div>' +
       '<label>Uang tunai di laci sekarang (Rp)<input class="inp" id="tf" data-rp inputmode="numeric" autocomplete="off" placeholder="Hitung dulu, lalu isi"></label><label>Catatan (opsional)<input class="inp" id="tn"></label><button class="btn pri big" data-act="tclose">Tutup kasir</button><div id="tlist"></div>';
     tutupList();
   }, {fail: e => { if ($('#tbody')) $('#tbody').innerHTML = '<p class="err">' + esc(e.message) + '</p>'; }});
@@ -2263,7 +2266,7 @@ const ACT = {
   queue: queueSheet, qnow: () => { flush(); setTimeout(() => { if (S.qopen) queueSheet(); }, 700); },
   btmode: el => btSetMode(el.dataset.m), btstat: () => btStat(), btpick: () => btConnUser(true), btconn: () => btConnUser(false), btdisc: async () => { await btDisconnect(); toast('Printer diputus'); }, btforget: () => btForget(), btuuid: () => btUuidSave(),
   btbeat: el => btOpt('btbeat', el.checked), btwake: el => btOpt('btwake', el.checked), btraw: () => { if (S.rc) btRawbt(S.rc); },
-  skugen: el => { const f = {}; document.querySelectorAll('#sheet [data-f]').forEach(e => f[e.dataset.f] = e.value); if (!f.product_id) return fieldErr('#sheet [data-f="product_id"]', 'Pilih produk dulu'); const i = document.querySelector('#sheet [data-f=sku]'); if (i) i.value = genSkuLocal(f, el.dataset.id || ''); },
+  skugen: el => { const f = {}; /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sheet [data-f]')).forEach(e => f[e.dataset.f] = e.value); if (!f.product_id) return fieldErr('#sheet [data-f="product_id"]', 'Pilih produk dulu'); const i = /** @type {HTMLInputElement|null} */ (document.querySelector('#sheet [data-f=sku]')); if (i) i.value = genSkuLocal(f, el.dataset.id || ''); },
   dtwa: () => waSend(testRc(), ''), dtbt: () => printBT(testRc()), dtshare: () => shareRc(testRc()),
   dping: async () => { const el = $('#dres'); el.textContent = 'Menguji…'; const t0 = performance.now(); try { S.srvMs = undefined; await api('ping', {}, {silent: true}); const a = Math.round(performance.now() - t0), ms1 = S.srvMs; // lalu muat data penuh: ukuran dan waktu server untuk bootstrap (hasil dibuang)
       el.textContent = 'Ping: ' + a + ' ms' + (ms1 !== undefined ? ' (server ' + ms1 + ' ms)' : '') + '. Mengukur muat data…'; const t1 = performance.now(); S.srvMs = undefined; const b = await api('bootstrap', {}, {silent: true}); const bt = Math.round(performance.now() - t1), kb = Math.round(JSON.stringify(b).length / 1024);
@@ -2291,8 +2294,8 @@ const ACT = {
   retur: el => returOpen(el.dataset.id), retur_ok: () => returGo(),
   rcpt: el => rcptOpen(el.dataset.id), rcpt_rev: async el => { await ACT.sreview(el); if (S.tab === 'riwayat') rcptOpen(el.dataset.id); },   // v2.7.0: struk per nota dari Riwayat
   crspan: el => { const R = crState(); R.span = Number(el.dataset.n) || 1; crGo(false); }, crmore: () => crGo(true),
-  retur_all: () => { document.querySelectorAll('#sheet [data-rv]').forEach(e => { e.value = e.max; }); },
-  ohsaran: async () => { const el = $('#oh-saran'); try { const r = await api('overhead.saran', {}); if (r.saran_per_unit == null) { if (el) el.textContent = r.pesan || 'Belum bisa dihitung.'; return; } if (el) el.textContent = 'Bulan ' + r.bulan + ': biaya ' + rp(r.biaya) + ' dibagi ' + num(r.unit) + ' unit = ' + rp(r.saran_per_unit) + ' per bungkus. Diisikan ke kolom di atas; tekan Simpan pengaturan.'; const f = document.querySelector('#sf [data-f="overhead_per_unit"]'), m = document.querySelector('#sf [data-f="metode_overhead"]'); if (m && m.value !== 'per_unit') { m.value = 'per_unit'; m.dispatchEvent(new Event('change', {bubbles: true})); } if (f) { f.value = r.saran_per_unit; f.dispatchEvent(new Event('input', {bubbles: true})); } } catch (e) { toast(e.message); } },
+  retur_all: () => { /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#sheet [data-rv]')).forEach(e => { e.value = e.max; }); },
+  ohsaran: async () => { const el = $('#oh-saran'); try { const r = await api('overhead.saran', {}); if (r.saran_per_unit == null) { if (el) el.textContent = r.pesan || 'Belum bisa dihitung.'; return; } if (el) el.textContent = 'Bulan ' + r.bulan + ': biaya ' + rp(r.biaya) + ' dibagi ' + num(r.unit) + ' unit = ' + rp(r.saran_per_unit) + ' per bungkus. Diisikan ke kolom di atas; tekan Simpan pengaturan.'; const f = /** @type {HTMLInputElement|null} */ (document.querySelector('#sf [data-f="overhead_per_unit"]')), m = /** @type {HTMLInputElement|null} */ (document.querySelector('#sf [data-f="metode_overhead"]')); if (m && m.value !== 'per_unit') { m.value = 'per_unit'; m.dispatchEvent(new Event('change', {bubbles: true})); } if (f) { f.value = r.saran_per_unit; f.dispatchEvent(new Event('input', {bubbles: true})); } } catch (e) { toast(e.message); } },
   stab: el => { S.stab = el.dataset.s; S.scat = 'Semua'; S.sq = ''; vStok(); },
   adj: el => adjSheet(el.dataset.t, el.dataset.id), adjsave: el => adjSave(el.dataset.t, el.dataset.id),
   pbopen: () => { Object.assign(S.pb, {need: [], back: null, sel: '', selq: ''}); pbSheet(); pbLastLoad(); }, pbdel: el => { S.pb.items.splice(el.dataset.i, 1); pbTouch(); pbSheet(); }, pbsave: pbSave,
@@ -2314,13 +2317,13 @@ const ACT = {
   } catch (e) { if (e.auth) softLogout(); else toast('Gagal memperbarui: ' + e.message); } })
 };
 document.addEventListener('click', e => {
-  const el = e.target.closest('[data-act]'), a = el && el.dataset.act; if (!el || !ACT[a]) return;
+  const el = /** @type {HTMLElement|null} */ (/** @type {Element} */ (e.target).closest('[data-act]')), a = el && el.dataset.act; if (!el || !ACT[a]) return;
   if (S.dirty && S.tab === 'settings' && (a === 'tab' || a === 'logout' || a === 'sync' || /^go_/.test(a))) { confirmBox({title: 'Perubahan belum disimpan', msg: 'Perubahan pengaturan akan hilang kalau Anda keluar sekarang.', stay: 'Lanjut mengisi', leave: 'Buang dan keluar'}).then(ok => { if (ok) { S.dirty = false; ACT[a](el); } }); return; }
   ACT[a](el);
 });
-document.addEventListener('input', e => { if (S.tab === 'settings' && e.target.closest && e.target.closest('#sf')) sDirty(); });
-document.addEventListener('change', e => { const t0 = /** @type {HTMLSelectElement} */ (e.target); if (t0 && t0.dataset && t0.dataset.f === 'role' && t0.closest && t0.closest('#sheet')) { const ri = $('#role-info'); if (ri) ri.textContent = ROLE_INFO[t0.value] || 'Pilih peran untuk melihat hak aksesnya.'; const pl = $('#pin-lbl'); if (pl && pl.firstChild) pl.firstChild.textContent = credLabel(t0.value, (($('[data-act="usave"]') || {dataset: {}}).dataset || {}).id); return; } if (e.target.id === 'foto_file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; fotoLoad(f); return; } if (e.target.id === 'logo_file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; logoLoad(f); return; } if (S.tab === 'settings' && e.target.closest && e.target.closest('#sf')) sDirty(); });
-document.addEventListener('input', e => { if (e.target.dataset && e.target.dataset.lg) logoEdit(e.target); });
+document.addEventListener('input', e => { const tg = /** @type {Element} */ (e.target); if (S.tab === 'settings' && tg.closest && tg.closest('#sf')) sDirty(); });
+document.addEventListener('change', e => { const t0 = /** @type {HTMLSelectElement} */ (e.target), tg = /** @type {any} */ (e.target); if (t0 && t0.dataset && t0.dataset.f === 'role' && t0.closest && t0.closest('#sheet')) { const ri = $('#role-info'); if (ri) ri.textContent = ROLE_INFO[t0.value] || 'Pilih peran untuk melihat hak aksesnya.'; const pl = $('#pin-lbl'); if (pl && pl.firstChild) pl.firstChild.textContent = credLabel(t0.value, (($('[data-act="usave"]') || {dataset: {}}).dataset || {}).id); return; } if (tg.id === 'foto_file') { const f = tg.files && tg.files[0]; tg.value = ''; fotoLoad(f); return; } if (tg.id === 'logo_file') { const f = tg.files && tg.files[0]; tg.value = ''; logoLoad(f); return; } if (S.tab === 'settings' && tg.closest && tg.closest('#sf')) sDirty(); });
+document.addEventListener('input', e => { const tg = /** @type {HTMLInputElement} */ (e.target); if (tg.dataset && tg.dataset.lg) logoEdit(tg); });
 window.addEventListener('beforeunload', e => { if (S.dirty || sheetDirtyNow()) { e.preventDefault(); e.returnValue = ''; } });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEv = e; if (S.tab === 'menu' && S.data) vMenu(); });
 window.addEventListener('appinstalled', () => { S.installEv = null; if (S.tab === 'menu' && S.data) vMenu(); });
@@ -2333,7 +2336,7 @@ document.addEventListener('input', e => {   // pemisah ribuan pada kolom uang [d
   try { t.setSelectionRange(p, p); } catch (x) {}
 }, true);
 document.addEventListener('input', e => {
-  const k = e.target.dataset && e.target.dataset.in; if (!k) return; let v = e.target.value;
+  const et = /** @type {HTMLInputElement} */ (e.target), k = et.dataset && et.dataset.in; if (!k) return; let v = et.value;
   if (k === 'cr') return crType(v);
   if (k === 'q') { S.q = v; clearTimeout(S.qT); S.qT = setTimeout(() => { if ($('#grid')) grid(); }, 90); return; } // v1.9.9: gabungkan ketikan beruntun menjadi satu penggambaran
   if (k === 'sq') { S.sq = v; return stokList(); }
@@ -2346,7 +2349,7 @@ document.addEventListener('input', e => {
   if (k === 'diskon' || k === 'terima') { v = v.replace(/\D/g, ''); S[k] = v; return upd(); }
 });
 document.addEventListener('input', e => { if (/** @type {HTMLElement|null} */ (e.target) && /** @type {HTMLElement} */ (e.target).id === 'a_h') adjHppUpd(); });   // peringatan "menimpa HPP" muncul begitu kolom HPP diisi
-document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.chg === 'day') { S.day = e.target.value; vRiwayat(); } });
+document.addEventListener('change', e => { const tg = /** @type {HTMLInputElement} */ (e.target); if (tg.dataset && tg.dataset.chg === 'day') { S.day = tg.value; vRiwayat(); } });
 document.addEventListener('keydown', e => {   // radiogroup metode bayar: panah memilih metode berikutnya/sebelumnya (pola radio standar)
   const t = /** @type {any} */ (e.target); if (!t || !t.matches || !t.matches('#mchips [role="radio"]') || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
   const all = Array.from(t.parentNode.querySelectorAll('[role="radio"]')), i = all.indexOf(t), step = /Right|Down/.test(e.key) ? 1 : -1, nx = all[(i + step + all.length) % all.length];
@@ -2453,7 +2456,7 @@ function trDetail(id) {
 }
 async function trAct(id, a) {
   const t = (S.trs || []).find(x => x.id === id); if (!t) return; const p = {id: id, action: a};
-  if (a === 'receive') { p.items = t.items.map((it, i) => { const el = document.querySelector('[data-rc="' + i + '"]'); return {item_type: it.tipe, item_id: it.item_id, qty_received: dnum(el ? el.value : it.dikirim)}; }); const bi = p.items.findIndex(x => isNaN(x.qty_received)); if (bi >= 0) return fieldErr('#sheet [data-rc="' + bi + '"]', 'Jumlah diterima tidak valid'); }
+  if (a === 'receive') { p.items = t.items.map((it, i) => { const el = /** @type {HTMLInputElement|null} */ (document.querySelector('[data-rc="' + i + '"]')); return {item_type: it.tipe, item_id: it.item_id, qty_received: dnum(el ? el.value : it.dikirim)}; }); const bi = p.items.findIndex(x => isNaN(x.qty_received)); if (bi >= 0) return fieldErr('#sheet [data-rc="' + bi + '"]', 'Jumlah diterima tidak valid'); }
   if (['reject', 'cancel'].indexOf(a) >= 0 && !await confirmBox({title: a === 'reject' ? 'Tolak transfer ini?' : 'Batalkan transfer ini?', msg: a === 'reject' ? 'Transfer ini tidak akan diproses.' : t.status === 'sent' ? 'Barang yang sudah dikirim dikembalikan ke outlet asal.' : 'Transfer tidak akan dikirim.', stay: 'Kembali', leave: a === 'reject' ? 'Tolak transfer' : 'Batalkan transfer'})) return;
   return busy('Memproses…', async () => { try { await api('transfer.action', p); await loadData(); closeSheet(); vTransfer(); toast('Transfer diperbarui'); } catch (e) { toast(e.message); } });
 }
@@ -2461,8 +2464,8 @@ async function trSave(aj) {
   const f = S.trf; if (!f.items.length) return fieldErr('#sheet [data-act="tradd"]', 'Tambahkan minimal satu item: pilih item, isi jumlah, lalu ketuk Tambah.');
   return busy('Menyimpan transfer…', async () => { try { await api('transfer.create', {from_outlet_id: S.data.outlet.id, to_outlet_id: f.to, items: f.items, catatan: f.catatan, ajukan: aj}); closeSheet(); vTransfer(); toast(aj ? 'Transfer diajukan' : 'Draft tersimpan'); } catch (e) { toast(e.message); } });
 }
-document.addEventListener('input', e => { const k = e.target && e.target.dataset && e.target.dataset.tf; if (k && S.trf) S.trf[k] = e.target.value; });
-document.addEventListener('change', e => { const k = e.target && e.target.dataset && e.target.dataset.tf; if (k && S.trf) { S.trf[k] = e.target.value; } });
+document.addEventListener('input', e => { const et = /** @type {HTMLInputElement} */ (e.target), k = et && et.dataset && et.dataset.tf; if (k && S.trf) S.trf[k] = et.value; });
+document.addEventListener('change', e => { const et = /** @type {HTMLInputElement} */ (e.target), k = et && et.dataset && et.dataset.tf; if (k && S.trf) { S.trf[k] = et.value; } });
 APP.views.transfer = vTransfer;
 Object.assign(ACT, {
   go_transfer: () => { S.tab = 'transfer'; render(); }, trnew: trNewSheet, trdetail: el => trDetail(el.dataset.id), tract: el => trAct(el.dataset.id, el.dataset.a),

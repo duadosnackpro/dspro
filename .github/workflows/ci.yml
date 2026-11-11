@@ -39,6 +39,8 @@ jobs:
         run: npm run test:riw
       - name: Uji printer Bluetooth
         run: npm run test:bt
+      - name: Uji hasil perkecil JS/CSS (perilaku sama seperti sumber)
+        run: npm run test:min
       - name: Uji logika kewenangan Edge Function
         run: npm run test:edge
   db:

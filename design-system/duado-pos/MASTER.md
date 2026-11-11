@@ -133,3 +133,15 @@ npm test             # termasuk tests/release_check.js (CSP, tanpa style/#hex, b
 Saat rilis, `deploy.yml` memperkecil JS/CSS hanya di paket situs (`tools/minify.js`: spasi dan sintaks, tanpa mengganti nama variabel); sumber di repo tetap terbaca. `npm run test:min` menjalankan ulang uji perilaku pada hasil perkecil. Lint dan tipe dijaga di nol (`--max-warnings 0`, `types/baseline.txt` kosong): jangan menambah peringatan atau galat baru.
 
 Setelah mengubah berkas di `web/`, naikkan versi (`package.json`, `web/js/config.js`, `web/sw.js`, judul `supabase/README.md`); service worker memakai cache per versi sehingga perangkat lama tidak menerima CSS/JS baru tanpa itu.
+
+## 9. Lapisan poles (bagian 12b CSS, v2.7.3)
+
+Hanya menambah keadaan yang dulu tidak bergaya; tata letak dan token tidak berubah.
+
+- **Nonaktif:** `.inp:disabled` (latar `--sunk`, teks `--mut`) dan saklar nonaktif (separuh pudar, kursor `not-allowed`).
+- **Tekan dan hover:** `.btn.sec`, `.dan`, `.wa`, `.dark` punya keadaan tekan/hover sendiri; segmen dan navigasi bawah mendapat hover (hanya `@media (hover:hover)`); `.step button` dan `.qty button` menguning saat hover seperti saat ditekan.
+- **Area aman:** dialog `.cfm` memakai `--px` dan `env(safe-area-inset-*)`.
+- **Angka:** `tabular-nums` ditambah ke `.st-v`, `.ok-r`, `.err-r`, `.rli-n`, `.hbrk`, `.kv b`.
+- **Pilih teks:** `::selection` memakai `--yel` dengan teks `--brand-deep`.
+- **Bilah gulir tipis** hanya untuk mouse (`hover:hover` dan `pointer:fine`); layar sentuh tidak terpengaruh.
+- **Kontras tinggi** (`forced-colors:active`): tombol, chip, saklar, lencana, dan kartu terpilih diberi tepi/garis bentuk karena warna latar dihapus. Hanya kata kunci sistem (`ButtonText`, `Highlight`, `CanvasText`), tanpa `#hex`.

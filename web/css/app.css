@@ -450,6 +450,38 @@ img,svg,canvas,video{max-width:100%}
 .pbwarn{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn);border-radius:var(--r-sm);padding:var(--s3);margin:var(--s2) 0;font-size:14px}
 .pbnote{margin:var(--s2) 0}
 
+/* ---------- 12b. Poles (v2.7.3): keadaan yang belum punya gaya ----------
+   Hanya menambah keadaan (hover, tekan, nonaktif, pilih teks, gulir, kontras tinggi); tata letak dan token tidak berubah. Warna tetap lewat token. */
+::selection{background:var(--yel);color:var(--brand-deep)}
+/* kolom isian dan saklar nonaktif: sebelumnya tampil sama dengan yang aktif */
+.inp:disabled{background:var(--sunk);color:var(--mut);border-color:var(--line);cursor:not-allowed}
+.sw input:disabled{cursor:not-allowed}.sw input:disabled+.sw-t{opacity:.5}
+.sw:has(input:disabled){cursor:not-allowed;color:var(--mut)}
+/* tombol bergaris dan gelap: keadaan tekan yang sejajar dengan tombol kuning */
+.btn.sec:active{background:var(--sunk)}.btn.dan:active{background:var(--err-bg)}.btn.wa:active{filter:brightness(.92)}
+/* dialog konfirmasi mengikuti area aman (HP berponi mendatar, bilah gestur) */
+.cfm{padding:max(var(--s4),env(safe-area-inset-top,0px)) var(--px) max(var(--s4),env(safe-area-inset-bottom,0px))}
+/* angka yang belum rata */
+.st-v,.ok-r,.err-r,.rli-n,.hbrk,.kv b{font-variant-numeric:tabular-nums}
+@media (hover:hover){
+  .btn.dark:hover{background:var(--brand-hi)}.btn.dan:hover{background:var(--err-bg)}.btn.wa:hover{filter:brightness(.94)}
+  .seg button:not(.on):hover{background:var(--hover-row)}
+  .nav button:not(.on):hover .ni{background:var(--sunk)}
+  .step button:hover,.qty button:hover{background:var(--yel)}
+}
+/* peramban desktop/tablet dengan mouse: bilah gulir tipis dan senada (layar sentuh tidak terpengaruh) */
+@media (hover:hover) and (pointer:fine){
+  main,.kleft,.kright,.sheet,.tw,pre.rc{scrollbar-width:thin;scrollbar-color:var(--grab) transparent}
+}
+/* mode kontras tinggi (Windows): warna latar dihilangkan, jadi beri tepi dan penanda berbentuk */
+@media (forced-colors:active){
+  .btn{border:2px solid ButtonText}.chip,.seg button{border:1px solid ButtonText}
+  .chip.on,.seg button.on,.nav button.on .ni{outline:2px solid Highlight;outline-offset:-2px}
+  .sw-t{border:2px solid ButtonText}.sw input:checked+.sw-t{background:Highlight}
+  .badge,.tag,.bdg{border:1px solid currentColor}
+  .card.pc.in{outline:2px solid Highlight}
+}
+
 /* ---------- 13. Utilitas dan kelas pengganti atribut style ----------
    CSP tidak lagi mengizinkan atribut style (style-src-attr dicabut). Utilitas memakai !important agar hasilnya sama dengan gaya inline lama.
    Nilai yang dihitung saat jalan (lebar/tinggi batang, lebar logo) ditulis di data-dw / data-dh dan dipasang lewat CSSOM oleh dynStyle() di 01-inti.js. */

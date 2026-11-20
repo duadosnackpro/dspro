@@ -24,3 +24,29 @@ Migrasi forward-only dan hanya menambah (fungsi baru + kolom `tanggal_selesai` p
 
 ## Belum dikerjakan
 Nomor lot/kedaluwarsa. Pencarian teks pada daftar riwayat produksi (yang ada baru pencarian resep di lembar input). Mengubah resep pada rencana yang sudah dibuat (saat ini batalkan lalu buat ulang).
+
+# Produksi: batalkan produksi yang sudah selesai (v2.8.0, migrasi 0044)
+
+## Yang berubah
+- **Tombol "Batalkan produksi (salah input)"** di detail produksi berstatus Selesai, untuk Owner, Admin, dan Supervisor. Peran Produksi hanya melihat petunjuk "Minta Owner, Admin, atau Supervisor membatalkan produksi ini". Alasan wajib (minimal 3 huruf) dan dicatat di audit. Rencana yang belum selesai tetap dibatalkan lewat "Batalkan rencana" (`production_cancel`, tidak berubah).
+- **Server (`production_void`, satu transaksi)**:
+  - Bahan kembali ke dapur sebesar yang tercatat di ledger saat produksi (`production_use`), dengan harga saat dipakai, bukan dari resep yang mungkin sudah berubah dan bukan dari harga pembelian terbaru. Mutasi bertipe `void_reverse`.
+  - Stok produk jadi berkurang sebesar hasil produksi dan HPP rata-rata produk dihitung ulang tanpa produksi itu (pola yang sama dengan `purchase_cancel`). Bila stok jadi nol, HPP lama dibiarkan sampai produksi berikutnya menimpanya.
+  - **Tidak dicatat sebagai kerugian persediaan** (`inventory_losses`), jadi laporan laba tidak terkotori seperti kalau dikoreksi lewat opname.
+  - Baris biaya (`production_costs`) dihapus supaya "Total biaya" di laporan tidak menghitungnya lagi; nilai aslinya (bahan, kemasan, tenaga kerja, overhead, total, HPP per unit) tersimpan di audit (`before`).
+  - Status menjadi `cancelled` dengan `cancelled_at`, `cancelled_by`, `cancel_reason`, dan `cancelled_after_done = true`. Hasil aktual dan tanggal selesai lama dipertahankan untuk riwayat. Daftar menampilkan "Batal, sesudah selesai"; detail menampilkan tanggal batal, alasan, dan jumlah yang dikurangi.
+- **Syarat (semua dicek di server; gagal = tidak ada yang berubah)**:
+  - Status harus Selesai. Produksi yang sudah batal tidak bisa dibatalkan lagi.
+  - **Hasilnya belum keluar**: tidak boleh ada mutasi pengurang pada produk itu sesudah produksi (penjualan, transfer keluar, opname turun, dan sebagainya), dan stok sekarang harus cukup untuk dikurangi. Bila sudah ada yang keluar, pembatalan ditolak dan diarahkan ke Stok, Penyesuaian. Pembatalan produksi lain tidak dianggap "keluar", jadi produksi lama boleh dibatalkan setelah produksi yang lebih baru dibatalkan.
+  - Tanggal selesainya tidak berada di periode yang sudah dikunci.
+  - Produksi harus punya catatan ledger. Produksi hasil impor lama tanpa ledger tidak bisa dibalik otomatis (koreksi lewat opname).
+- **Anti-ganda**: `request_id` opsional. Kirim ulang dengan isi sama mengembalikan hasil pertama (`duplicate: true`); isi berbeda dengan `request_id` sama ditolak (23505). Klien memakai `request_id` yang sama selama id dan alasan tidak berubah.
+- `production_list` menambah `batal_setelah_selesai`, `alasan_batal`, dan `tanggal_batal` (hanya tambahan).
+
+## Hal yang perlu diketahui
+- Karena pembatalan ditolak bila ada pengurang apa pun sesudah produksi itu, opname turun pada produk yang sama juga memblokirnya, bukan hanya penjualan.
+- Salah hitung hanya di jumlah hasil (mis. 90, bukan 100) tidak perlu dibatalkan: cukup koreksi stok produk jadi lewat Stok, Penyesuaian.
+- Setelah dibatalkan, catat ulang produksi yang benar lewat "Catat produksi selesai".
+
+## Rollback
+Migrasi forward-only dan hanya menambah (4 kolom di `production_orders`, fungsi baru, dan `production_list` dengan kolom tambahan). Klien 2.7.x tetap berjalan di atas skema 0044. `MIN_SCHEMA` tidak dinaikkan: klien 2.8.0 yang dipakai sebelum migrasi 0044 terpasang hanya gagal pada tombol ini, dengan pesan "butuh migrasi 0044". Pasang migrasi dulu, baru unggah klien.

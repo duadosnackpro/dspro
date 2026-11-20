@@ -24,7 +24,8 @@ function boot(role) {
     emptyState: (i, t, d, a) => '<empty>' + t + '|' + d + (a || '') + '</empty>', idDate: d => d, idRange: () => '', today: () => '2026-11-05', addDays: (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + k); return x.toISOString().slice(0, 10); },
     vById: id => S.data.variants.find(v => v.id === id) && Object.assign({stok: 0, hpp_rata2: 0}, S.data.variants.find(v => v.id === id)), vName: v => v.id === 'v1' ? 'Basreng' : 'Keripik', vSub: () => '100g',
     can: cap => ({stockedit: ['owner', 'admin', 'supervisor', 'stok'], approve: ['owner', 'admin', 'supervisor'], produce: ['owner', 'admin', 'supervisor', 'produksi']}[cap] || []).indexOf(role) >= 0,
-    own: () => role === 'owner', loadData: async () => {}, start() {}, pbPrefill: (items, back) => calls.push({op: 'pbPrefill', items: items, back: back})};
+    promptBox: async o => { calls.push({op: 'promptBox', o: o}); return A.nextWhy === undefined ? 'salah input hasil' : A.nextWhy; },
+    own: () => role === 'owner', loadData: async () => { calls.push({op: 'loadData'}); }, start() {}, pbPrefill: (items, back) => calls.push({op: 'pbPrefill', items: items, back: back})};
   const win = {APP: A, crypto: require('crypto').webcrypto};
   const doc = {addEventListener: (t, f) => { listeners[t] = f; }, querySelectorAll: () => []};
   vm.runInNewContext(src, {window: win, document: doc, console: console, crypto: require('crypto').webcrypto, confirm: () => true, Date: Date, Math: Math, JSON: JSON, Object: Object, Promise: Promise, String: String, Number: Number, Array: Array, setTimeout: setTimeout});
@@ -119,6 +120,52 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   // jawaban filter lama yang datang terlambat tidak boleh menimpa
   m = boot('owner'); let late = null; m.A.vload = (op, body, paint) => { if (!body.from) late = () => paint([plan({id: 'LAMA'})], false); else paint([plan({id: 'BARU'})], false); };
   m.views.produksi(); m.listeners.change({target: {dataset: {chg: 'pfrom'}, value: '2026-11-01'}}); late(); ok(/BARU/.test(m.els['#plist'].innerHTML) && !/LAMA/.test(m.els['#plist'].innerHTML), 'jawaban basi untuk filter lama diabaikan');
+
+  // ===== Batalkan produksi yang sudah selesai (production.void, migrasi 0044) =====
+  const voided = o => done(Object.assign({status: 'batal', batal_setelah_selesai: true, alasan_batal: 'salah input hasil', tanggal_batal: '2026-11-06 09:15:00', hpp_per_unit: null, total: null}, o));
+  for (const rl of ['owner', 'admin', 'supervisor']) { m = boot(rl); m.respond.list = () => [done()]; m.views.produksi(); m.ACT.pdetail({dataset: {id: 'po2'}});
+    ok(/data-act="pvoid"/.test(m.els.__sheet) && /Batalkan produksi \(salah input\)/.test(m.els.__sheet), 'detail selesai: ' + rl + ' melihat tombol Batalkan produksi'); }
+  m = boot('produksi'); m.respond.list = () => [done()]; m.views.produksi(); m.ACT.pdetail({dataset: {id: 'po2'}});
+  ok(!/data-act="pvoid"/.test(m.els.__sheet) && /Minta Owner, Admin, atau Supervisor/.test(m.els.__sheet), 'detail selesai: peran produksi tanpa tombol, hanya petunjuk minta atasan');
+  m = boot('stok'); m.respond.list = () => [done()]; m.views.produksi(); m.ACT.pdetail({dataset: {id: 'po2'}});
+  ok(!/data-act="pvoid"/.test(m.els.__sheet) && !/Minta Owner/.test(m.els.__sheet), 'detail selesai: peran stok tanpa tombol dan tanpa petunjuk');
+  m = boot('owner'); m.respond.list = () => [plan()]; m.views.produksi(); m.ACT.pdetail({dataset: {id: 'po1'}}); ok(!/data-act="pvoid"/.test(m.els.__sheet), 'detail rencana: tidak ada tombol Batalkan produksi (hanya Batalkan rencana)');
+  m = boot('owner'); m.respond.list = () => [voided(), plan({id: 'po3', status: 'batal'})]; m.views.produksi();
+  ok(/sesudah selesai/.test(m.els['#plist'].innerHTML) && (m.els['#plist'].innerHTML.match(/sesudah selesai/g) || []).length === 1, 'daftar: hanya yang dibatalkan setelah selesai diberi keterangan');
+  m.ACT.pdetail({dataset: {id: 'po2'}});
+  ok(/dibatalkan setelah selesai \(2026-11-06 09:15\)/.test(m.els.__sheet) && /Alasan: salah input hasil/.test(m.els.__sheet) && /dikurangi 19 unit/.test(m.els.__sheet) && !/data-act="pvoid"/.test(m.els.__sheet), 'detail batal setelah selesai: tanggal, alasan, tanpa tombol');
+  m.ACT.pdetail({dataset: {id: 'po3'}}); ok(/Produksi ini dibatalkan\./.test(m.els.__sheet) && !/Alasan:/.test(m.els.__sheet), 'detail rencana batal: teks lama');
+
+  // alur sukses: alasan dari dialog, request_id, stok klien diperbarui, daftar dimuat ulang
+  m = boot('supervisor'); m.respond.list = () => [done()]; m.views.produksi(); m.ACT.pdetail({dataset: {id: 'po2'}});
+  m.respond['production.void'] = b => ({id: b.id, status: 'cancelled', qty_dikurangi: 19, materials: [{id: 'm1', nama: 'Tepung', qty: 4, stok: 7}], variant: {id: 'v1', stok: 0, hpp_rata2: 1000}});
+  m.calls.length = 0; await m.ACT.pvoid({dataset: {id: 'po2'}}); await tick();
+  const pd = m.calls.find(c => c.op === 'promptBox'), pv = m.calls.find(c => c.op === 'production.void');
+  ok(pd && /19 unit/.test(pd.o.msg) && /Stok, Penyesuaian/.test(pd.o.msg) && pd.o.leave === 'Batalkan produksi', 'dialog: menyebut 19 unit dikurangi dan arahan opname');
+  ok(pv && pv.body.id === 'po2' && pv.body.alasan === 'salah input hasil' && typeof pv.body.request_id === 'string' && pv.body.request_id.length >= 8, 'kirim production.void dengan id, alasan, request_id');
+  ok(m.S.data.materials[0].stok === 7 && !m.calls.some(c => c.op === 'loadData'), 'stok bahan di klien diperbarui dari hasil server (tanpa muat ulang penuh)');
+  ok(m.els.__sheet === '' && /Produksi dibatalkan\. Bahan kembali ke stok, stok produk dikurangi 19 unit/.test(m.toasts.pop()), 'lembar ditutup, pesan sukses');
+  ok(m.calls.some(c => c.op === 'vload:production.list' && c.opt && c.opt.force), 'daftar produksi dimuat ulang paksa');
+
+  // batal di dialog: tidak ada permintaan
+  m = boot('owner'); m.respond.list = () => [done()]; m.views.produksi(); m.A.nextWhy = null; m.calls.length = 0; await m.ACT.pvoid({dataset: {id: 'po2'}}); await tick();
+  ok(!m.calls.some(c => c.op === 'production.void'), 'dialog dibatalkan: tidak ada permintaan ke server');
+  const np = m.calls.filter(c => c.op === 'promptBox').length; m.A.nextWhy = 'x harus tidak terkirim'; await m.ACT.pvoid({dataset: {id: 'tidak-ada'}}); await tick();
+  ok(m.calls.filter(c => c.op === 'promptBox').length === np && !m.calls.some(c => c.op === 'production.void'), 'id tidak dikenal: tidak ada dialog dan tidak ada permintaan');
+
+  // galat server (hasil sudah keluar): pesan tampil, lembar tetap, kirim ulang alasan sama memakai request_id sama, alasan baru => request_id baru
+  m = boot('owner'); m.respond.list = () => [done()]; m.views.produksi(); m.ACT.pdetail({dataset: {id: 'po2'}});
+  m.respond['production.void'] = () => { throw new Error('Produksi tidak dapat dibatalkan: hasilnya (Basreng 100g) sudah ada yang keluar (stok kini 3, hasil produksi 19). Koreksi lewat Stok, Penyesuaian.'); };
+  m.calls.length = 0; await m.ACT.pvoid({dataset: {id: 'po2'}}); await tick();
+  ok(/sudah ada yang keluar/.test(m.toasts.pop()) && /data-act="pvoid"/.test(m.els.__sheet), 'galat server: pesan tampil dan lembar tetap terbuka');
+  await m.ACT.pvoid({dataset: {id: 'po2'}}); await tick(); m.A.nextWhy = 'alasan lain'; await m.ACT.pvoid({dataset: {id: 'po2'}}); await tick();
+  const vs = m.calls.filter(c => c.op === 'production.void');
+  ok(vs.length === 3 && vs[0].body.request_id === vs[1].body.request_id && vs[2].body.request_id !== vs[1].body.request_id && vs[2].body.alasan === 'alasan lain', 'kirim ulang dengan alasan sama => request_id sama; alasan berubah => request_id baru');
+
+  // kirim ulang yang sudah berhasil di server: duplicate => muat ulang data, pesan sesuai
+  m = boot('owner'); m.respond.list = () => [done()]; m.views.produksi(); m.respond['production.void'] = b => ({id: b.id, status: 'cancelled', duplicate: true}); m.calls.length = 0;
+  await m.ACT.pvoid({dataset: {id: 'po2'}}); await tick();
+  ok(/sudah dibatalkan sebelumnya/.test(m.toasts.pop()) && m.calls.some(c => c.op === 'loadData'), 'duplicate: pesan "sudah dibatalkan sebelumnya" dan data dimuat ulang');
 
   console.log('Semua lulus (' + n + ' pemeriksaan)');
 })().catch(e => { console.error(e); process.exit(1); });

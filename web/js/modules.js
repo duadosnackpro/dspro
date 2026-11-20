@@ -1,7 +1,7 @@
 /* Modul Owner: Beranda (dashboard), Produksi + Resep (HPP produksi), Laporan, Impor Shopee. Memakai API di app.js lewat window.APP. */
 (function () {
 'use strict';
-const A = window.APP, S = A.S, $ = A.$, api = A.api, rp = A.rp, num = A.num, esc = A.esc, LS = A.LS, sheet = A.sheet, closeSheet = A.closeSheet, toast = A.toast, busy = A.busy, skel = A.skel, ACT = A.ACT, confirmBox = A.confirmBox, fieldErr = A.fieldErr;
+const A = window.APP, S = A.S, $ = A.$, api = A.api, rp = A.rp, num = A.num, esc = A.esc, LS = A.LS, sheet = A.sheet, closeSheet = A.closeSheet, toast = A.toast, busy = A.busy, skel = A.skel, ACT = A.ACT, confirmBox = A.confirmBox, promptBox = A.promptBox, fieldErr = A.fieldErr;
 const set = k => S.data.settings[k];
 const newRid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2);   // request_id produksi: sama selama isian tidak berubah (kirim ulang aman), baru bila isian berubah
 const mById = id => S.data.materials.find(m => m.id === id);
@@ -228,7 +228,7 @@ function drawProd() {
   el.innerHTML = S.prod.map(o => {
     const st = o.status, tag = st === 'selesai' ? '<span class="tag grn">Selesai</span>' : st === 'rencana' ? '<span class="tag">Rencana</span>' : '<span class="tag red">Batal</span>';
     return '<button class="li-flat li" data-act="pdetail" data-id="' + esc(o.id) + '"><div><b>' + esc(vLabel(o.variant_id)) + '</b><div class="muted">' + esc(JN[o.jenis] || o.jenis) + ' · ' + num(o.jumlah_batch) + ' batch · ' + (st === 'selesai' && o.tanggal_selesai ? 'selesai ' + esc(String(o.tanggal_selesai).slice(0, 10)) : esc(String(o.tanggal).slice(0, 10))) + '</div></div><div class="r">' + tag +
-      (st === 'selesai' ? '<div class="muted">' + num(o.qty_hasil) + ' pcs · HPP ' + rp(o.hpp_per_unit) + '</div>' : '') + '</div></button>';
+      (st === 'selesai' ? '<div class="muted">' + num(o.qty_hasil) + ' pcs · HPP ' + rp(o.hpp_per_unit) + '</div>' : st === 'batal' && o.batal_setelah_selesai ? '<div class="muted">sesudah selesai</div>' : '') + '</div></button>';
   }).join('') + (S.prod.length >= 200 ? '<p class="muted">Menampilkan 200 produksi terbaru. Persempit filter tanggal untuk melihat yang lain.</p>' : '') || (S.pfl && (S.pfl.from || S.pfl.to) ? emptyState('produksi', 'Tidak ada produksi', 'Tidak ada produksi pada rentang tanggal ini.', '<button class="btn sec" data-act="pfq" data-p="all">Tampilkan semua</button>') : S.data.recipes.length ? emptyState('produksi', 'Belum ada produksi', 'Catat produksi pertama untuk menambah stok produk jadi dan menghitung HPP otomatis.', '<button class="btn pri" data-act="prec">+ Catat produksi selesai</button>') : emptyState('produksi', 'Belum ada produksi', 'Buat resep dulu agar kebutuhan bahan dan HPP bisa dihitung otomatis.', '<button class="btn pri" data-act="redit" data-id="">Buat resep pertama</button>'));
 }
 function prodNew() {
@@ -249,9 +249,10 @@ function pv() {
 function prodDetail(id) {
   const o = S.prod.find(x => x.id === id); if (!o) return;
   let h = '<h2>' + esc(vLabel(o.variant_id)) + '</h2><p class="muted">' + esc(JN[o.jenis] || o.jenis) + ' · ' + num(o.jumlah_batch) + ' batch · dibuat ' + esc(String(o.tanggal).slice(0, 16)) + (o.status === 'selesai' && o.tanggal_selesai ? ' · selesai ' + esc(String(o.tanggal_selesai).slice(0, 16)) : '') + (o.catatan ? ' · ' + esc(o.catatan) : '') + '</p>';
-  if (o.status === 'selesai') h += '<div class="u-blk li">' + kv('Hasil standar', num(o.qty_standar)) + kv('Hasil aktual', num(o.qty_hasil)) + kv('Susut', num(o.qty_standar - o.qty_hasil)) + kv('Bahan baku', rp(o.bahan)) + kv('Kemasan', rp(o.kemasan)) + kv('Tenaga kerja', rp(o.tenaga_kerja)) + kv('Overhead', rp(o.overhead)) + kv('Total biaya', rp(o.total), 'big') + kv('HPP per unit', rp(o.hpp_per_unit), 'big') + '</div>';
+  if (o.status === 'selesai') h += '<div class="u-blk li">' + kv('Hasil standar', num(o.qty_standar)) + kv('Hasil aktual', num(o.qty_hasil)) + kv('Susut', num(o.qty_standar - o.qty_hasil)) + kv('Bahan baku', rp(o.bahan)) + kv('Kemasan', rp(o.kemasan)) + kv('Tenaga kerja', rp(o.tenaga_kerja)) + kv('Overhead', rp(o.overhead)) + kv('Total biaya', rp(o.total), 'big') + kv('HPP per unit', rp(o.hpp_per_unit), 'big') + '</div>' +
+    (A.can('approve') ? '<button class="btn dan" data-act="pvoid" data-id="' + esc(id) + '">Batalkan produksi (salah input)</button>' : A.can('produce') ? '<p class="muted">Salah input? Minta Owner, Admin, atau Supervisor membatalkan produksi ini.</p>' : '');
   else if (o.status === 'rencana') h += '<button class="btn pri" data-act="pdone" data-id="' + esc(id) + '">Selesaikan produksi</button><button class="btn sec" data-act="pedit" data-id="' + esc(id) + '">Ubah jumlah batch</button><button class="btn dan" data-act="pcancel" data-id="' + esc(id) + '">Batalkan rencana</button>';
-  else h += '<p class="muted">Produksi ini dibatalkan.</p>';
+  else h += o.batal_setelah_selesai ? '<p class="muted">Produksi ini dibatalkan setelah selesai' + (o.tanggal_batal ? ' (' + esc(String(o.tanggal_batal).slice(0, 16)) + ')' : '') + '. Bahan sudah dikembalikan dan stok produk jadi dikurangi ' + num(o.qty_hasil) + ' unit.</p>' + (o.alasan_batal ? '<p>Alasan: ' + esc(o.alasan_batal) + '</p>' : '') : '<p class="muted">Produksi ini dibatalkan.</p>';
   sheet(h + '<button class="btn sec" data-act="close">Tutup</button>');
 }
 function prodDone(id) {
@@ -334,6 +335,7 @@ function rpv() {
   if (btn) btn.disabled = k.short.length > 0;
 }
 /* Perbarui stok lokal dari hasil server. Hasil kirim-ulang (duplicate) berisi angka saat transaksi pertama dan bisa basi, jadi data dimuat ulang. */
+let pvState = null;   // {id, why, rid}: request_id pembatalan produksi selesai, tetap sama selama id dan alasan tidak berubah
 async function prodApply(r) {
   if (r.duplicate) return A.loadData();
   r.materials.forEach(u => { const m = mById(u.id); if (m) m.stok = u.stok; });
@@ -642,6 +644,16 @@ Object.assign(ACT, {
   psave: () => !S.pform.recipe ? toast('Pilih resep dulu') : busy('Menyimpan rencana…', async () => { try { await api('production.create', {request_id: S.pform.rid || (S.pform.rid = newRid()), recipe_id: S.pform.recipe, jumlah_batch: N(S.pform.batch), jenis: S.pform.jenis, catatan: S.pform.catatan}); recRemember(S.pform); S.pform.rid = ''; closeSheet(); toast('Rencana produksi tersimpan'); vProduksi(true); } catch (e) { toast(e.message); } }),
   pdetail: el => prodDetail(el.dataset.id), pdone: el => prodDone(el.dataset.id),
   pcancel: async el => { if (!await confirmBox({title: 'Batalkan rencana produksi ini?', msg: 'Rencana ini tidak akan diproduksi.', stay: 'Kembali', leave: 'Batalkan rencana'})) return; return busy('Membatalkan…', async () => { try { await api('production.cancel', {id: el.dataset.id}); closeSheet(); vProduksi(true); } catch (e) { toast(e.message); } }); },
+  pvoid: async el => {   // migrasi 0044: batalkan produksi yang sudah selesai (Owner/Admin/Supervisor); alasan wajib, server menolak bila hasilnya sudah keluar
+    const id = el.dataset.id, o = S.prod.find(x => x.id === id); if (!o || o.status !== 'selesai') return;
+    const why = await promptBox({title: 'Batalkan produksi yang sudah selesai?', msg: 'Bahan dikembalikan ke stok dan stok produk jadi dikurangi ' + num(o.qty_hasil) + ' unit. Ditolak bila hasilnya sudah ada yang terjual atau keluar; koreksi lewat Stok, Penyesuaian. Alasan dicatat di audit.', label: 'Alasan (min. 3 huruf)', err: 'Alasan wajib diisi (minimal 3 huruf).', stay: 'Kembali', leave: 'Batalkan produksi'});
+    if (why === null) return;
+    if (!pvState || pvState.id !== id || pvState.why !== why) pvState = {id: id, why: why, rid: newRid()};   // kirim ulang (jaringan putus) memakai request_id yang sama
+    return busy('Membatalkan produksi…', async () => { try {
+      const r = await api('production.void', {request_id: pvState.rid, id: id, alasan: why}); await prodApply(r); pvState = null; closeSheet();
+      toast(r.duplicate ? 'Produksi ini sudah dibatalkan sebelumnya' : 'Produksi dibatalkan. Bahan kembali ke stok, stok produk dikurangi ' + num(r.qty_dikurangi) + ' unit'); vProduksi(true);
+    } catch (e) { toast(e.message); } });
+  },
   pdosave: () => busy('Menyelesaikan produksi…', () => prodRun('production.complete', {request_id: S.pd.rid, id: S.pd.id, qty_hasil: N(S.pd.qty), tenaga_kerja: S.pd.tk === '' ? '' : N(S.pd.tk), overhead: S.pd.oh === '' ? '' : N(S.pd.oh)}, closeSheet)),
   prec: () => { precState(); S.rsq = ''; recNew(); },
   prjenis: el => { precState().jenis = el.dataset.j; S.rsq = ''; recNew(); },

@@ -314,6 +314,10 @@ async function call(action, p, token, tokCb) {
     case 'production.update': return rpc('production_update', p, token);   // 0036: ubah jumlah batch rencana (request_id dikirim klien)
     case 'production.complete': return rpc('production_complete', p, token);
     case 'production.cancel': return rpc('production_cancel', p, token);
+    case 'production.void': {   // 0044: batalkan produksi yang SUDAH selesai (bahan kembali, stok produk dikurangi); request_id anti-ganda
+      try { return await rpc('production_void', Object.assign({request_id: uuid()}, p), token); }
+      catch (e) { if (e.code === 'PGRST202' || /rpc_production_void/.test(e.message || '')) throw fail('Pembatalan produksi butuh migrasi 0044 di database. Hubungi admin untuk memasangnya dulu.', {schema: true}); throw e; }
+    }
     case 'production.list': return rpc('production_list', withOutlet(p), token);
     case 'dashboard.get': return rpc('dashboard', withOutlet(p), token);
     case 'report.get': return (p.type === 'konsolidasi' || p.type === 'konsolidasi_stok') ? rpc('report_konsolidasi', {type: p.type, from: p.from, to: p.to}, token)   // F-07: semua outlet

@@ -29,3 +29,4 @@ psql -f tests/017_ops_sync.test.sql
 psql -f tests/018_dashboard_tahap2.test.sql
 psql -f tests/019_riwayat_cari.test.sql
 psql -f tests/020_review_list.test.sql
+psql -f tests/021_production_void.test.sql

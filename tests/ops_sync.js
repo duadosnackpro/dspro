@@ -84,7 +84,7 @@ const nCalls = (m, a) => m.sv.calls.filter(c => c === a).length;
   await m.ev("api('sales.list', {})"); await m.ev("api('sale.create', {})"); await m.ev("api('report.get', {})"); await m.ev("api('shift.list', {})"); await m.ev("api('master.list', {})");
   ok(opsT(m) === 0, 'aksi baca dan penjualan biasa tidak menjadwalkan penyelarasan (kasir ramai tidak membebani)');
   const writes = ['sale.return', 'recipe.save', 'recipe.copy', 'master.save', 'master.remove', 'stock.adjust', 'purchase.create', 'purchase.cancel', 'production.create',
-    'production.record', 'production.update', 'production.complete', 'production.cancel', 'transfer.create', 'transfer.action', 'expense.void', 'cash.move', 'shift.close', 'shift.reopen', 'shift.approve', 'data.reset', 'sale.review'];
+    'production.record', 'production.update', 'production.complete', 'production.cancel', 'production.void', 'transfer.create', 'transfer.action', 'expense.void', 'cash.move', 'shift.close', 'shift.reopen', 'shift.approve', 'data.reset', 'sale.review'];
   for (const a of writes) { m = make(); await m.ev('loadData()'); await m.ev("api('" + a + "', {})"); ok(opsT(m) === 1, a + ' menjadwalkan penyelarasan'); }
   m = make(); await m.ev('loadData()'); await m.ev("api('recipe.save', {})"); await m.ev("api('stock.adjust', {})"); await m.ev("api('purchase.create', {})");
   ok(opsT(m) === 1, 'beberapa tulisan beruntun digabung menjadi satu penyelarasan');

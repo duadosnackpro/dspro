@@ -340,7 +340,7 @@ async function api(action, payload, opt) {
 /* v2.6.9 (migrasi 0040): aksi tulis yang mengubah data operasional (resep, bahan, pembelian, produksi, retur, biaya, transfer, sesi kas). Server menaikkan ops_ver
    untuk semuanya; perangkat lain mengetahuinya lewat sinyal Realtime/polling. Perangkat yang menulis menyelaraskan dirinya sendiri di sini, diam-diam
    (tanpa toast "Data terbaru dimuat"), sehingga cache layar dan Riwayat tidak memakai data sebelum perubahan. */
-const OPS_W = /^(sale\.(return|review)|recipe\.(save|copy)|master\.(save|remove)|stock\.adjust|purchase\.(create|cancel)|production\.(create|record|update|complete|cancel)|transfer\.(create|action)|expense\.void|cash\.move|shift\.(close|reopen|approve)|data\.reset)$/;
+const OPS_W = /^(sale\.(return|review)|recipe\.(save|copy)|master\.(save|remove)|stock\.adjust|purchase\.(create|cancel)|production\.(create|record|update|complete|cancel|void)|transfer\.(create|action)|expense\.void|cash\.move|shift\.(close|reopen|approve)|data\.reset)$/;
 let opsT = null, lastOwnWrite = 0;
 function opsSoon() {
   lastOwnWrite = Date.now(); clearTimeout(opsT);

@@ -81,6 +81,7 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
     if (/rpc_report_legacy/.test(url)) return {status: 200, body: {type: body.p.type, title: 'T', columns: [], fmt: [], rows: [], summary: []}};
     if (/rpc_production_list/.test(url)) return {status: 200, body: []};
     if (/rpc_production_update/.test(url)) return {status: 200, body: {id: body.p.id, status: 'planned', jumlah_batch: body.p.jumlah_batch, qty_standar: 30}};
+    if (/rpc_production_void/.test(url)) return {status: 200, body: {id: body.p.id, status: 'cancelled', qty_dikurangi: 19, materials: [], variant: {id: 'v1', stok: 0, hpp_rata2: 1000}}};
     if (/rpc_production_record/.test(url)) return {status: 200, body: {id: 'po-1', status: 'done', costs: {hpp_per_unit: 1000}, materials: [], variant: {id: 'v1', stok: 10, hpp_rata2: 1000}}};
     if (/rpc_sale_backdate/.test(url)) return {status: 200, body: {sale: {id: 's-1', nomor: 'T1-261031-001', tanggal: body.p.tanggal, total: 24000, metode: body.p.metode_bayar}, stok: {}, potong_stok: body.p.potong_stok}};
     if (/rpc_recipe_save/.test(url)) return {status: 200, body: {recipe: {id: 'r-1', nama: 'Resep A'}}};
@@ -114,6 +115,12 @@ const boot = role => ({user: {uid: 'u1', nama: 'Tia', username: 'tia'}, outlets:
   ok(rt.production_list.from === '2026-11-01' && rt.production_list.to === '2026-11-05' && rt.production_list.outlet_id === 'o1', '0036: production.list meneruskan filter from/to + outlet aktif');
   const pu = await q.S.call('production.update', {id: 'po-9', jumlah_batch: 3, catatan: 'x', request_id: 'upd-fixed-0001'}, good);
   ok(pu.jumlah_batch === 3 && rt.production_update.id === 'po-9' && rt.production_update.jumlah_batch === 3 && rt.production_update.request_id === 'upd-fixed-0001' && rt.production_update.catatan === 'x', '0036: production.update => rpc_production_update dengan request_id klien');
+  const pv = await q.S.call('production.void', {id: 'po-9', alasan: 'salah input', request_id: 'void-fixed-0001'}, good);
+  ok(pv && rt.production_void.id === 'po-9' && rt.production_void.alasan === 'salah input' && rt.production_void.request_id === 'void-fixed-0001', '0044: production.void => rpc_production_void dengan request_id klien');
+  await q.S.call('production.void', {id: 'po-9', alasan: 'salah input'}, good);
+  ok(typeof rt.production_void.request_id === 'string' && rt.production_void.request_id.length >= 8, '0044: production.void tanpa request_id diberi request_id otomatis');
+  const mv = load((url) => /rpc_schema_version/.test(url) ? {status: 200, body: {version: '20261107000042', min_client: '2.3.0'}} : /rpc_production_void/.test(url) ? {status: 404, body: {code: 'PGRST202', message: 'Could not find the function public.rpc_production_void(p) in the schema cache'}} : {status: 404, body: {message: 'x'}}, {VERSION: '2.3.1'});
+  try { await mv.S.call('production.void', {id: 'po-9', alasan: 'salah input'}, good); ok(false, 'migrasi 0044 belum terpasang harus ditolak'); } catch (e) { ok(e.schema && /migrasi 0044/.test(e.message), '0044: fungsi belum ada => pesan "butuh migrasi 0044", bukan galat mentah: ' + e.message); }
   const bd = await q.S.call('sale.backdate', {tanggal: '2026-10-31 14:05:00', channel_id: 'c1', metode_bayar: 'qris', potong_stok: false, items: [{variant_id: 'v1', qty: 2, harga: 12000}], request_id: 'bd-fixed-0001'}, good);
   ok(bd.sale.nomor === 'T1-261031-001' && rt.sale_backdate.request_id === 'bd-fixed-0001' && rt.sale_backdate.outlet_id === 'o1' && rt.sale_backdate.tanggal === '2026-10-31 14:05:00' && rt.sale_backdate.potong_stok === false && rt.sale_backdate.metode_bayar === 'qris', '0038: sale.backdate => rpc_sale_backdate dengan request_id klien + outlet aktif');
   const prr = await q.S.call('production.record', {recipe_id: 'r-1', jumlah_batch: 2, qty_hasil: 19, request_id: 'rec-fixed-0001'}, good);
